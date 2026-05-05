@@ -165,35 +165,37 @@ async function importStages(
   importerUserId: string,
   _filename: string,
 ): Promise<ImportResult> {
-  // Buscar el match existente. El nombre del archivo de stage incluye
-  // " - Stage N" en el heading, pero el name del ParsedMatch ya viene
-  // limpio (sin esa parte) gracias al parser.
-  const matchName = stripStageSuffix(parsed.name);
+  // Resolver el match al que pertenece este stage:
+  // 1) Limpiamos sufijos conocidos del título del stage ("Stage N",
+  //    "Ejercicio N", "Etapa N", etc.) y buscamos por nombre exacto.
+  // 2) Fallback: buscamos matches del mismo día/disciplina cuyo nombre
+  //    sea prefijo del título del stage (cubre cualquier sufijo desconocido
+  //    que no esté en stripStageSuffix).
+  const matchRow = await resolveMatchForStage(supabase, parsed, disciplineId);
 
-  const { data: matchRow, error: matchErr } = await supabase
-    .from("matches")
-    .select("id, imported_by_user_id")
-    .eq("discipline_id", disciplineId)
-    .eq("name", matchName)
-    .eq("date", parsed.date)
-    .maybeSingle();
-
-  if (matchErr) {
-    throw new ImportError(matchErr.message, "MATCH_LOOKUP_FAILED");
-  }
   if (!matchRow) {
+    const candidatesText = await listSameDayMatchNames(
+      supabase,
+      disciplineId,
+      parsed.date,
+    );
+    const detail = candidatesText
+      ? ` Matches existentes del ${parsed.date}: ${candidatesText}.`
+      : ` No hay matches importados con fecha ${parsed.date} todavía.`;
     throw new ImportError(
-      `Primero hay que importar el archivo de "Match Results" (${matchName} - ${parsed.date}).`,
+      `No se pudo asociar el stage a un match existente.${detail} Importá primero el archivo de "Match Results" del torneo.`,
       "MATCH_NOT_FOUND",
     );
   }
+
   if (matchRow.imported_by_user_id !== importerUserId) {
     throw new ImportError(
       "Solo el usuario que importó el match original puede agregarle stages.",
       "NOT_MATCH_OWNER",
     );
   }
-  const matchId = matchRow.id as string;
+  const matchId = matchRow.id;
+  const matchName = matchRow.name;
 
   let totalStages = 0;
   let totalResults = 0;
@@ -361,7 +363,111 @@ function mapStageResultToRow(
   };
 }
 
-function stripStageSuffix(name: string): string {
-  // "TP ESCOPETA 20/02/26 TFALP - Stage 1" -> "TP ESCOPETA 20/02/26 TFALP"
-  return name.replace(/\s*-\s*Stage\s+\d+\s*$/i, "").trim();
+/**
+ * Quita sufijos conocidos del título de un stage para recuperar el nombre del match.
+ * Cubre variantes en inglés y español frecuentes en PractiScore:
+ *   "Stage N", "Ejercicio N", "Etapa N", "Stand N", "Match N",
+ *   con o sin punto en la abreviatura (Ej., St.).
+ *
+ * Ej:
+ *   "TP ESCOPETA 20/02/26 TFALP - Stage 1" -> "TP ESCOPETA 20/02/26 TFALP"
+ *   "2° RanKing Social - Ejercicio 6"      -> "2° RanKing Social"
+ */
+export function stripStageSuffix(name: string): string {
+  return name
+    .replace(
+      /\s*[-–—]\s*(Stage|Ejercicio|Ej\.?|Stand|St\.?|Etapa|Match)\s+\d+(?:\s*\([^)]*\))?\s*$/i,
+      "",
+    )
+    .trim();
+}
+
+interface MatchLookupRow {
+  id: string;
+  name: string;
+  imported_by_user_id: string;
+}
+
+/**
+ * Resuelve el match al que pertenece un archivo de stage.
+ * Prioriza match exacto por (name limpio, date); si falla, busca por
+ * prefijo entre los matches del mismo día y disciplina.
+ *
+ * Exportada para testing del algoritmo de prefijo.
+ */
+async function resolveMatchForStage(
+  supabase: SupabaseClient,
+  parsed: ParsedMatch,
+  disciplineId: number,
+): Promise<MatchLookupRow | null> {
+  const cleanName = stripStageSuffix(parsed.name);
+
+  // 1) Match exacto.
+  const { data: exact } = await supabase
+    .from("matches")
+    .select("id, name, imported_by_user_id")
+    .eq("discipline_id", disciplineId)
+    .eq("name", cleanName)
+    .eq("date", parsed.date)
+    .maybeSingle();
+  if (exact) return exact as MatchLookupRow;
+
+  // 2) Fallback: matches del mismo día y disciplina, buscamos prefijo.
+  const { data: sameDay } = await supabase
+    .from("matches")
+    .select("id, name, imported_by_user_id")
+    .eq("discipline_id", disciplineId)
+    .eq("date", parsed.date);
+
+  return findBestPrefixMatch(parsed.name, (sameDay ?? []) as MatchLookupRow[]);
+}
+
+/**
+ * Devuelve el match cuyo nombre normalizado es prefijo del título del stage,
+ * priorizando el más largo (más específico). Exportada para testing.
+ */
+export function findBestPrefixMatch<T extends { name: string }>(
+  stageTitle: string,
+  candidates: T[],
+): T | null {
+  const norm = (s: string) =>
+    s
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/gu, "")
+      .toLowerCase()
+      .trim();
+
+  const target = norm(stageTitle);
+  let best: T | null = null;
+
+  for (const c of candidates) {
+    const cn = norm(c.name);
+    if (cn.length === 0) continue;
+    const isPrefix =
+      target === cn ||
+      target.startsWith(cn + " ") ||
+      target.startsWith(cn + "-") ||
+      target.startsWith(cn + " -") ||
+      target.startsWith(cn + " –") || // en-dash
+      target.startsWith(cn + " —"); // em-dash
+    if (isPrefix && (!best || c.name.length > best.name.length)) {
+      best = c;
+    }
+  }
+
+  return best;
+}
+
+async function listSameDayMatchNames(
+  supabase: SupabaseClient,
+  disciplineId: number,
+  date: string,
+): Promise<string> {
+  const { data } = await supabase
+    .from("matches")
+    .select("name")
+    .eq("discipline_id", disciplineId)
+    .eq("date", date);
+  const names = (data ?? []).map((m: { name: string }) => `"${m.name}"`);
+  return names.join(", ");
 }
