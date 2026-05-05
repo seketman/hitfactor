@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HitFactor
 
-## Getting Started
+App para tiradores deportivos: importás los HTMLs de PractiScore (Tiro
+Práctico, y próximamente Steel Challenge / Tiro FBI) y seguís tu evolución
+match a match.
 
-First, run the development server:
+## Quickstart
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local           # completar con credenciales de Supabase
+# aplicar supabase/migrations/0001_initial_schema.sql en el SQL Editor
+npm run dev                          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Next.js 16 (App Router) · React 19 · TypeScript · Supabase (Postgres + Auth) ·
+Tailwind 4 · Vitest.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Comandos
 
-## Learn More
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Dev server |
+| `npm run build` | Build de producción |
+| `npm test` | Tests del parser e importer |
+| `npm run test:watch` | Tests en watch mode |
 
-To learn more about Next.js, take a look at the following resources:
+## Documentación
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Toda la documentación funcional vive en [`docs/`](./docs/README.md):
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [Setup local](./docs/development.md)
+- [Arquitectura](./docs/architecture.md)
+- [Modelo de datos](./docs/data-model.md)
+- [Parsers](./docs/parsers.md)
+- [Importación](./docs/importing.md)
+- [Deployment](./docs/deployment.md)
 
-## Deploy on Vercel
+## Estructura del proyecto
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+src/
+├── app/             # rutas (route groups: (auth) y (app))
+├── components/      # UI reutilizable
+├── lib/
+│   ├── db/          # capa de acceso a datos
+│   ├── import/      # lógica de importación
+│   ├── parsers/     # parsers de archivos externos
+│   ├── supabase/    # clientes
+│   └── types/       # tipos de dominio
+└── proxy.ts         # refresh de sesión por request
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+supabase/migrations/ # SQL del schema
+docs/                # documentación
+tests/               # vitest + fixtures reales de PractiScore
+```
