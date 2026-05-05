@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 interface AppHeaderProps {
   userName: string;
@@ -30,6 +31,7 @@ export function AppHeader({ userName }: AppHeaderProps) {
         </nav>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <span className="hidden text-sm text-fg-muted sm:inline">{userName}</span>
           <form action="/auth/signout" method="post">
             <Button type="submit" variant="ghost" size="sm">
