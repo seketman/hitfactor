@@ -43,7 +43,7 @@ export interface Match {
 }
 
 export interface MatchWithDiscipline extends Match {
-  disciplines: { code: string; name: string } | null;
+  disciplines: { code: string; name: string; scoring_type?: string } | null;
 }
 
 export interface Stage {
@@ -65,6 +65,7 @@ export interface MatchEntry {
   place: number;
   match_points: number;
   match_percentage: number;
+  total_time_seconds: number | null;
   is_dq: boolean;
 }
 
@@ -78,6 +79,7 @@ export interface MyEntryRow {
   place: number;
   match_points: number;
   match_percentage: number;
+  total_time_seconds: number | null;
   is_dq: boolean;
   power_factor: "Min" | "Maj" | null;
   category: string | null;
@@ -87,7 +89,7 @@ export interface MyEntryRow {
     name: string;
     date: string;
     region: string | null;
-    disciplines: { code: string; name: string } | null;
+    disciplines: { code: string; name: string; scoring_type?: string } | null;
   } | null;
 }
 
@@ -117,6 +119,7 @@ export interface MyMatchSummary {
     place: number;
     match_points: number;
     match_percentage: number;
+    total_time_seconds: number | null;
     is_dq: boolean;
     power_factor: "Min" | "Maj" | null;
     category: string | null;

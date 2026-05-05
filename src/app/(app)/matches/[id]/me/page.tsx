@@ -8,6 +8,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { createClient } from "@/lib/supabase/server";
 import { getMyShooter } from "@/lib/db/shooters";
 import { getMyMatchSummary } from "@/lib/db/matches";
+import type { MyMatchSummary } from "@/lib/db/types";
 import { getClubCode, getClubName } from "@/lib/clubs";
 import { formatDate, formatNumber, formatPercent } from "@/lib/utils";
 
@@ -53,6 +54,10 @@ export default async function PersonalMatchPage({ params }: PageProps) {
   const { match, entry, stageResults } = summary;
   const clubCode = getClubCode(match.region);
   const clubName = getClubName(match.region);
+  const isTimeBased =
+    match.disciplines?.scoring_type === "time_plus" ||
+    match.disciplines?.code === "steel_challenge" ||
+    match.disciplines?.code === "combat_solutions";
 
   return (
     <PageContainer>
@@ -80,32 +85,11 @@ export default async function PersonalMatchPage({ params }: PageProps) {
         </Link>
       </header>
 
-      <Card className="mb-8">
-        <div className="grid grid-cols-2 gap-6 p-5 sm:grid-cols-5">
-          <Stat label="División">
-            {entry.divisions ? (
-              <span title={entry.divisions.name}>
-                {entry.divisions.code}
-                <span className="ml-2 text-xs font-normal text-fg-muted">
-                  {entry.divisions.name}
-                </span>
-              </span>
-            ) : (
-              "—"
-            )}
-          </Stat>
-          <Stat label="Factor">
-            {entry.power_factor ? POWER_FACTOR_LABELS[entry.power_factor] : "—"}
-          </Stat>
-          <Stat label="Categoría">{entry.category ?? "General"}</Stat>
-          <Stat label="Puesto">
-            {entry.is_dq ? <Badge tone="danger">DQ</Badge> : entry.place}
-          </Stat>
-          <Stat label="Match %" mono>
-            {entry.is_dq ? "—" : formatPercent(entry.match_percentage)}
-          </Stat>
-        </div>
-      </Card>
+      {isTimeBased ? (
+        <SteelSummaryCard entry={entry} />
+      ) : (
+        <IpscSummaryCard entry={entry} />
+      )}
 
       <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
@@ -122,69 +106,185 @@ export default async function PersonalMatchPage({ params }: PageProps) {
               import para verlos acá.
             </p>
           </Card>
+        ) : isTimeBased ? (
+          <SteelStagesTable stageResults={stageResults} />
         ) : (
-          <Card className="overflow-hidden">
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Stage</TH>
-                  <TH className="text-right">Puesto</TH>
-                  <TH className="text-right">Tiempo</TH>
-                  <TH className="text-right">Points</TH>
-                  <TH className="text-right">Pen.</TH>
-                  <TH className="text-right">Hit Factor</TH>
-                  <TH className="text-right">Stage Pts</TH>
-                  <TH className="text-right">Stage %</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {stageResults.map((r) => (
-                  <TR key={r.id}>
-                    <TD>
-                      <span className="font-medium">
-                        {r.stages?.stage_number != null
-                          ? `Stage ${r.stages.stage_number}`
-                          : r.stages?.name ?? "—"}
-                      </span>
-                    </TD>
-                    <TD className="text-right font-mono">
-                      {r.is_dq ? <Badge tone="danger">DQ</Badge> : r.place ?? "—"}
-                    </TD>
-                    <TD className="text-right font-mono text-fg-muted">
-                      {r.time_seconds != null
-                        ? `${formatNumber(r.time_seconds, 2)}s`
-                        : "—"}
-                    </TD>
-                    <TD className="text-right font-mono text-fg-muted">
-                      {formatNumber(r.points, 0)}
-                    </TD>
-                    <TD className="text-right font-mono text-fg-muted">
-                      {r.penalties && Number(r.penalties) > 0 ? (
-                        <span className="text-danger">
-                          {formatNumber(r.penalties, 0)}
-                        </span>
-                      ) : (
-                        formatNumber(r.penalties, 0)
-                      )}
-                    </TD>
-                    <TD className="text-right font-mono">
-                      {formatNumber(r.hit_factor, 4)}
-                    </TD>
-                    <TD className="text-right font-mono">
-                      {formatNumber(r.stage_points, 2)}
-                    </TD>
-                    <TD className="text-right font-mono">
-                      {r.is_dq ? "—" : formatPercent(r.stage_percentage)}
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </Card>
+          <IpscStagesTable stageResults={stageResults} />
         )}
       </section>
     </PageContainer>
   );
+}
+
+// ----------------------------------------------------------------------------
+// Resumen y tablas: una variante por tipo de scoring
+// ----------------------------------------------------------------------------
+
+type EntrySummary = MyMatchSummary["entry"];
+
+function IpscSummaryCard({ entry }: { entry: EntrySummary }) {
+  return (
+    <Card className="mb-8">
+      <div className="grid grid-cols-2 gap-6 p-5 sm:grid-cols-5">
+        <Stat label="División">
+          {entry.divisions ? (
+            <span title={entry.divisions.name}>
+              {entry.divisions.code}
+              <span className="ml-2 text-xs font-normal text-fg-muted">
+                {entry.divisions.name}
+              </span>
+            </span>
+          ) : (
+            "—"
+          )}
+        </Stat>
+        <Stat label="Factor">
+          {entry.power_factor ? POWER_FACTOR_LABELS[entry.power_factor] : "—"}
+        </Stat>
+        <Stat label="Categoría">{entry.category ?? "General"}</Stat>
+        <Stat label="Puesto">
+          {entry.is_dq ? <Badge tone="danger">DQ</Badge> : entry.place}
+        </Stat>
+        <Stat label="Match %" mono>
+          {entry.is_dq ? "—" : formatPercent(entry.match_percentage)}
+        </Stat>
+      </div>
+    </Card>
+  );
+}
+
+function SteelSummaryCard({ entry }: { entry: EntrySummary }) {
+  return (
+    <Card className="mb-8">
+      <div className="grid grid-cols-2 gap-6 p-5 sm:grid-cols-5">
+        <Stat label="División">
+          {entry.divisions ? (
+            <span title={entry.divisions.name}>{entry.divisions.name}</span>
+          ) : (
+            "—"
+          )}
+        </Stat>
+        <Stat label="Categoría">{entry.category ?? "General"}</Stat>
+        <Stat label="Puesto">
+          {entry.is_dq ? <Badge tone="danger">DQ</Badge> : entry.place}
+        </Stat>
+        <Stat label="Tiempo total" mono>
+          {entry.is_dq || entry.total_time_seconds == null
+            ? "—"
+            : `${formatNumber(entry.total_time_seconds, 2)}s`}
+        </Stat>
+        <Stat label="Match %" mono>
+          {entry.is_dq ? "—" : formatPercent(entry.match_percentage)}
+        </Stat>
+      </div>
+    </Card>
+  );
+}
+
+function IpscStagesTable({ stageResults }: { stageResults: MyMatchSummary["stageResults"] }) {
+  return (
+    <Card className="overflow-hidden">
+      <Table>
+        <THead>
+          <TR>
+            <TH>Stage</TH>
+            <TH className="text-right">Puesto</TH>
+            <TH className="text-right">Tiempo</TH>
+            <TH className="text-right">Points</TH>
+            <TH className="text-right">Pen.</TH>
+            <TH className="text-right">Hit Factor</TH>
+            <TH className="text-right">Stage Pts</TH>
+            <TH className="text-right">Stage %</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {stageResults.map((r) => (
+            <TR key={r.id}>
+              <TD>
+                <span className="font-medium">{stageLabel(r)}</span>
+              </TD>
+              <TD className="text-right font-mono">
+                {r.is_dq ? <Badge tone="danger">DQ</Badge> : r.place ?? "—"}
+              </TD>
+              <TD className="text-right font-mono text-fg-muted">
+                {r.time_seconds != null
+                  ? `${formatNumber(r.time_seconds, 2)}s`
+                  : "—"}
+              </TD>
+              <TD className="text-right font-mono text-fg-muted">
+                {formatNumber(r.points, 0)}
+              </TD>
+              <TD className="text-right font-mono text-fg-muted">
+                {r.penalties && Number(r.penalties) > 0 ? (
+                  <span className="text-danger">
+                    {formatNumber(r.penalties, 0)}
+                  </span>
+                ) : (
+                  formatNumber(r.penalties, 0)
+                )}
+              </TD>
+              <TD className="text-right font-mono">
+                {formatNumber(r.hit_factor, 4)}
+              </TD>
+              <TD className="text-right font-mono">
+                {formatNumber(r.stage_points, 2)}
+              </TD>
+              <TD className="text-right font-mono">
+                {r.is_dq ? "—" : formatPercent(r.stage_percentage)}
+              </TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </Card>
+  );
+}
+
+function SteelStagesTable({ stageResults }: { stageResults: MyMatchSummary["stageResults"] }) {
+  return (
+    <Card className="overflow-hidden">
+      <Table>
+        <THead>
+          <TR>
+            <TH>Stage</TH>
+            <TH className="text-right">Puesto</TH>
+            <TH className="text-right">Tiempo</TH>
+            <TH className="text-right">Stage %</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {stageResults.map((r) => (
+            <TR key={r.id}>
+              <TD>
+                <span className="font-medium">{stageLabel(r)}</span>
+                {r.stages?.name && r.stages.stage_number != null && (
+                  <span className="ml-2 text-xs text-fg-muted">
+                    {r.stages.name}
+                  </span>
+                )}
+              </TD>
+              <TD className="text-right font-mono">
+                {r.is_dq ? <Badge tone="danger">DQ</Badge> : r.place ?? "—"}
+              </TD>
+              <TD className="text-right font-mono">
+                {r.time_seconds != null
+                  ? `${formatNumber(r.time_seconds, 2)}s`
+                  : "—"}
+              </TD>
+              <TD className="text-right font-mono">
+                {r.is_dq ? "—" : formatPercent(r.stage_percentage)}
+              </TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </Card>
+  );
+}
+
+function stageLabel(r: MyMatchSummary["stageResults"][number]) {
+  if (r.stages?.stage_number != null) return `Stage ${r.stages.stage_number}`;
+  return r.stages?.name ?? "—";
 }
 
 function BackToDashboard() {

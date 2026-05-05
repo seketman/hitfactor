@@ -16,6 +16,7 @@ export type ParsedMatchSource =
   | "practiscore_match_html"
   | "practiscore_combined_html"
   | "practiscore_stage_html"
+  | "practiscore_steel_html"
   | "practiscore_pdf";
 
 /**
@@ -41,6 +42,8 @@ export interface ParsedMatchEntry {
   place: number;
   matchPoints: number;
   matchPercentage: number;
+  /** Tiempo total para disciplinas time-based (Steel Challenge). NULL para IPSC. */
+  totalTimeSeconds: number | null;
   isDq: boolean;
 }
 

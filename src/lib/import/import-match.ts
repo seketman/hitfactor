@@ -154,6 +154,21 @@ async function importMatchOverall(
     }
   }
 
+  // Si el archivo trae stages embebidos (caso Steel Challenge), los
+  // insertamos en la misma operación.
+  let insertedStages = 0;
+  let insertedStageResults = 0;
+  if (parsed.stages.length > 0) {
+    const { stagesCount, resultsCount } = await attachStagesToMatch(
+      supabase,
+      parsed,
+      matchId,
+      divisionByCode,
+    );
+    insertedStages = stagesCount;
+    insertedStageResults = resultsCount;
+  }
+
   return {
     matchId,
     matchName: parsed.name,
@@ -161,8 +176,8 @@ async function importMatchOverall(
     disciplineCode: discipline.code,
     disciplineName: discipline.name,
     insertedEntries: entryRows.length,
-    insertedStages: 0,
-    insertedStageResults: 0,
+    insertedStages,
+    insertedStageResults,
     existedAlready: false,
   };
 }
@@ -211,8 +226,38 @@ async function importStages(
   const matchId = matchRow.id;
   const matchName = matchRow.name;
 
-  let totalStages = 0;
-  let totalResults = 0;
+  const { stagesCount, resultsCount } = await attachStagesToMatch(
+    supabase,
+    parsed,
+    matchId,
+    divisionByCode,
+  );
+
+  return {
+    matchId,
+    matchName,
+    matchDate: parsed.date,
+    disciplineCode: discipline.code,
+    disciplineName: discipline.name,
+    insertedEntries: 0,
+    insertedStages: stagesCount,
+    insertedStageResults: resultsCount,
+    existedAlready: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Stages attachment (compartido entre Steel match overall e IPSC stage import)
+// ---------------------------------------------------------------------------
+
+async function attachStagesToMatch(
+  supabase: SupabaseClient,
+  parsed: ParsedMatch,
+  matchId: string,
+  divisionByCode: Map<string, number>,
+): Promise<{ stagesCount: number; resultsCount: number }> {
+  let stagesCount = 0;
+  let resultsCount = 0;
 
   for (const stage of parsed.stages) {
     // Insertar stage (puede existir si reimportan)
@@ -240,7 +285,7 @@ async function importStages(
         throw new ImportError(stageErr.message, "STAGE_INSERT_FAILED");
       }
       stageId = newStage!.id;
-      totalStages++;
+      stagesCount++;
     }
 
     // Para cada resultado, encontrar match_entry correspondiente
@@ -273,21 +318,11 @@ async function importStages(
       if (resErr) {
         throw new ImportError(resErr.message, "STAGE_RESULTS_INSERT_FAILED");
       }
-      totalResults += stageResultRows.length;
+      resultsCount += stageResultRows.length;
     }
   }
 
-  return {
-    matchId,
-    matchName,
-    matchDate: parsed.date,
-    disciplineCode: discipline.code,
-    disciplineName: discipline.name,
-    insertedEntries: 0,
-    insertedStages: totalStages,
-    insertedStageResults: totalResults,
-    existedAlready: true,
-  };
+  return { stagesCount, resultsCount };
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +391,7 @@ function mapMatchEntryToRow(
     place: entry.place,
     match_points: entry.matchPoints,
     match_percentage: entry.matchPercentage,
+    total_time_seconds: entry.totalTimeSeconds,
     is_dq: entry.isDq,
   };
 }

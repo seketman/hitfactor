@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { parsePractiscoreHtml } from "@/lib/parsers/practiscore";
+import { parseHtml } from "@/lib/parsers";
 import {
   importParsedMatch,
   ImportError,
@@ -26,7 +26,7 @@ export async function importHtml(formData: FormData) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/login");
 
-  const parsed = parsePractiscoreHtml(html);
+  const parsed = parseHtml(html);
 
   if (!parsed.name || !parsed.date) {
     redirect(

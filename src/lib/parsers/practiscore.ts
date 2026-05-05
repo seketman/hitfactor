@@ -182,6 +182,7 @@ function parseMatchRow(headers: string[], row: string[]): ParsedMatchEntry | nul
     place: parseIntOr(placeRaw, 0),
     matchPoints: parseFloatOr(get("Match Pts"), 0),
     matchPercentage: parsePercentage(get("Match %")),
+    totalTimeSeconds: null, // IPSC no usa tiempo total; queda explícito.
     isDq,
   };
 }

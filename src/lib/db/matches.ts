@@ -9,7 +9,7 @@ import type {
 } from "./types";
 
 const MATCH_BASE_SELECT =
-  "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(code, name)";
+  "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(code, name, scoring_type)";
 
 /** Matches importados por un usuario, más recientes primero. */
 export async function listImportedByUser(
@@ -89,7 +89,7 @@ export async function listEntriesByShooter(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name))",
+      "id, place, match_points, match_percentage, total_time_seconds, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name, scoring_type))",
     )
     .eq("shooter_id", shooterId)
     .order("matches(date)", { ascending: false });
@@ -114,7 +114,7 @@ export async function getMyMatchSummary(
   const { data: entryData } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, is_dq, power_factor, category, classification, divisions(code, name)",
+      "id, place, match_points, match_percentage, total_time_seconds, is_dq, power_factor, category, classification, divisions(code, name)",
     )
     .eq("match_id", matchId)
     .eq("shooter_id", shooterId)
