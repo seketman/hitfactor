@@ -162,8 +162,9 @@ export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
                     </TD>
                     <TD>
                       <Link
-                        href={`/matches/${e.matches?.id}`}
+                        href={`/matches/${e.matches?.id}/me`}
                         className="font-medium text-fg hover:text-accent"
+                        title="Ver tu detalle del torneo"
                       >
                         {e.matches?.name}
                       </Link>

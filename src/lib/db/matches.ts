@@ -4,6 +4,8 @@ import type {
   MatchEntryWithRelations,
   MatchWithDiscipline,
   MyEntryRow,
+  MyMatchSummary,
+  MyStageResultRow,
   Stage,
 } from "./types";
 
@@ -92,4 +94,52 @@ export async function listEntriesByShooter(
     .eq("shooter_id", shooterId)
     .order("matches(date)", { ascending: false });
   return (data as unknown as MyEntryRow[] | null) ?? [];
+}
+
+/**
+ * Resumen de la participación de un shooter en un match específico:
+ * el match con disciplina, su match_entry, y todos sus stage_results
+ * (ordenados por número de stage).
+ *
+ * Devuelve null si el shooter no participó del match.
+ */
+export async function getMyMatchSummary(
+  supabase: SupabaseClient,
+  matchId: string,
+  shooterId: string,
+): Promise<MyMatchSummary | null> {
+  const match = await getMatchById(supabase, matchId);
+  if (!match) return null;
+
+  const { data: entryData } = await supabase
+    .from("match_entries")
+    .select(
+      "id, place, match_points, match_percentage, is_dq, power_factor, category, classification, divisions(code, name)",
+    )
+    .eq("match_id", matchId)
+    .eq("shooter_id", shooterId)
+    .maybeSingle();
+
+  if (!entryData) return null;
+  const entry = entryData as unknown as MyMatchSummary["entry"];
+
+  const { data: stageData } = await supabase
+    .from("stage_results")
+    .select(
+      "id, points, penalties, time_seconds, hit_factor, stage_points, stage_percentage, place, is_dq, stages!inner(id, stage_number, name, match_id)",
+    )
+    .eq("match_entry_id", entry.id)
+    .eq("stages.match_id", matchId);
+
+  const stageResults =
+    (stageData as unknown as MyStageResultRow[] | null) ?? [];
+
+  // Orden por número de stage (los nulls al final).
+  stageResults.sort((a, b) => {
+    const an = a.stages?.stage_number ?? Number.MAX_SAFE_INTEGER;
+    const bn = b.stages?.stage_number ?? Number.MAX_SAFE_INTEGER;
+    return an - bn;
+  });
+
+  return { match, entry, stageResults };
 }
