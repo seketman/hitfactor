@@ -26,12 +26,22 @@ const POWER_FACTOR_LABELS: Record<string, string> = {
 };
 
 export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
+  const [discipline, setDiscipline] = useState<string>("all");
   const [division, setDivision] = useState<string>("all");
   const [factor, setFactor] = useState<string>("all");
   const [club, setClub] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("date_desc");
 
   // Opciones disponibles según los datos del usuario
+  const disciplineOptions = useMemo(() => {
+    const set = new Map<string, string>();
+    for (const e of entries) {
+      const d = e.matches?.disciplines;
+      if (d) set.set(d.code, d.name);
+    }
+    return Array.from(set.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [entries]);
+
   const divisionOptions = useMemo(() => {
     const set = new Map<string, string>();
     for (const e of entries) {
@@ -53,6 +63,9 @@ export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
   const filtered = useMemo(() => {
     let list = entries.slice();
 
+    if (discipline !== "all") {
+      list = list.filter((e) => e.matches?.disciplines?.code === discipline);
+    }
     if (division !== "all") {
       list = list.filter((e) => e.divisions?.code === division);
     }
@@ -79,11 +92,24 @@ export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
     });
 
     return list;
-  }, [entries, division, factor, club, sort]);
+  }, [entries, discipline, division, factor, club, sort]);
 
   return (
     <div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Select
+          label="Disciplina"
+          value={discipline}
+          onChange={(e) => setDiscipline(e.target.value)}
+        >
+          <option value="all">Todas</option>
+          {disciplineOptions.map(([code, name]) => (
+            <option key={code} value={code}>
+              {name}
+            </option>
+          ))}
+        </Select>
+
         <Select
           label="División"
           value={division}
@@ -143,6 +169,7 @@ export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
             <THead>
               <TR>
                 <TH>Fecha</TH>
+                <TH>Disciplina</TH>
                 <TH>Torneo</TH>
                 <TH>Club</TH>
                 <TH>División</TH>
@@ -155,10 +182,14 @@ export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
               {filtered.map((e) => {
                 const clubName = getClubName(e.matches?.region);
                 const clubCode = getClubCode(e.matches?.region);
+                const disc = e.matches?.disciplines;
                 return (
                   <TR key={e.id}>
                     <TD className="whitespace-nowrap font-mono text-fg-muted">
                       {formatDate(e.matches?.date)}
+                    </TD>
+                    <TD className="text-fg-muted">
+                      {disc ? <span title={disc.code}>{disc.name}</span> : "—"}
                     </TD>
                     <TD>
                       <Link

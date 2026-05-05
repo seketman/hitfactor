@@ -49,6 +49,7 @@ export async function importHtml(formData: FormData) {
     ok: "1",
     matchId: result.matchId,
     name: result.matchName,
+    discipline: result.disciplineName,
     entries: String(result.insertedEntries),
     stages: String(result.insertedStages),
     stageResults: String(result.insertedStageResults),

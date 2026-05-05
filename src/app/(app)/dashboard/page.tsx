@@ -102,7 +102,13 @@ function MatchList({
   matches,
   showImporter,
 }: {
-  matches: { id: string; name: string; date: string; region: string | null }[];
+  matches: {
+    id: string;
+    name: string;
+    date: string;
+    region: string | null;
+    disciplines: { code: string; name: string } | null;
+  }[];
   showImporter: boolean;
 }) {
   return (
@@ -114,8 +120,15 @@ function MatchList({
               href={`/matches/${m.id}`}
               className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-surface-2/40"
             >
-              <div>
-                <p className="font-medium">{m.name}</p>
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 font-medium">
+                  <span className="truncate">{m.name}</span>
+                  {m.disciplines && (
+                    <Badge tone="accent" title={m.disciplines.code}>
+                      {m.disciplines.name}
+                    </Badge>
+                  )}
+                </p>
                 <p className="mt-0.5 text-xs text-fg-muted">
                   {formatDate(m.date)}
                   {m.region && ` · ${m.region}`}

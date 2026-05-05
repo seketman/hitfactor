@@ -1,6 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  Match,
   MatchEntryWithRelations,
   MatchWithDiscipline,
   MyEntryRow,
@@ -9,32 +8,35 @@ import type {
   Stage,
 } from "./types";
 
+const MATCH_BASE_SELECT =
+  "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(code, name)";
+
 /** Matches importados por un usuario, más recientes primero. */
 export async function listImportedByUser(
   supabase: SupabaseClient,
   userId: string,
   limit = 20,
-): Promise<Match[]> {
+): Promise<MatchWithDiscipline[]> {
   const { data } = await supabase
     .from("matches")
-    .select("id, name, date, region, imported_at, imported_by_user_id, source_filename")
+    .select(MATCH_BASE_SELECT)
     .eq("imported_by_user_id", userId)
     .order("date", { ascending: false })
     .limit(limit);
-  return (data as Match[] | null) ?? [];
+  return (data as unknown as MatchWithDiscipline[] | null) ?? [];
 }
 
 /** Todos los matches visibles, más recientes primero. */
 export async function listAllMatches(
   supabase: SupabaseClient,
   limit = 20,
-): Promise<Match[]> {
+): Promise<MatchWithDiscipline[]> {
   const { data } = await supabase
     .from("matches")
-    .select("id, name, date, region, imported_at, imported_by_user_id, source_filename")
+    .select(MATCH_BASE_SELECT)
     .order("date", { ascending: false })
     .limit(limit);
-  return (data as Match[] | null) ?? [];
+  return (data as unknown as MatchWithDiscipline[] | null) ?? [];
 }
 
 /** Match con su disciplina embebida. */
@@ -44,9 +46,7 @@ export async function getMatchById(
 ): Promise<MatchWithDiscipline | null> {
   const { data } = await supabase
     .from("matches")
-    .select(
-      "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(name)",
-    )
+    .select(MATCH_BASE_SELECT)
     .eq("id", matchId)
     .maybeSingle();
   return (data as unknown as MatchWithDiscipline | null) ?? null;
@@ -89,7 +89,7 @@ export async function listEntriesByShooter(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region)",
+      "id, place, match_points, match_percentage, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name))",
     )
     .eq("shooter_id", shooterId)
     .order("matches(date)", { ascending: false });

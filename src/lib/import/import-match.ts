@@ -10,6 +10,8 @@ export interface ImportResult {
   matchId: string;
   matchName: string;
   matchDate: string;
+  disciplineCode: string;
+  disciplineName: string;
   insertedEntries: number;
   insertedStages: number;
   insertedStageResults: number;
@@ -38,10 +40,10 @@ export async function importParsedMatch(
   importerUserId: string,
   filename: string,
 ): Promise<ImportResult> {
-  // Resolver discipline_id y divisions
+  // Resolver disciplina (id, code, name) y divisiones
   const { data: discipline, error: discErr } = await supabase
     .from("disciplines")
-    .select("id")
+    .select("id, code, name")
     .eq("code", parsed.discipline)
     .single();
   if (discErr || !discipline) {
@@ -50,12 +52,16 @@ export async function importParsedMatch(
       "UNKNOWN_DISCIPLINE",
     );
   }
-  const disciplineId = discipline.id as number;
+  const disciplineRef: DisciplineRef = {
+    id: discipline.id as number,
+    code: discipline.code as string,
+    name: discipline.name as string,
+  };
 
   const { data: divisionsData, error: divErr } = await supabase
     .from("divisions")
     .select("id, code")
-    .eq("discipline_id", disciplineId);
+    .eq("discipline_id", disciplineRef.id);
   if (divErr || !divisionsData) {
     throw new ImportError("No se pudieron cargar las divisiones", "DIVISIONS_FETCH_FAILED");
   }
@@ -68,7 +74,7 @@ export async function importParsedMatch(
     return importStages(
       supabase,
       parsed,
-      disciplineId,
+      disciplineRef,
       divisionByCode,
       importerUserId,
       filename,
@@ -78,11 +84,17 @@ export async function importParsedMatch(
   return importMatchOverall(
     supabase,
     parsed,
-    disciplineId,
+    disciplineRef,
     divisionByCode,
     importerUserId,
     filename,
   );
+}
+
+interface DisciplineRef {
+  id: number;
+  code: string;
+  name: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +104,7 @@ export async function importParsedMatch(
 async function importMatchOverall(
   supabase: SupabaseClient,
   parsed: ParsedMatch,
-  disciplineId: number,
+  discipline: DisciplineRef,
   divisionByCode: Map<string, number>,
   importerUserId: string,
   filename: string,
@@ -101,7 +113,7 @@ async function importMatchOverall(
   const { data: matchRow, error: matchErr } = await supabase
     .from("matches")
     .insert({
-      discipline_id: disciplineId,
+      discipline_id: discipline.id,
       name: parsed.name,
       date: parsed.date,
       region: parsed.region,
@@ -146,6 +158,8 @@ async function importMatchOverall(
     matchId,
     matchName: parsed.name,
     matchDate: parsed.date,
+    disciplineCode: discipline.code,
+    disciplineName: discipline.name,
     insertedEntries: entryRows.length,
     insertedStages: 0,
     insertedStageResults: 0,
@@ -160,7 +174,7 @@ async function importMatchOverall(
 async function importStages(
   supabase: SupabaseClient,
   parsed: ParsedMatch,
-  disciplineId: number,
+  discipline: DisciplineRef,
   divisionByCode: Map<string, number>,
   importerUserId: string,
   _filename: string,
@@ -171,12 +185,12 @@ async function importStages(
   // 2) Fallback: buscamos matches del mismo día/disciplina cuyo nombre
   //    sea prefijo del título del stage (cubre cualquier sufijo desconocido
   //    que no esté en stripStageSuffix).
-  const matchRow = await resolveMatchForStage(supabase, parsed, disciplineId);
+  const matchRow = await resolveMatchForStage(supabase, parsed, discipline.id);
 
   if (!matchRow) {
     const candidatesText = await listSameDayMatchNames(
       supabase,
-      disciplineId,
+      discipline.id,
       parsed.date,
     );
     const detail = candidatesText
@@ -267,6 +281,8 @@ async function importStages(
     matchId,
     matchName,
     matchDate: parsed.date,
+    disciplineCode: discipline.code,
+    disciplineName: discipline.name,
     insertedEntries: 0,
     insertedStages: totalStages,
     insertedStageResults: totalResults,

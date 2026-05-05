@@ -43,7 +43,7 @@ export interface Match {
 }
 
 export interface MatchWithDiscipline extends Match {
-  disciplines: { name: string } | null;
+  disciplines: { code: string; name: string } | null;
 }
 
 export interface Stage {
@@ -82,7 +82,13 @@ export interface MyEntryRow {
   power_factor: "Min" | "Maj" | null;
   category: string | null;
   divisions: { code: string; name: string } | null;
-  matches: { id: string; name: string; date: string; region: string | null } | null;
+  matches: {
+    id: string;
+    name: string;
+    date: string;
+    region: string | null;
+    disciplines: { code: string; name: string } | null;
+  } | null;
 }
 
 /** Mi resultado en un stage individual con la info del stage embebida. */

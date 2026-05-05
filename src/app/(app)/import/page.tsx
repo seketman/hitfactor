@@ -17,6 +17,7 @@ export default async function ImportPage({
     ok?: string;
     matchId?: string;
     name?: string;
+    discipline?: string;
     entries?: string;
     stages?: string;
     stageResults?: string;
@@ -59,6 +60,11 @@ export default async function ImportPage({
       {params.ok === "1" && (
         <Alert tone="success" title={`Importado: ${params.name}`} className="mb-6">
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            {params.discipline && (
+              <li>
+                Disciplina: <strong className="text-fg">{params.discipline}</strong>
+              </li>
+            )}
             {params.entries && Number(params.entries) > 0 && (
               <li>{params.entries} resultados de tiradores</li>
             )}
