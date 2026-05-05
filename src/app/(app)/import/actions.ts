@@ -47,6 +47,7 @@ export async function importHtml(formData: FormData) {
 
   const params = new URLSearchParams({
     ok: "1",
+    matchId: result.matchId,
     name: result.matchName,
     entries: String(result.insertedEntries),
     stages: String(result.insertedStages),

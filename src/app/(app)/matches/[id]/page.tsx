@@ -20,7 +20,8 @@ import {
   formatPercent,
 } from "@/lib/utils";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
-import { claimShooter, deleteMatch } from "./actions";
+import { claimShooter } from "@/lib/actions/claim";
+import { deleteMatch } from "./actions";
 
 interface PageProps {
   params: Promise<{ id: string }>;

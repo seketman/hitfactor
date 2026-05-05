@@ -1,7 +1,12 @@
+import Link from "next/link";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { createClient } from "@/lib/supabase/server";
+import { findClaimCandidates } from "@/lib/import/match-claim";
+import { claimShooter } from "@/lib/actions/claim";
 import { importHtml } from "./actions";
 
 export default async function ImportPage({
@@ -10,6 +15,7 @@ export default async function ImportPage({
   searchParams: Promise<{
     error?: string;
     ok?: string;
+    matchId?: string;
     name?: string;
     entries?: string;
     stages?: string;
@@ -18,6 +24,21 @@ export default async function ImportPage({
   }>;
 }) {
   const params = await searchParams;
+
+  // Si vinimos de un import exitoso con matchId, buscamos candidatos a claim
+  // (solo si el usuario aún no linkeó su shooter).
+  let candidates: Awaited<ReturnType<typeof findClaimCandidates>> = [];
+  if (params.ok === "1" && params.matchId) {
+    const supabase = await createClient();
+    const { data: userData } = await supabase.auth.getUser();
+    if (userData.user) {
+      candidates = await findClaimCandidates(
+        supabase,
+        userData.user.id,
+        params.matchId,
+      );
+    }
+  }
 
   return (
     <PageContainer className="max-w-2xl">
@@ -52,6 +73,57 @@ export default async function ImportPage({
             )}
           </ul>
         </Alert>
+      )}
+
+      {candidates.length > 0 && params.matchId && (
+        <Card className="mb-6 border-accent/30 bg-accent-soft">
+          <div className="px-5 py-4">
+            <h2 className="text-sm font-medium text-accent">
+              ¿Sos alguno de estos tiradores?
+            </h2>
+            <p className="mt-1 text-sm text-fg-muted">
+              Detectamos {candidates.length === 1 ? "una coincidencia" : `${candidates.length} coincidencias`}
+              {" "}entre los participantes y tu perfil. Linkealos para ver tu performance.
+            </p>
+          </div>
+          <ul className="divide-y divide-border border-t border-border">
+            {candidates.map((c) => (
+              <li
+                key={c.shooterId}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">{c.fullName}</p>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-fg-muted">
+                    {c.divisionCode && <Badge>{c.divisionCode}</Badge>}
+                    {c.memberNumber && <span>#{c.memberNumber}</span>}
+                    <span className="text-fg-subtle">
+                      coincidencia por {c.reason === "member_number" ? "número de socio" : "nombre"}
+                    </span>
+                  </p>
+                </div>
+                <form action={claimShooter}>
+                  <input type="hidden" name="shooter_id" value={c.shooterId} />
+                  <input type="hidden" name="match_id" value={params.matchId} />
+                  <input type="hidden" name="redirect_to" value="/dashboard" />
+                  <Button type="submit" size="sm">
+                    Soy yo
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+          <div className="border-t border-border px-5 py-3 text-xs text-fg-subtle">
+            ¿Ninguno?{" "}
+            <Link
+              href={`/matches/${params.matchId}`}
+              className="text-accent hover:underline"
+            >
+              Buscalo manualmente en el ranking
+            </Link>
+            .
+          </div>
+        </Card>
       )}
 
       <Card className="p-6">
