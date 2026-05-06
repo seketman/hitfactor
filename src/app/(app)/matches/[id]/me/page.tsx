@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { createClient } from "@/lib/supabase/server";
-import { getMyShooter } from "@/lib/db/shooters";
+import { listMyShooters } from "@/lib/db/shooters";
 import { getMyMatchSummary } from "@/lib/db/matches";
 import type { MyMatchSummary } from "@/lib/db/types";
 import { getClubCode, getClubName } from "@/lib/clubs";
@@ -28,9 +27,9 @@ export default async function PersonalMatchPage({ params }: PageProps) {
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user!.id; // protegido por (app)/layout
 
-  const myShooter = await getMyShooter(supabase, userId);
+  const myShooters = await listMyShooters(supabase, userId);
 
-  if (!myShooter) {
+  if (myShooters.length === 0) {
     return (
       <PageContainer>
         <BackToDashboard />
@@ -45,10 +44,26 @@ export default async function PersonalMatchPage({ params }: PageProps) {
     );
   }
 
-  const summary = await getMyMatchSummary(supabase, id, myShooter.id);
+  // El usuario puede tener múltiples shooters linkeados (uno por disciplina).
+  // Buscamos cuál participó en este match — el primero que devuelva summary.
+  let summary: Awaited<ReturnType<typeof getMyMatchSummary>> = null;
+  for (const s of myShooters) {
+    summary = await getMyMatchSummary(supabase, id, s.id);
+    if (summary) break;
+  }
 
   if (!summary) {
-    notFound();
+    return (
+      <PageContainer>
+        <BackToDashboard />
+        <Alert tone="warning" title="No participaste de este match">
+          Ninguna de tus identidades aparece en el ranking de este torneo.{" "}
+          <Link href={`/matches/${id}`} className="underline hover:text-fg">
+            Ver ranking público
+          </Link>
+        </Alert>
+      </PageContainer>
+    );
   }
 
   const { match, entry, stageResults } = summary;

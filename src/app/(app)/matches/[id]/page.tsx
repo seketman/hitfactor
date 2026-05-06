@@ -7,7 +7,7 @@ import { Alert } from "@/components/ui/Alert";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/db/profiles";
-import { getMyShooter } from "@/lib/db/shooters";
+import { listMyShooters } from "@/lib/db/shooters";
 import {
   getMatchById,
   listEntriesByMatch,
@@ -39,14 +39,14 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const match = await getMatchById(supabase, id);
   if (!match) notFound();
 
-  const [importerProfile, entries, stages, myShooter] = await Promise.all([
+  const [importerProfile, entries, stages, myShooters] = await Promise.all([
     getProfile(supabase, match.imported_by_user_id),
     listEntriesByMatch(supabase, id),
     listStagesByMatch(supabase, id),
-    getMyShooter(supabase, userId),
+    listMyShooters(supabase, userId),
   ]);
 
-  const myShooterId = myShooter?.id ?? null;
+  const myShooterIds = new Set(myShooters.map((s) => s.id));
   const isImporter = match.imported_by_user_id === userId;
 
   // Agrupar por división
@@ -130,11 +130,11 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                 <TBody>
                   {list.map((e) => {
                     const shooter = e.shooters;
-                    const isMine = myShooterId && shooter?.id === myShooterId;
+                    const isMine = !!shooter && myShooterIds.has(shooter.id);
+                    // Cualquier shooter no linkeado es claimable: un usuario
+                    // puede tener varias identidades (una por disciplina).
                     const canClaim =
-                      !myShooterId &&
-                      shooter &&
-                      shooter.linked_user_id === null;
+                      !!shooter && shooter.linked_user_id === null;
                     return (
                       <TR
                         key={e.id}

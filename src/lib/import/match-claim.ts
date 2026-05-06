@@ -19,40 +19,60 @@ export interface ClaimCandidate {
 
 /**
  * Devuelve los shooters de un match que parecen ser el usuario logueado.
+ *
+ * Soporta **múltiples identidades**: un mismo usuario puede tener varios
+ * shooters linkeados (porque el nombre escrito en cada torneo varía: PractiScore
+ * suele ser "Apellido, Nombre", la planilla FBI usa "Apellido Nombre", etc.).
+ * Por eso, los aliases para matchear se construyen de:
+ *   - `display_name` y `full_name` del profile.
+ *   - El `full_name` de **todos** los shooters ya linkeados a este usuario.
+ *   - El `member_number` del profile + los de los shooters ya linkeados.
+ *
  * Reglas:
- *  - Si el usuario ya tiene otro shooter linkeado: devuelve [].
- *  - Solo considera shooters sin linked_user_id (claimables).
- *  - Match por número de socio: coincidencia exacta sobre el campo `member_number`.
- *  - Match por nombre: tokens normalizados (acento-insensitive, ignorando comas/puntos),
- *    requiriendo que todos los tokens del lado más corto estén en el otro,
- *    y al menos 2 tokens distintos (para no matchear solo apellido o solo nombre).
+ *  - Solo considera shooters sin `linked_user_id` (claimables — los ya linkeados
+ *    a este mismo usuario no se vuelven a sugerir).
+ *  - Match por número de socio: coincidencia exacta.
+ *  - Match por nombre: tokens normalizados (ver `areNamesSimilar`), requiriendo
+ *    al menos 2 tokens distintos para evitar falsos positivos por apellidos comunes.
  */
 export async function findClaimCandidates(
   supabase: SupabaseClient,
   userId: string,
   matchId: string,
 ): Promise<ClaimCandidate[]> {
-  // ¿Ya tengo un shooter linkeado? Si sí, no sugerimos nada.
-  const { data: existing } = await supabase
-    .from("shooters")
-    .select("id")
-    .eq("linked_user_id", userId)
-    .maybeSingle();
-  if (existing) return [];
+  const [profileRes, linkedRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, full_name, member_number")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase
+      .from("shooters")
+      .select("full_name, member_number")
+      .eq("linked_user_id", userId),
+  ]);
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("display_name, full_name, member_number")
-    .eq("id", userId)
-    .maybeSingle();
-  if (!profile) return [];
+  const profile = profileRes.data as
+    | { display_name: string | null; full_name: string | null; member_number: string | null }
+    | null;
+  const linkedShooters = (linkedRes.data ?? []) as Array<{
+    full_name: string;
+    member_number: string | null;
+  }>;
 
-  const profileNames = [profile.display_name, profile.full_name].filter(
-    (s): s is string => typeof s === "string" && s.trim().length > 0,
-  );
-  const profileMember = profile.member_number?.trim() ?? null;
+  const aliasNames = [
+    profile?.display_name,
+    profile?.full_name,
+    ...linkedShooters.map((s) => s.full_name),
+  ].filter((s): s is string => typeof s === "string" && s.trim().length > 0);
 
-  if (profileNames.length === 0 && !profileMember) return [];
+  const aliasMembers = new Set<string>();
+  if (profile?.member_number) aliasMembers.add(profile.member_number.trim());
+  for (const s of linkedShooters) {
+    if (s.member_number) aliasMembers.add(s.member_number.trim());
+  }
+
+  if (aliasNames.length === 0 && aliasMembers.size === 0) return [];
 
   type EntryRow = {
     divisions: { code: string } | null;
@@ -79,16 +99,15 @@ export async function findClaimCandidates(
   for (const e of entries) {
     const shooter = e.shooters;
     if (!shooter) continue;
-    if (shooter.linked_user_id) continue; // ya claimado por alguien
+    if (shooter.linked_user_id) continue; // ya claimado (por este usuario o por otro)
     if (seen.has(shooter.id)) continue;
 
     const memberMatch =
-      profileMember &&
-      shooter.member_number &&
-      profileMember === shooter.member_number.trim();
+      shooter.member_number !== null &&
+      aliasMembers.has(shooter.member_number.trim());
 
-    const nameMatch = profileNames.some((pn) =>
-      areNamesSimilar(pn, shooter.full_name),
+    const nameMatch = aliasNames.some((alias) =>
+      areNamesSimilar(alias, shooter.full_name),
     );
 
     if (memberMatch || nameMatch) {

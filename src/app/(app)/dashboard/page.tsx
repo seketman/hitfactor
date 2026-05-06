@@ -7,10 +7,10 @@ import { HistoryTable } from "@/components/HistoryTable";
 import { StatsOverview } from "@/components/StatsOverview";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/db/profiles";
-import { getMyShooter } from "@/lib/db/shooters";
+import { listMyShooters } from "@/lib/db/shooters";
 import {
   listAllMatches,
-  listEntriesByShooter,
+  listEntriesByShooters,
   listImportedByUser,
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
@@ -21,16 +21,17 @@ export default async function DashboardPage() {
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user!.id; // garantizado por (app)/layout
 
-  const [profile, myShooter, importedMatches, allMatches] = await Promise.all([
+  const [profile, myShooters, importedMatches, allMatches] = await Promise.all([
     getProfile(supabase, userId),
-    getMyShooter(supabase, userId),
+    listMyShooters(supabase, userId),
     listImportedByUser(supabase, userId),
     listAllMatches(supabase),
   ]);
 
-  const myEntries = myShooter
-    ? await listEntriesByShooter(supabase, myShooter.id)
-    : [];
+  const myEntries = await listEntriesByShooters(
+    supabase,
+    myShooters.map((s) => s.id),
+  );
 
   return (
     <PageContainer>
@@ -40,13 +41,23 @@ export default async function DashboardPage() {
             Hola, {profile?.display_name ?? "tirador"}
           </h1>
           <p className="mt-1 text-sm text-fg-muted">
-            {myShooter ? (
+            {myShooters.length === 0 ? (
+              "Aún no linkeaste tu identidad. Buscá tu nombre en algún match para hacerlo."
+            ) : myShooters.length === 1 ? (
               <>
                 Linkeado como{" "}
-                <span className="text-fg">{myShooter.full_name}</span>
+                <span className="text-fg">{myShooters[0]!.full_name}</span>
               </>
             ) : (
-              "Aún no linkeaste tu identidad. Buscá tu nombre en algún match para hacerlo."
+              <>
+                Linkeado como{" "}
+                <span className="text-fg" title={myShooters.map((s) => s.full_name).join(" · ")}>
+                  {myShooters[0]!.full_name}
+                </span>{" "}
+                <span className="text-fg-subtle">
+                  (+{myShooters.length - 1} {myShooters.length - 1 === 1 ? "identidad" : "identidades"})
+                </span>
+              </>
             )}
           </p>
         </div>
@@ -55,7 +66,7 @@ export default async function DashboardPage() {
         </Link>
       </header>
 
-      {myShooter && myEntries.length > 0 && (
+      {myEntries.length > 0 && (
         <>
           <Section title="Tu performance">
             <StatsOverview stats={computeShooterStats(myEntries)} />

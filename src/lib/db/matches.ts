@@ -81,17 +81,22 @@ export async function listEntriesByMatch(
   return (data as unknown as MatchEntryWithRelations[] | null) ?? [];
 }
 
-/** Resultados de un shooter en todos sus matches, más recientes primero. */
-export async function listEntriesByShooter(
+/**
+ * Resultados agregados de uno o varios shooters en sus matches, más recientes
+ * primero. Aceptamos múltiples IDs porque un usuario puede tener varias
+ * identidades linkeadas (una por disciplina/torneo).
+ */
+export async function listEntriesByShooters(
   supabase: SupabaseClient,
-  shooterId: string,
+  shooterIds: string[],
 ): Promise<MyEntryRow[]> {
+  if (shooterIds.length === 0) return [];
   const { data } = await supabase
     .from("match_entries")
     .select(
       "id, place, match_points, match_percentage, total_time_seconds, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name, scoring_type))",
     )
-    .eq("shooter_id", shooterId)
+    .in("shooter_id", shooterIds)
     .order("matches(date)", { ascending: false });
   return (data as unknown as MyEntryRow[] | null) ?? [];
 }
