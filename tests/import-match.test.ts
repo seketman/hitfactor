@@ -126,6 +126,86 @@ describe("importParsedMatch — Match overall", () => {
     });
   });
 
+  it("no duplica shooters cuando el mismo nombre aparece en múltiples divisiones (race fix)", async () => {
+    // Reproducimos el caso FBI: un mismo tirador aparece varias veces en el
+    // CSV (típicamente una por cada disciplina). Antes del fix, Promise.all
+    // resolvía findOrCreateShooter en paralelo y creaba shooter rows duplicados.
+    fake.seed("disciplines", [
+      { id: 99, code: "tiro_fbi", name: "Tiro FBI", scoring_type: "points" },
+    ]);
+    fake.seed("divisions", [
+      { id: 901, discipline_id: 99, code: "PIS", name: "Pistola" },
+      { id: 902, discipline_id: 99, code: "PCC", name: "PCC" },
+      { id: 903, discipline_id: 99, code: "MINI", name: "Minirifle" },
+    ]);
+
+    const repeatedShooter = {
+      fullName: "Foradori Lucas",
+      memberNumber: null,
+      region: "TFALP",
+    };
+    const parsed = {
+      discipline: "tiro_fbi" as const,
+      source: "fbi_csv" as const,
+      name: "Test Match",
+      date: "2026-05-03",
+      region: null,
+      stages: [],
+      generatedBy: null,
+      matchEntries: [
+        {
+          shooter: repeatedShooter,
+          divisionCode: "PIS",
+          classification: null,
+          powerFactor: null,
+          category: "A",
+          place: 1,
+          matchPoints: 100,
+          matchPercentage: 100,
+          totalTimeSeconds: null,
+          isDq: false,
+        },
+        {
+          shooter: repeatedShooter,
+          divisionCode: "PCC",
+          classification: null,
+          powerFactor: null,
+          category: "A",
+          place: 2,
+          matchPoints: 95,
+          matchPercentage: 95,
+          totalTimeSeconds: null,
+          isDq: false,
+        },
+        {
+          shooter: repeatedShooter,
+          divisionCode: "MINI",
+          classification: null,
+          powerFactor: null,
+          category: "A",
+          place: 3,
+          matchPoints: 90,
+          matchPercentage: 90,
+          totalTimeSeconds: null,
+          isDq: false,
+        },
+      ],
+    };
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "fbi.csv");
+
+    const lucas = fake.tables.shooters.rows.filter(
+      (s) => String(s.full_name).toLowerCase() === "foradori lucas",
+    );
+    expect(lucas).toHaveLength(1);
+
+    // Y debe tener una match_entry por división.
+    const entriesForLucas = fake.tables.match_entries.rows.filter(
+      (e) => e.shooter_id === lucas[0]!.id,
+    );
+    expect(entriesForLucas).toHaveLength(3);
+  });
+
   it("falla con UNKNOWN_DIVISION si aparece una división no registrada", async () => {
     // Quitar la división Production
     fake.tables.divisions.rows = fake.tables.divisions.rows.filter(

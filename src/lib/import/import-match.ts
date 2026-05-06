@@ -135,14 +135,27 @@ async function importMatchOverall(
   }
   const matchId = matchRow!.id as string;
 
-  // Resolver/crear shooters e insertar match_entries
-  const entryRows = await Promise.all(
-    parsed.matchEntries.map(async (entry) => {
-      const shooterId = await findOrCreateShooter(supabase, entry.shooter);
-      const divisionId = requireDivision(divisionByCode, entry.divisionCode);
-      return mapMatchEntryToRow(entry, matchId, shooterId, divisionId);
-    }),
-  );
+  // Resolver/crear shooters e insertar match_entries.
+  //
+  // OJO con la concurrencia: si llamamos findOrCreateShooter en paralelo para
+  // el mismo nombre (ej. un tirador que aparece en varias divisiones del
+  // mismo CSV), las queries SELECT corren antes de cualquier INSERT y ambas
+  // ven que el shooter no existe → terminamos creando duplicados.
+  //
+  // Por eso resolvemos shooters de forma SECUENCIAL y CACHEADA: una sola
+  // llamada a findOrCreateShooter por tirador único.
+  const shooterCache = new Map<string, string>();
+  const entryRows = [];
+  for (const entry of parsed.matchEntries) {
+    const cacheKey = shooterCacheKey(entry.shooter);
+    let shooterId = shooterCache.get(cacheKey);
+    if (!shooterId) {
+      shooterId = await findOrCreateShooter(supabase, entry.shooter);
+      shooterCache.set(cacheKey, shooterId);
+    }
+    const divisionId = requireDivision(divisionByCode, entry.divisionCode);
+    entryRows.push(mapMatchEntryToRow(entry, matchId, shooterId, divisionId));
+  }
 
   if (entryRows.length > 0) {
     const { error: entryErr } = await supabase.from("match_entries").insert(entryRows);
@@ -328,6 +341,11 @@ async function attachStagesToMatch(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/** Clave de cache para deduplicar tiradores dentro del mismo import. */
+function shooterCacheKey(s: ParsedShooter): string {
+  return `${s.fullName.trim().toLowerCase()}|${s.memberNumber ?? ""}`;
+}
 
 async function findOrCreateShooter(
   supabase: SupabaseClient,

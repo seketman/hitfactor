@@ -126,6 +126,20 @@ export function parseFbiCsv(content: string): ParsedMatch {
     else byDivision.set(divisionCode, [entry]);
   }
 
+  // Si un mismo tirador aparece varias veces en la misma división (raro,
+  // pero posible si la planilla registra varias tiradas de control) nos
+  // quedamos con el mejor puntaje. El UNIQUE de la DB lo rechazaría, así
+  // que dedupeamos acá para no romper el import.
+  for (const [code, group] of byDivision) {
+    const best = new Map<string, RawEntry>();
+    for (const e of group) {
+      const key = e.shooter.fullName.toLowerCase();
+      const prev = best.get(key);
+      if (!prev || e.puntos > prev.puntos) best.set(key, e);
+    }
+    byDivision.set(code, Array.from(best.values()));
+  }
+
   const matchEntries: ParsedMatchEntry[] = [];
   for (const [, group] of byDivision) {
     group.sort((a, b) => {
