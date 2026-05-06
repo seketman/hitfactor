@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { createClient } from "@/lib/supabase/server";
 import { findClaimCandidates } from "@/lib/import/match-claim";
 import { claimShooter } from "@/lib/actions/claim";
-import { importHtml } from "./actions";
+import { ImportForm } from "./ImportForm";
 
 export default async function ImportPage({
   searchParams,
@@ -132,25 +132,14 @@ export default async function ImportPage({
         </Card>
       )}
 
-      <Card className="p-6">
-        <form action={importHtml}>
-          <label className="block">
-            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-fg-muted">
-              Archivo HTML
-            </span>
-            <input
-              type="file"
-              name="file"
-              accept=".html,.htm"
-              required
-              className="block w-full cursor-pointer rounded-md border border-border bg-surface-2 text-sm text-fg file:mr-4 file:border-0 file:bg-accent file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-bg hover:file:bg-accent-strong"
-            />
-          </label>
-          <Button type="submit" className="mt-6 w-full">
-            Importar
-          </Button>
-        </form>
-      </Card>
+      {/*
+        key cambia con cada nuevo resultado: fuerza remount del form y
+        limpia el input file. Si no hay resultado, queda en "idle".
+      */}
+      <ImportForm
+        key={resultKey(params)}
+        hasPreviousResult={params.ok === "1" || Boolean(params.error)}
+      />
 
       <details className="mt-6 text-sm text-fg-muted">
         <summary className="cursor-pointer hover:text-fg">
@@ -173,4 +162,25 @@ export default async function ImportPage({
       </details>
     </PageContainer>
   );
+}
+
+/**
+ * Hash determinístico de los searchParams relevantes a la importación,
+ * usado como `key` del ImportForm para forzar remount cuando hay un
+ * resultado nuevo (y así limpiar el input file).
+ */
+function resultKey(params: {
+  ok?: string;
+  error?: string;
+  matchId?: string;
+  name?: string;
+  entries?: string;
+  stages?: string;
+  stageResults?: string;
+}): string {
+  if (params.error) return `err:${params.error}`;
+  if (params.ok === "1") {
+    return `ok:${params.matchId ?? ""}:${params.entries ?? ""}:${params.stages ?? ""}:${params.stageResults ?? ""}`;
+  }
+  return "idle";
 }
