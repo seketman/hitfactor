@@ -62,8 +62,11 @@ describe("computeShooterStats — casos vacíos", () => {
     expect(s.avgPercentage).toBe(0);
     expect(s.bestPercentage).toBeNull();
     expect(s.bestPlace).toBeNull();
-    expect(s.trendDelta).toBeNull();
-    expect(s.trendWindow).toBe(0);
+    expect(s.avgPercentile).toBeNull();
+    expect(s.bestPercentile).toBeNull();
+    expect(s.consistency).toBeNull();
+    expect(s.trajectorySlope).toBeNull();
+    expect(s.cadence).toBeNull();
     expect(s.topDiscipline).toBeNull();
     expect(s.topDivision).toBeNull();
     expect(s.byDiscipline).toEqual([]);
@@ -80,7 +83,7 @@ describe("computeShooterStats — casos vacíos", () => {
 });
 
 describe("computeShooterStats — un solo entry", () => {
-  it("calcula KPIs básicos sin tendencia", () => {
+  it("calcula KPIs básicos sin tendencia ni consistencia", () => {
     const s = computeShooterStats([
       entry({ matchPercentage: 75, place: 5 }),
     ]);
@@ -89,8 +92,8 @@ describe("computeShooterStats — un solo entry", () => {
     expect(s.avgPercentage).toBe(75);
     expect(s.bestPercentage?.value).toBe(75);
     expect(s.bestPlace?.value).toBe(5);
-    expect(s.trendDelta).toBeNull();
-    expect(s.trendWindow).toBe(0);
+    expect(s.trajectorySlope).toBeNull();
+    expect(s.consistency).toBeNull();
   });
 });
 
@@ -140,46 +143,184 @@ describe("computeShooterStats — bestPercentage / bestPlace", () => {
   });
 });
 
-describe("computeShooterStats — trendDelta", () => {
+describe("computeShooterStats — trajectorySlope (regresión lineal)", () => {
   it("null si hay menos de 2 matches válidos", () => {
     const s = computeShooterStats([entry({ matchPercentage: 50 })]);
-    expect(s.trendDelta).toBeNull();
-    expect(s.trendWindow).toBe(0);
+    expect(s.trajectorySlope).toBeNull();
   });
 
-  it("achica la ventana cuando hay menos de 6 matches", () => {
+  it("pendiente positiva cuando mejorás linealmente", () => {
+    // y = 60, 70, 80 → +10 por torneo
     const s = computeShooterStats([
       entry({ id: "a", matchId: "ma", date: "2026-01-01", matchPercentage: 60 }),
-      entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 80 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 70 }),
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 80 }),
     ]);
-    expect(s.trendWindow).toBe(1);
-    expect(s.trendDelta).toBe(20);
+    expect(s.trajectorySlope).toBeCloseTo(10, 6);
   });
 
-  it("usa ventana de 3 con 6 matches o más", () => {
-    const s = computeShooterStats([
-      entry({ id: "a", matchId: "ma", date: "2026-01-01", matchPercentage: 50 }),
-      entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 60 }),
-      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 70 }),
-      entry({ id: "d", matchId: "md", date: "2026-04-01", matchPercentage: 80 }),
-      entry({ id: "e", matchId: "me", date: "2026-05-01", matchPercentage: 90 }),
-      entry({ id: "f", matchId: "mf", date: "2026-06-01", matchPercentage: 100 }),
-    ]);
-    expect(s.trendWindow).toBe(3);
-    // recientes: (80+90+100)/3=90, anteriores: (50+60+70)/3=60 → +30
-    expect(s.trendDelta).toBe(30);
-  });
-
-  it("tendencia negativa cuando empeoró", () => {
+  it("pendiente negativa cuando empeorás", () => {
     const s = computeShooterStats([
       entry({ id: "a", matchId: "ma", date: "2026-01-01", matchPercentage: 90 }),
       entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 80 }),
-      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 60 }),
-      entry({ id: "d", matchId: "md", date: "2026-04-01", matchPercentage: 50 }),
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 70 }),
     ]);
-    // half=2: recientes (60+50)/2=55, anteriores (90+80)/2=85 → -30
-    expect(s.trendWindow).toBe(2);
-    expect(s.trendDelta).toBe(-30);
+    expect(s.trajectorySlope).toBeCloseTo(-10, 6);
+  });
+
+  it("pendiente ~0 si el rendimiento se mantiene", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", matchPercentage: 75 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 76 }),
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 74 }),
+      entry({ id: "d", matchId: "md", date: "2026-04-01", matchPercentage: 75 }),
+    ]);
+    expect(s.trajectorySlope).not.toBeNull();
+    expect(Math.abs(s.trajectorySlope!)).toBeLessThan(1);
+  });
+});
+
+describe("computeShooterStats — consistencia", () => {
+  it("null con menos de 2 matches válidos", () => {
+    expect(computeShooterStats([]).consistency).toBeNull();
+    expect(
+      computeShooterStats([entry({ matchPercentage: 80 })]).consistency,
+    ).toBeNull();
+  });
+
+  it("baja cuando los puntajes son parecidos", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", matchPercentage: 70 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 71 }),
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 69 }),
+    ]);
+    expect(s.consistency).not.toBeNull();
+    expect(s.consistency!).toBeLessThan(2);
+  });
+
+  it("alta cuando hay mucha varianza", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", matchPercentage: 30 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 90 }),
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 50 }),
+    ]);
+    expect(s.consistency).not.toBeNull();
+    expect(s.consistency!).toBeGreaterThan(20);
+  });
+});
+
+describe("computeShooterStats — percentil", () => {
+  it("null si no se proveen tamaños de división", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", divisionCode: "P", place: 5 }),
+    ]);
+    expect(s.avgPercentile).toBeNull();
+    expect(s.bestPercentile).toBeNull();
+  });
+
+  it("computa percentil = place / total × 100 por match", () => {
+    const sizes = new Map<string, number>([
+      ["ma|P", 10], // #5 de 10 → percentil 50
+      ["mb|P", 20], // #2 de 20 → percentil 10
+    ]);
+    const s = computeShooterStats(
+      [
+        entry({ id: "a", matchId: "ma", divisionCode: "P", place: 5 }),
+        entry({
+          id: "b",
+          matchId: "mb",
+          date: "2026-02-01",
+          divisionCode: "P",
+          place: 2,
+        }),
+      ],
+      { divisionSizes: sizes },
+    );
+    expect(s.avgPercentile).toBeCloseTo(30, 6);
+    expect(s.bestPercentile?.value).toBeCloseTo(10, 6);
+    expect(s.bestPercentile?.matchId).toBe("mb");
+  });
+
+  it("ignora matches sin tamaño conocido para promediar", () => {
+    const sizes = new Map<string, number>([["ma|P", 10]]);
+    const s = computeShooterStats(
+      [
+        entry({ id: "a", matchId: "ma", divisionCode: "P", place: 1 }),
+        entry({
+          id: "b",
+          matchId: "mb",
+          date: "2026-02-01",
+          divisionCode: "P",
+          place: 5,
+        }),
+      ],
+      { divisionSizes: sizes },
+    );
+    // Solo "ma" cuenta: #1 de 10 = 10
+    expect(s.avgPercentile).toBeCloseTo(10, 6);
+  });
+
+  it("excluye DQs del promedio de percentiles", () => {
+    const sizes = new Map<string, number>([
+      ["ma|P", 10],
+      ["mb|P", 10],
+    ]);
+    const s = computeShooterStats(
+      [
+        entry({ id: "a", matchId: "ma", divisionCode: "P", place: 1 }),
+        entry({
+          id: "b",
+          matchId: "mb",
+          date: "2026-02-01",
+          divisionCode: "P",
+          place: 99,
+          isDq: true,
+        }),
+      ],
+      { divisionSizes: sizes },
+    );
+    expect(s.avgPercentile).toBeCloseTo(10, 6);
+  });
+});
+
+describe("computeShooterStats — cadencia", () => {
+  const NOW = new Date("2026-05-01T00:00:00Z");
+
+  it("null cuando no hay matches", () => {
+    expect(computeShooterStats([], { now: NOW }).cadence).toBeNull();
+  });
+
+  it("cuenta días desde el último match", () => {
+    const s = computeShooterStats(
+      [entry({ id: "a", matchId: "ma", date: "2026-04-21" })],
+      { now: NOW },
+    );
+    expect(s.cadence?.daysSinceLastMatch).toBe(10);
+  });
+
+  it("matchesPerMonth = (matches en últimos 90d / 90) × 30", () => {
+    // 3 matches dentro de los últimos 90 días → 1.0/mes
+    const s = computeShooterStats(
+      [
+        entry({ id: "a", matchId: "ma", date: "2026-04-01" }),
+        entry({ id: "b", matchId: "mb", date: "2026-03-01" }),
+        entry({ id: "c", matchId: "mc", date: "2026-02-15" }),
+      ],
+      { now: NOW },
+    );
+    expect(s.cadence?.matchesPerMonth).toBeCloseTo(1, 6);
+  });
+
+  it("excluye matches fuera de la ventana de 90 días", () => {
+    const s = computeShooterStats(
+      [
+        entry({ id: "old", matchId: "ma", date: "2025-01-01" }),
+        entry({ id: "new", matchId: "mb", date: "2026-04-15" }),
+      ],
+      { now: NOW },
+    );
+    // Solo el reciente cuenta para cadencia.
+    expect(s.cadence?.matchesPerMonth).toBeCloseTo(1 / 3, 4);
   });
 });
 

@@ -82,6 +82,34 @@ export async function listEntriesByMatch(
 }
 
 /**
+ * Para cada (match_id, division_code) que aparece en los matches dados,
+ * devuelve cuántos tiradores compitieron en esa división. Lo usamos para
+ * calcular percentiles (place / total) en el dashboard.
+ *
+ * Devuelve un Map con clave `${matchId}|${divisionCode}` → count.
+ */
+export async function getDivisionSizes(
+  supabase: SupabaseClient,
+  matchIds: string[],
+): Promise<Map<string, number>> {
+  if (matchIds.length === 0) return new Map();
+
+  type Row = { match_id: string; divisions: { code: string } | null };
+  const { data } = await supabase
+    .from("match_entries")
+    .select("match_id, divisions(code)")
+    .in("match_id", matchIds);
+
+  const counts = new Map<string, number>();
+  for (const row of (data as unknown as Row[] | null) ?? []) {
+    if (!row.divisions) continue;
+    const key = `${row.match_id}|${row.divisions.code}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
  * Resultados agregados de uno o varios shooters en sus matches, más recientes
  * primero. Aceptamos múltiples IDs porque un usuario puede tener varias
  * identidades linkeadas (una por disciplina/torneo).

@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { PerformanceChart } from "@/components/PerformanceChart";
 import { cn, formatPercent, formatDate } from "@/lib/utils";
-import type { ShooterStats } from "@/lib/stats/shooter-stats";
+import type { CadenceStats, ShooterStats } from "@/lib/stats/shooter-stats";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 /**
@@ -15,6 +14,7 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
 
   return (
     <div className="space-y-4">
+      {/* Fila 1: rendimiento crudo */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Torneos disputados"
@@ -29,9 +29,7 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
           label="Promedio %"
           value={formatPercent(stats.avgPercentage)}
           hint={
-            stats.topDivision
-              ? `Top div: ${stats.topDivision.code}`
-              : undefined
+            stats.topDivision ? `Top div: ${stats.topDivision.code}` : undefined
           }
         />
         <KpiCard
@@ -70,24 +68,30 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
         />
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
-        <TrendCard
-          delta={stats.trendDelta}
-          window={stats.trendWindow}
+      {/* Fila 2: KPIs derivados (estado actual + proyección) */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <PercentileCard
+          avg={stats.avgPercentile}
+          best={stats.bestPercentile}
         />
-        <Card className="px-5 py-4 lg:col-span-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Evolución
-          </p>
-          {stats.timeline.length >= 2 ? (
-            <PerformanceChart points={stats.timeline} />
-          ) : (
-            <p className="mt-3 text-sm text-fg-subtle">
-              Necesitás al menos 2 torneos para ver la evolución.
-            </p>
-          )}
-        </Card>
+        <ConsistencyCard value={stats.consistency} />
+        <SlopeCard slope={stats.trajectorySlope} />
+        <CadenceCard cadence={stats.cadence} />
       </div>
+
+      {/* Chart */}
+      <Card className="px-5 py-4">
+        <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
+          Evolución
+        </p>
+        {stats.timeline.length >= 2 ? (
+          <PerformanceChart points={stats.timeline} />
+        ) : (
+          <p className="mt-3 text-sm text-fg-subtle">
+            Necesitás al menos 2 torneos para ver la evolución.
+          </p>
+        )}
+      </Card>
 
       {stats.byDiscipline.length > 1 && (
         <Card className="px-5 py-4">
@@ -123,61 +127,120 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
   );
 }
 
+// ----------------------------------------------------------------------------
+// KPI cards
+// ----------------------------------------------------------------------------
+
 function KpiCard({
   label,
   value,
   hint,
+  tone,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   hint?: React.ReactNode;
+  tone?: string;
 }) {
   return (
     <Card className="px-5 py-4">
       <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
         {label}
       </p>
-      <p className="mt-1.5 font-mono text-2xl font-semibold tabular-nums">
+      <p
+        className={cn(
+          "mt-1.5 font-mono text-2xl font-semibold tabular-nums",
+          tone,
+        )}
+      >
         {value}
       </p>
-      {hint && (
-        <p className="mt-1 truncate text-xs text-fg-subtle">{hint}</p>
-      )}
+      {hint && <p className="mt-1 truncate text-xs text-fg-subtle">{hint}</p>}
     </Card>
   );
 }
 
-function TrendCard({
-  delta,
-  window,
+function PercentileCard({
+  avg,
+  best,
 }: {
-  delta: number | null;
-  window: number;
+  avg: number | null;
+  best: ShooterStats["bestPercentile"];
 }) {
-  if (delta === null) {
+  if (avg === null) {
     return (
-      <Card className="px-5 py-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-          Tendencia
-        </p>
-        <p className="mt-1.5 text-sm text-fg-subtle">
-          Necesitás más torneos para calcular tu tendencia.
-        </p>
-      </Card>
+      <KpiCard
+        label="Percentil promedio"
+        value="—"
+        hint="Sin datos de tamaño de división"
+      />
+    );
+  }
+  return (
+    <KpiCard
+      label="Percentil promedio"
+      value={`Top ${avg.toFixed(0)}%`}
+      hint={
+        best ? (
+          <Link
+            href={`/matches/${best.matchId}/me`}
+            className="hover:text-accent"
+            title={best.matchName}
+          >
+            mejor: top {best.value.toFixed(0)}% ({formatDate(best.date)})
+          </Link>
+        ) : (
+          "menor = mejor"
+        )
+      }
+    />
+  );
+}
+
+function ConsistencyCard({ value }: { value: number | null }) {
+  if (value === null) {
+    return (
+      <KpiCard
+        label="Consistencia"
+        value="—"
+        hint="Necesitás al menos 2 torneos"
+      />
+    );
+  }
+  // Convención: <10 sólido, 10-20 normal, >20 volátil.
+  const tag =
+    value < 10 ? "sólido" : value < 20 ? "normal" : "volátil";
+  return (
+    <KpiCard
+      label="Consistencia"
+      value={`±${value.toFixed(1)}%`}
+      hint={`${tag} · menor = más predecible`}
+    />
+  );
+}
+
+function SlopeCard({ slope }: { slope: number | null }) {
+  if (slope === null) {
+    return (
+      <KpiCard
+        label="Tendencia"
+        value="—"
+        hint="Necesitás al menos 2 torneos"
+      />
     );
   }
 
-  // Umbral pequeño para considerarla "estable" en lugar de mostrar ±0.x
-  const ABS_THRESHOLD = 0.5;
-  const isFlat = Math.abs(delta) < ABS_THRESHOLD;
-  const isUp = !isFlat && delta > 0;
+  // Umbral pequeño para considerarla "estable".
+  const ABS_THRESHOLD = 0.3;
+  const isFlat = Math.abs(slope) < ABS_THRESHOLD;
+  const isUp = !isFlat && slope > 0;
   const Icon = isFlat ? Minus : isUp ? TrendingUp : TrendingDown;
   const tone = isFlat
     ? "text-fg-muted"
     : isUp
       ? "text-success"
       : "text-danger";
-  const sign = delta > 0 ? "+" : "";
+  const sign = slope > 0 ? "+" : "";
 
   return (
     <Card className="px-5 py-4">
@@ -191,13 +254,42 @@ function TrendCard({
         )}
       >
         <Icon className="h-5 w-5" aria-hidden />
-        {isFlat ? "Estable" : `${sign}${delta.toFixed(1)}%`}
+        {isFlat ? "Estable" : `${sign}${slope.toFixed(1)}%`}
       </p>
       <p className="mt-1 text-xs text-fg-subtle">
-        Últimos {window} vs anteriores {window}
-        {" · "}
-        <Badge>avg</Badge>
+        {isFlat ? "regresión lineal sobre tu historial" : "% por torneo (regresión lineal)"}
       </p>
     </Card>
+  );
+}
+
+function CadenceCard({ cadence }: { cadence: CadenceStats | null }) {
+  if (!cadence) {
+    return <KpiCard label="Cadencia" value="—" hint="Sin matches" />;
+  }
+  const days = cadence.daysSinceLastMatch;
+  const lastLabel =
+    days === null
+      ? null
+      : days === 0
+        ? "hoy"
+        : days === 1
+          ? "ayer"
+          : days < 14
+            ? `hace ${days} días`
+            : days < 60
+              ? `hace ${Math.round(days / 7)} sem`
+              : `hace ${Math.round(days / 30)} meses`;
+
+  return (
+    <KpiCard
+      label="Cadencia"
+      value={`${cadence.matchesPerMonth.toFixed(1)}/mes`}
+      hint={
+        lastLabel
+          ? `últ. 90d · último match ${lastLabel}`
+          : "últimos 90 días"
+      }
+    />
   );
 }

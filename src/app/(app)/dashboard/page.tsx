@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
 import {
+  getDivisionSizes,
   listAllMatches,
   listEntriesByShooters,
   listImportedByUser,
@@ -32,6 +33,12 @@ export default async function DashboardPage() {
     supabase,
     myShooters.map((s) => s.id),
   );
+
+  // Tamaños de división para calcular percentil — uno solo por match.
+  const uniqueMatchIds = Array.from(
+    new Set(myEntries.map((e) => e.matches?.id).filter((id): id is string => !!id)),
+  );
+  const divisionSizes = await getDivisionSizes(supabase, uniqueMatchIds);
 
   return (
     <PageContainer>
@@ -69,7 +76,9 @@ export default async function DashboardPage() {
       {myEntries.length > 0 && (
         <>
           <Section title="Tu performance">
-            <StatsOverview stats={computeShooterStats(myEntries)} />
+            <StatsOverview
+              stats={computeShooterStats(myEntries, { divisionSizes })}
+            />
           </Section>
 
           <Section title={`Tu historial (${myEntries.length})`}>
