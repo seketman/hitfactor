@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { HistoryTable } from "@/components/HistoryTable";
+import { StatsOverview } from "@/components/StatsOverview";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/db/profiles";
 import { getMyShooter } from "@/lib/db/shooters";
@@ -12,6 +13,7 @@ import {
   listEntriesByShooter,
   listImportedByUser,
 } from "@/lib/db/matches";
+import { computeShooterStats } from "@/lib/stats/shooter-stats";
 import { formatDate } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -54,9 +56,15 @@ export default async function DashboardPage() {
       </header>
 
       {myShooter && myEntries.length > 0 && (
-        <Section title={`Tu historial (${myEntries.length})`}>
-          <HistoryTable entries={myEntries} />
-        </Section>
+        <>
+          <Section title="Tu performance">
+            <StatsOverview stats={computeShooterStats(myEntries)} />
+          </Section>
+
+          <Section title={`Tu historial (${myEntries.length})`}>
+            <HistoryTable entries={myEntries} />
+          </Section>
+        </>
       )}
 
       <Section title="Matches que importaste">
