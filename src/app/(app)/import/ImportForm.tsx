@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +19,11 @@ interface ImportFormProps {
  *  - El botón cambia de "Importar" a "Importando..." con spinner.
  *  - Después de un import exitoso, el label pasa a "Importar otro archivo".
  *
+ * El input file nativo está oculto: usamos un botón + nombre de archivo
+ * propios para mantener la UI 100% en español (el "Choose File" /
+ * "No file chosen" del browser depende del locale del sistema y no se
+ * puede traducir vía atributo).
+ *
  * El reseteo del input file se hace por el `key` que pasa la página (que cambia
  * en cada nuevo resultado).
  */
@@ -33,6 +39,7 @@ export function ImportForm({ hasPreviousResult }: ImportFormProps) {
 
 function FormBody({ hasPreviousResult }: { hasPreviousResult: boolean }) {
   const { pending } = useFormStatus();
+  const [filename, setFilename] = useState<string | null>(null);
 
   const buttonLabel = pending
     ? "Importando..."
@@ -42,31 +49,50 @@ function FormBody({ hasPreviousResult }: { hasPreviousResult: boolean }) {
 
   return (
     <fieldset disabled={pending} className="space-y-6 disabled:opacity-60">
-      <label className="block">
-        <span className="mb-1.5 flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
-          <span>Archivo HTML</span>
+      <div>
+        <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
+          <span>Archivo a importar</span>
           {pending && (
             <span className="inline-flex items-center gap-1 text-accent normal-case tracking-normal">
               <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
               Procesando archivo…
             </span>
           )}
-        </span>
-        <input
-          type="file"
-          name="file"
-          accept=".html,.htm,.csv"
-          required
-          aria-busy={pending}
+        </div>
+
+        <label
           className={cn(
-            "block w-full rounded-md border border-border bg-surface-2 text-sm text-fg",
-            "file:mr-4 file:border-0 file:bg-accent file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-bg",
-            pending
-              ? "cursor-not-allowed file:cursor-not-allowed"
-              : "cursor-pointer hover:file:bg-accent-strong",
+            "flex items-center gap-3 rounded-md border border-border bg-surface-2 p-1 pr-3",
+            pending ? "cursor-not-allowed" : "cursor-pointer",
           )}
-        />
-      </label>
+        >
+          <input
+            type="file"
+            name="file"
+            accept=".html,.htm,.csv"
+            required
+            aria-busy={pending}
+            onChange={(e) => setFilename(e.target.files?.[0]?.name ?? null)}
+            className="sr-only"
+          />
+          <span
+            className={cn(
+              "rounded-sm bg-accent px-4 py-2 text-sm font-medium text-bg",
+              !pending && "hover:bg-accent-strong",
+            )}
+          >
+            Elegir archivo
+          </span>
+          <span
+            className={cn(
+              "truncate text-sm",
+              filename ? "text-fg" : "text-fg-subtle",
+            )}
+          >
+            {filename ?? "Ningún archivo seleccionado"}
+          </span>
+        </label>
+      </div>
 
       <Button type="submit" className="w-full" aria-busy={pending}>
         {pending ? (
