@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { parseHtml } from "@/lib/parsers";
+import { parseFile } from "@/lib/parsers";
 import {
   importParsedMatch,
   ImportError,
@@ -16,22 +16,22 @@ export async function importHtml(formData: FormData) {
   }
 
   const filename = file.name;
-  if (!/\.html?$/i.test(filename)) {
-    redirect("/import?error=Solo%20archivos%20HTML%20por%20ahora");
+  if (!/\.(html?|csv)$/i.test(filename)) {
+    redirect("/import?error=Solo%20se%20aceptan%20archivos%20HTML%20o%20CSV");
   }
 
-  const html = await file.text();
+  const content = await file.text();
 
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/login");
 
-  const parsed = parseHtml(html);
+  const parsed = parseFile(content);
 
   if (!parsed.name || !parsed.date) {
     redirect(
       "/import?error=" +
-        encodeURIComponent("El archivo no parece ser un reporte de PractiScore válido."),
+        encodeURIComponent("El archivo no parece ser un reporte válido."),
     );
   }
 

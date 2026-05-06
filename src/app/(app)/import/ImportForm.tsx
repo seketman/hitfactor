@@ -55,7 +55,7 @@ function FormBody({ hasPreviousResult }: { hasPreviousResult: boolean }) {
         <input
           type="file"
           name="file"
-          accept=".html,.htm"
+          accept=".html,.htm,.csv"
           required
           aria-busy={pending}
           className={cn(
