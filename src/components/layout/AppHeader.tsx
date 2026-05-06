@@ -28,6 +28,12 @@ export function AppHeader({ userName }: AppHeaderProps) {
           >
             Importar
           </Link>
+          <Link
+            href="/firearms"
+            className="rounded-md px-3 py-1.5 text-sm text-fg-muted hover:bg-surface-2 hover:text-fg"
+          >
+            Armas
+          </Link>
         </nav>
 
         <div className="flex items-center gap-3">

@@ -4,9 +4,15 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
+import { FirearmSelector } from "@/components/FirearmSelector";
 import { createClient } from "@/lib/supabase/server";
 import { listMyShooters } from "@/lib/db/shooters";
 import { getMyMatchSummary } from "@/lib/db/matches";
+import {
+  getMatchFirearmLog,
+  listMyFirearms,
+} from "@/lib/db/firearms";
+import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
 import type { MyMatchSummary } from "@/lib/db/types";
 import { getClubCode, getClubName } from "@/lib/clubs";
 import { formatDate, formatNumber, formatPercent } from "@/lib/utils";
@@ -74,6 +80,15 @@ export default async function PersonalMatchPage({ params }: PageProps) {
     match.disciplines?.code === "steel_challenge" ||
     match.disciplines?.code === "combat_solutions";
 
+  const [myFirearms, currentFirearmLog] = await Promise.all([
+    listMyFirearms(supabase, userId),
+    getMatchFirearmLog(supabase, entry.id),
+  ]);
+  const suggestedRounds = estimateRoundsFired(
+    match.disciplines?.code,
+    stageResults.length,
+  );
+
   return (
     <PageContainer>
       <BackToDashboard />
@@ -105,6 +120,14 @@ export default async function PersonalMatchPage({ params }: PageProps) {
       ) : (
         <IpscSummaryCard entry={entry} />
       )}
+
+      <FirearmSelector
+        matchEntryId={entry.id}
+        matchId={id}
+        firearms={myFirearms}
+        current={currentFirearmLog}
+        suggestedRounds={suggestedRounds}
+      />
 
       <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">

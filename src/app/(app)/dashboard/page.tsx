@@ -15,6 +15,7 @@ import {
   listImportedByUser,
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
+import { listFirearmUsageStats } from "@/lib/db/firearms";
 import { formatDate } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -22,12 +23,14 @@ export default async function DashboardPage() {
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData.user!.id; // garantizado por (app)/layout
 
-  const [profile, myShooters, importedMatches, allMatches] = await Promise.all([
-    getProfile(supabase, userId),
-    listMyShooters(supabase, userId),
-    listImportedByUser(supabase, userId),
-    listAllMatches(supabase),
-  ]);
+  const [profile, myShooters, importedMatches, allMatches, firearmStats] =
+    await Promise.all([
+      getProfile(supabase, userId),
+      listMyShooters(supabase, userId),
+      listImportedByUser(supabase, userId),
+      listAllMatches(supabase),
+      listFirearmUsageStats(supabase, userId),
+    ]);
 
   const myEntries = await listEntriesByShooters(
     supabase,
@@ -85,6 +88,41 @@ export default async function DashboardPage() {
             <HistoryTable entries={myEntries} />
           </Section>
         </>
+      )}
+
+      {firearmStats.length > 0 && (
+        <Section title="Tus armas">
+          <Card>
+            <ul className="divide-y divide-border">
+              {firearmStats.map(({ firearm, totalRounds, totalMatches, lastUsedDate }) => (
+                <li key={firearm.id}>
+                  <Link
+                    href={`/firearms/${firearm.id}`}
+                    className="flex flex-wrap items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-2/40"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">{firearm.name}</p>
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-fg-muted">
+                        {firearm.brand && <span>{firearm.brand}</span>}
+                        {firearm.model && <span>{firearm.model}</span>}
+                        {firearm.caliber && <Badge>{firearm.caliber}</Badge>}
+                      </p>
+                    </div>
+                    <div className="text-right text-sm">
+                      <p className="font-mono text-fg">
+                        {totalRounds.toLocaleString("es-AR")} tiros
+                      </p>
+                      <p className="text-xs text-fg-subtle">
+                        {totalMatches} torneo{totalMatches === 1 ? "" : "s"}
+                        {lastUsedDate && ` · últ. ${formatDate(lastUsedDate)}`}
+                      </p>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </Section>
       )}
 
       <Section title="Matches que importaste">

@@ -111,6 +111,36 @@ export interface MyStageResultRow {
   } | null;
 }
 
+export interface Firearm {
+  id: string;
+  owner_user_id: string;
+  name: string;
+  brand: string | null;
+  model: string | null;
+  caliber: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MatchFirearmLog {
+  match_entry_id: string;
+  firearm_id: string;
+  rounds_fired: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Estadísticas de uso de un arma a partir del log. */
+export interface FirearmUsageStats {
+  firearm: Firearm;
+  totalMatches: number;
+  totalRounds: number;
+  /** Fecha del último match (YYYY-MM-DD), o null si no se usó nunca. */
+  lastUsedDate: string | null;
+}
+
 /** Resumen de mi participación en un match: entry + stages. */
 export interface MyMatchSummary {
   match: MatchWithDiscipline;
