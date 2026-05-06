@@ -13,6 +13,7 @@ import {
   listMyFirearms,
 } from "@/lib/db/firearms";
 import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
+import { isTimeBasedDiscipline } from "@/lib/disciplines";
 import type { MyMatchSummary } from "@/lib/db/types";
 import { getClubCode, getClubName } from "@/lib/clubs";
 import { formatDate, formatNumber, formatPercent } from "@/lib/utils";
@@ -75,10 +76,7 @@ export default async function PersonalMatchPage({ params }: PageProps) {
   const { match, entry, stageResults } = summary;
   const clubCode = getClubCode(match.region);
   const clubName = getClubName(match.region);
-  const isTimeBased =
-    match.disciplines?.scoring_type === "time_plus" ||
-    match.disciplines?.code === "steel_challenge" ||
-    match.disciplines?.code === "combat_solutions";
+  const isTimeBased = isTimeBasedDiscipline(match.disciplines);
 
   const [myFirearms, currentFirearmLog] = await Promise.all([
     listMyFirearms(supabase, userId),

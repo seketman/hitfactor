@@ -1,3 +1,4 @@
+import { DISCIPLINE } from "@/lib/disciplines";
 import type {
   ParsedMatch,
   ParsedMatchEntry,
@@ -165,7 +166,7 @@ export function parseFbiCsv(content: string): ParsedMatch {
   }
 
   return {
-    discipline: "tiro_fbi",
+    discipline: DISCIPLINE.FBI,
     source: "fbi_csv",
     name: matchName,
     date,

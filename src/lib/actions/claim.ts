@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { redirectWithError } from "@/lib/redirects";
 
 /**
  * Acción de claim de un shooter: el usuario logueado declara
@@ -48,14 +49,11 @@ export async function claimShooter(formData: FormData) {
     return;
   }
 
+  const errorTarget = redirectTo || (matchId ? `/matches/${matchId}` : "/dashboard");
+
   // Linkeado a otro usuario: error.
   if (shooter && shooter.linked_user_id && shooter.linked_user_id !== userId) {
-    const errorTarget = redirectTo || (matchId ? `/matches/${matchId}` : "/dashboard");
-    redirect(
-      `${errorTarget}?error=${encodeURIComponent(
-        "Este tirador ya fue claimado por otro usuario.",
-      )}`,
-    );
+    redirectWithError(errorTarget, "Este tirador ya fue claimado por otro usuario.");
   }
 
   const { error } = await supabase
@@ -65,12 +63,7 @@ export async function claimShooter(formData: FormData) {
     .is("linked_user_id", null);
 
   if (error) {
-    const errorTarget = redirectTo || (matchId ? `/matches/${matchId}` : "/dashboard");
-    redirect(
-      `${errorTarget}?error=${encodeURIComponent(
-        "No se pudo linkear el tirador: " + error.message,
-      )}`,
-    );
+    redirectWithError(errorTarget, "No se pudo linkear el tirador: " + error.message);
   }
 
   if (matchId) revalidatePath(`/matches/${matchId}`);

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { redirectWithError } from "@/lib/redirects";
 
 export async function signup(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
@@ -9,11 +10,11 @@ export async function signup(formData: FormData) {
   const displayName = String(formData.get("display_name") ?? "").trim();
 
   if (!email || !password || !displayName) {
-    redirect("/signup?error=Faltan%20datos");
+    redirectWithError("/signup", "Faltan datos");
   }
 
   if (password.length < 8) {
-    redirect("/signup?error=La%20contrase%C3%B1a%20debe%20tener%20al%20menos%208%20caracteres");
+    redirectWithError("/signup", "La contraseña debe tener al menos 8 caracteres");
   }
 
   const supabase = await createClient();
@@ -28,7 +29,7 @@ export async function signup(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+    redirectWithError("/signup", error.message);
   }
 
   // Si el proyecto requiere confirmación de email, no habrá session aún.

@@ -1,4 +1,5 @@
 import { parse, type HTMLElement } from "node-html-parser";
+import { DISCIPLINE } from "../disciplines";
 import type {
   ParsedMatch,
   ParsedMatchEntry,
@@ -85,7 +86,7 @@ export function parseSteelChallengeHtml(html: string): ParsedMatch {
     matchEntries.find((e) => e.shooter.region)?.shooter.region ?? null;
 
   return {
-    discipline: "steel_challenge",
+    discipline: DISCIPLINE.STEEL,
     source: "practiscore_steel_html",
     name,
     date,

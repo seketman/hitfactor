@@ -1,4 +1,5 @@
 import { parse, type HTMLElement } from "node-html-parser";
+import { DISCIPLINE } from "../disciplines";
 import type {
   ParsedMatch,
   ParsedMatchEntry,
@@ -101,7 +102,7 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
     null;
 
   return {
-    discipline: "ipsc",
+    discipline: DISCIPLINE.IPSC,
     source,
     name,
     date,

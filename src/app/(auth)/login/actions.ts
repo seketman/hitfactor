@@ -2,20 +2,21 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { redirectWithError } from "@/lib/redirects";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    redirect("/login?error=Faltan%20credenciales");
+    redirectWithError("/login", "Faltan credenciales");
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirectWithError("/login", error.message);
   }
 
   redirect("/dashboard");

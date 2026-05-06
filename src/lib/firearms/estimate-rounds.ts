@@ -15,6 +15,8 @@
  *  - Otras disciplinas: null.
  */
 
+import { DISCIPLINE } from "@/lib/disciplines";
+
 const FBI_ROUNDS = 45; // 8 × 5 puntuables + 5 warmup
 const STEEL_ROUNDS_PER_STAGE = 25; // 5 strings × 5 platos
 
@@ -23,9 +25,9 @@ export function estimateRoundsFired(
   stagesImportedCount: number,
 ): number | null {
   switch (disciplineCode) {
-    case "tiro_fbi":
+    case DISCIPLINE.FBI:
       return FBI_ROUNDS;
-    case "steel_challenge":
+    case DISCIPLINE.STEEL:
       return stagesImportedCount > 0
         ? stagesImportedCount * STEEL_ROUNDS_PER_STAGE
         : null;

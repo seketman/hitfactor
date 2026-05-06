@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { parseFile } from "@/lib/parsers";
+import { redirectWithError } from "@/lib/redirects";
 import {
   importParsedMatch,
   ImportError,
@@ -12,12 +13,12 @@ import {
 export async function importHtml(formData: FormData) {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    redirect("/import?error=Eleg%C3%AD%20un%20archivo");
+    redirectWithError("/import", "Elegí un archivo");
   }
 
   const filename = file.name;
   if (!/\.(html?|csv)$/i.test(filename)) {
-    redirect("/import?error=Solo%20se%20aceptan%20archivos%20HTML%20o%20CSV");
+    redirectWithError("/import", "Solo se aceptan archivos HTML o CSV");
   }
 
   const content = await file.text();
@@ -29,10 +30,7 @@ export async function importHtml(formData: FormData) {
   const parsed = parseFile(content);
 
   if (!parsed.name || !parsed.date) {
-    redirect(
-      "/import?error=" +
-        encodeURIComponent("El archivo no parece ser un reporte válido."),
-    );
+    redirectWithError("/import", "El archivo no parece ser un reporte válido.");
   }
 
   let result: ImportResult;
@@ -40,7 +38,7 @@ export async function importHtml(formData: FormData) {
     result = await importParsedMatch(supabase, parsed, userData.user.id, filename);
   } catch (e) {
     if (e instanceof ImportError) {
-      redirect(`/import?error=${encodeURIComponent(e.message)}`);
+      redirectWithError("/import", e.message);
     }
     throw e;
   }

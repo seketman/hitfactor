@@ -4,11 +4,9 @@
  * y la entrada al importador.
  */
 
-export type Discipline =
-  | "ipsc" // Tiro Práctico
-  | "steel_challenge"
-  | "combat_solutions"
-  | "tiro_fbi";
+import type { DisciplineCode } from "@/lib/disciplines";
+
+export type Discipline = DisciplineCode;
 
 export type PowerFactor = "Min" | "Maj" | null;
 

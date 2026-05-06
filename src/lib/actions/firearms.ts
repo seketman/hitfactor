@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { redirectWithError } from "@/lib/redirects";
 
 /**
  * Acciones para administrar el catálogo de armas del usuario y el log
@@ -19,7 +20,7 @@ function trimOrNull(value: unknown): string | null {
 export async function createFirearm(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
-    redirect("/firearms?error=" + encodeURIComponent("Falta el nombre"));
+    redirectWithError("/firearms", "Falta el nombre");
   }
 
   const supabase = await createClient();
@@ -36,7 +37,7 @@ export async function createFirearm(formData: FormData) {
   });
 
   if (error) {
-    redirect("/firearms?error=" + encodeURIComponent(error.message));
+    redirectWithError("/firearms", error.message);
   }
 
   revalidatePath("/firearms");
@@ -48,7 +49,7 @@ export async function updateFirearm(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   if (!id || !name) {
-    redirect("/firearms?error=" + encodeURIComponent("Datos incompletos"));
+    redirectWithError("/firearms", "Datos incompletos");
   }
 
   const supabase = await createClient();
@@ -67,7 +68,7 @@ export async function updateFirearm(formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    redirect("/firearms?error=" + encodeURIComponent(error.message));
+    redirectWithError("/firearms", error.message);
   }
 
   revalidatePath("/firearms");
@@ -86,7 +87,7 @@ export async function deleteFirearm(formData: FormData) {
 
   const { error } = await supabase.from("firearms").delete().eq("id", id);
   if (error) {
-    redirect("/firearms?error=" + encodeURIComponent(error.message));
+    redirectWithError("/firearms", error.message);
   }
 
   revalidatePath("/firearms");
@@ -119,14 +120,12 @@ export async function setMatchFirearm(formData: FormData) {
       .delete()
       .eq("match_entry_id", matchEntryId);
     if (error) {
-      redirect(`${errorTarget}?error=${encodeURIComponent(error.message)}`);
+      redirectWithError(errorTarget, error.message);
     }
   } else {
     const rounds = Number.parseInt(roundsRaw, 10);
     if (!Number.isFinite(rounds) || rounds < 0) {
-      redirect(
-        `${errorTarget}?error=${encodeURIComponent("Tiros disparados inválido")}`,
-      );
+      redirectWithError(errorTarget, "Tiros disparados inválido");
     }
 
     const { error } = await supabase.from("match_firearm_log").upsert(
@@ -139,7 +138,7 @@ export async function setMatchFirearm(formData: FormData) {
       { onConflict: "match_entry_id" },
     );
     if (error) {
-      redirect(`${errorTarget}?error=${encodeURIComponent(error.message)}`);
+      redirectWithError(errorTarget, error.message);
     }
   }
 
