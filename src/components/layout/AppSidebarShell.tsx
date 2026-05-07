@@ -11,6 +11,7 @@ import {
   Upload,
   LayoutDashboard,
   Crosshair,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -176,6 +177,13 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
               icon={<Upload className="h-4 w-4" aria-hidden />}
               label="Importar"
               active={pathname === "/import"}
+              collapsed={collapsed}
+            />
+            <NavItem
+              href="/activity"
+              icon={<History className="h-4 w-4" aria-hidden />}
+              label="Actividad"
+              active={pathname === "/activity"}
               collapsed={collapsed}
             />
           </ul>

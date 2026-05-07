@@ -4,16 +4,50 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
+import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 
 export async function deleteMatch(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
   if (!matchId) return;
 
   const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) redirect("/login");
+
+  // Snapshot antes de borrar — sino perdemos el contexto para auditar.
+  const { data: matchSnapshot } = await supabase
+    .from("matches")
+    .select("name, date, region, disciplines(code, name)")
+    .eq("id", matchId)
+    .maybeSingle();
+
   const { error } = await supabase.from("matches").delete().eq("id", matchId);
   if (error) {
     redirectWithError(`/matches/${matchId}`, "No se pudo borrar: " + error.message);
   }
+
+  if (matchSnapshot) {
+    type Snapshot = {
+      name: string;
+      date: string;
+      region: string | null;
+      disciplines: { code: string; name: string } | null;
+    };
+    const snap = matchSnapshot as unknown as Snapshot;
+    await logAction(supabase, userData.user.id, {
+      action: AUDIT_ACTION.MATCH_DELETE,
+      entityType: "match",
+      entityId: matchId,
+      metadata: {
+        match_name: snap.name,
+        match_date: snap.date,
+        region: snap.region,
+        discipline_code: snap.disciplines?.code,
+        discipline_name: snap.disciplines?.name,
+      },
+    });
+  }
+
   redirect("/dashboard?info=" + encodeURIComponent("Match eliminado"));
 }
 
@@ -52,6 +86,13 @@ export async function updateMatchClub(formData: FormData) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/login");
 
+  // Snapshot antes para registrar before/after.
+  const { data: matchBefore } = await supabase
+    .from("matches")
+    .select("name, region")
+    .eq("id", matchId)
+    .maybeSingle();
+
   const { error } = await supabase
     .from("matches")
     .update({ region })
@@ -60,6 +101,20 @@ export async function updateMatchClub(formData: FormData) {
 
   if (error) {
     redirectWithError(`/matches/${matchId}`, "No se pudo actualizar el club: " + error.message);
+  }
+
+  if (matchBefore) {
+    const snap = matchBefore as unknown as { name: string; region: string | null };
+    await logAction(supabase, userData.user.id, {
+      action: AUDIT_ACTION.MATCH_UPDATE_CLUB,
+      entityType: "match",
+      entityId: matchId,
+      metadata: {
+        match_name: snap.name,
+        before: { region: snap.region },
+        after: { region },
+      },
+    });
   }
 
   revalidatePath(`/matches/${matchId}`);

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
+import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 
 /**
  * Acción de claim de un shooter: el usuario logueado declara
@@ -37,7 +38,7 @@ export async function claimShooter(formData: FormData) {
 
   const { data: shooter } = await supabase
     .from("shooters")
-    .select("id, linked_user_id")
+    .select("id, full_name, linked_user_id")
     .eq("id", shooterId)
     .maybeSingle();
 
@@ -66,6 +67,29 @@ export async function claimShooter(formData: FormData) {
     redirectWithError(errorTarget, "No se pudo linkear el tirador: " + error.message);
   }
 
+  // Si vino con match_id resolvemos también el nombre del match para que
+  // la línea del audit log diga "desde 'Social 4 - 19/04/26'".
+  let matchName: string | undefined;
+  if (matchId) {
+    const { data: m } = await supabase
+      .from("matches")
+      .select("name")
+      .eq("id", matchId)
+      .maybeSingle();
+    matchName = (m as { name?: string } | null)?.name;
+  }
+
+  await logAction(supabase, userId, {
+    action: AUDIT_ACTION.SHOOTER_CLAIM,
+    entityType: "shooter",
+    entityId: shooterId,
+    metadata: {
+      shooter_full_name: (shooter as { full_name?: string } | null)?.full_name,
+      match_id: matchId || undefined,
+      match_name: matchName,
+    },
+  });
+
   if (matchId) revalidatePath(`/matches/${matchId}`);
   revalidatePath("/dashboard");
 
@@ -87,11 +111,33 @@ export async function unclaimShooter(formData: FormData) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/login");
 
-  await supabase
+  // Snapshot del nombre antes de desvincular.
+  const { data: shooter } = await supabase
+    .from("shooters")
+    .select("full_name")
+    .eq("id", shooterId)
+    .eq("linked_user_id", userData.user.id)
+    .maybeSingle();
+
+  const { data: updated } = await supabase
     .from("shooters")
     .update({ linked_user_id: null })
     .eq("id", shooterId)
-    .eq("linked_user_id", userData.user.id);
+    .eq("linked_user_id", userData.user.id)
+    .select("id");
+
+  // Solo logueamos si el update afectó alguna fila — sino podríamos loggear
+  // intentos que no hicieron nada (ej. doble submit, shooter ajeno).
+  if (Array.isArray(updated) && updated.length > 0) {
+    await logAction(supabase, userData.user.id, {
+      action: AUDIT_ACTION.SHOOTER_UNCLAIM,
+      entityType: "shooter",
+      entityId: shooterId,
+      metadata: {
+        shooter_full_name: (shooter as { full_name?: string } | null)?.full_name,
+      },
+    });
+  }
 
   if (matchId) revalidatePath(`/matches/${matchId}`);
   revalidatePath("/dashboard");

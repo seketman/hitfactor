@@ -111,6 +111,16 @@ export interface MyStageResultRow {
   } | null;
 }
 
+export interface AuditLogRow {
+  id: number;
+  user_id: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface Club {
   code: string;
   name: string;
