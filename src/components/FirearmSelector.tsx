@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -81,11 +83,22 @@ function FirearmForm({
   suggestedRounds,
 }: FirearmSelectorProps) {
   const initialFirearmId = current?.firearm_id ?? "";
-  const initialRounds =
-    current?.rounds_fired ?? suggestedRounds ?? 0;
+
+  // Default de tiros:
+  //  - Si hay un valor guardado real (>0), lo usamos.
+  //  - Si no, intentamos auto-estimar (FBI=45, Steel=stages*25).
+  //  - Si no, vacío + placeholder. Para IPSC no podemos estimar, así que el
+  //    usuario tiene que tipear. Mostrar 0 era engañoso porque la gente
+  //    guardaba sin darse cuenta.
+  const initialRoundsNumber =
+    current?.rounds_fired && current.rounds_fired > 0
+      ? current.rounds_fired
+      : suggestedRounds;
 
   const [firearmId, setFirearmId] = useState<string>(initialFirearmId);
-  const [rounds, setRounds] = useState<string>(String(initialRounds));
+  const [rounds, setRounds] = useState<string>(
+    initialRoundsNumber != null ? String(initialRoundsNumber) : "",
+  );
 
   const isClearing = !firearmId;
 
@@ -115,6 +128,7 @@ function FirearmForm({
           name="rounds_fired"
           type="number"
           min={0}
+          placeholder="Ej: 100"
           value={rounds}
           onChange={(e) => setRounds(e.target.value)}
           disabled={isClearing}
@@ -126,9 +140,34 @@ function FirearmForm({
         />
       </div>
 
-      <Button type="submit" size="sm">
-        {current ? "Actualizar" : isClearing ? "Confirmar" : "Guardar"}
-      </Button>
+      <SubmitButton isUpdate={!!current} isClearing={isClearing} />
     </form>
+  );
+}
+
+function SubmitButton({
+  isUpdate,
+  isClearing,
+}: {
+  isUpdate: boolean;
+  isClearing: boolean;
+}) {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button type="submit" size="sm" disabled={pending} aria-busy={pending}>
+      {pending ? (
+        <>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          Guardando…
+        </>
+      ) : isUpdate ? (
+        "Actualizar"
+      ) : isClearing ? (
+        "Confirmar"
+      ) : (
+        "Guardar"
+      )}
+    </Button>
   );
 }
