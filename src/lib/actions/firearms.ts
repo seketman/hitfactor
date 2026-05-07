@@ -145,5 +145,12 @@ export async function setMatchFirearm(formData: FormData) {
   if (matchId) revalidatePath(`/matches/${matchId}/me`);
   revalidatePath("/dashboard");
   revalidatePath("/firearms");
-  redirect(matchId ? `/matches/${matchId}/me` : "/dashboard");
+
+  // Preservamos el ?entry= para que el usuario quede en la misma división que
+  // estaba editando — sino lo manda a la entry de mejor % por default y
+  // pierde el contexto.
+  const target = matchId
+    ? `/matches/${matchId}/me?entry=${encodeURIComponent(matchEntryId)}`
+    : "/dashboard";
+  redirect(target);
 }

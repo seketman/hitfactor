@@ -54,7 +54,15 @@ export function FirearmSelector({
       <p className="mb-3 text-xs font-medium uppercase tracking-wider text-fg-muted">
         Arma usada
       </p>
+      {/*
+        key={matchEntryId} fuerza remount cuando cambia la entry (ej: el
+        usuario salta entre divisiones del mismo match con el DivisionSelector).
+        Sin esto, los useState internos retienen el firearmId/rounds de la
+        división anterior y el form muestra valores que no corresponden a la
+        entry actual.
+      */}
       <FirearmForm
+        key={matchEntryId}
         matchEntryId={matchEntryId}
         matchId={matchId}
         firearms={firearms}
