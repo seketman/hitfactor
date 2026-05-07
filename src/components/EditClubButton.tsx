@@ -11,9 +11,7 @@ interface EditClubButtonProps {
   matchId: string;
   /** Region actual del match, ej "ARG-TFALP", "TFALP", o un texto libre. */
   currentRegion: string | null;
-  /** Code del país detectado en el region actual (ej "ARG"), null si no se detectó. */
-  currentCountry: string | null;
-  /** Code del club detectado, null si no se mapeó al catálogo. */
+  /** Code del club detectado en el region actual, null si no se mapeó al catálogo. */
   currentClubCode: string | null;
   clubs: Club[];
 }
@@ -23,13 +21,13 @@ interface EditClubButtonProps {
  * club se llevó a cabo el match. Útil cuando los datos importados no incluyen
  * la región (típico FBI).
  *
- * El select se popula desde la tabla `clubs` (ver db/clubs.ts). La opción
- * "Otro..." habilita un input free-text para clubs no listados.
+ * El select se popula desde la tabla `clubs` (ver db/clubs.ts). El país
+ * se infiere del club seleccionado (es atributo del club, no del torneo).
+ * La opción "Otro..." habilita un input free-text para clubs no listados.
  */
 export function EditClubButton({
   matchId,
   currentRegion,
-  currentCountry,
   currentClubCode,
   clubs,
 }: EditClubButtonProps) {
@@ -47,7 +45,6 @@ export function EditClubButton({
     <ClubForm
       matchId={matchId}
       currentRegion={currentRegion}
-      currentCountry={currentCountry}
       currentClubCode={currentClubCode}
       clubs={clubs}
       onCancel={() => setOpen(false)}
@@ -58,7 +55,6 @@ export function EditClubButton({
 function ClubForm({
   matchId,
   currentRegion,
-  currentCountry,
   currentClubCode,
   clubs,
   onCancel,
@@ -72,20 +68,22 @@ function ClubForm({
   const [clubCode, setClubCode] = useState<string>(
     initialCodeIsKnown ? currentClubCode! : currentRegion ? "OTHER" : "",
   );
-  const [country, setCountry] = useState<string>(currentCountry ?? "ARG");
   const [custom, setCustom] = useState<string>(
     initialCodeIsKnown ? "" : currentRegion ?? "",
   );
 
+  // País derivado del club seleccionado (atributo del club, no del torneo).
+  const selectedClub = clubs.find((c) => c.code === clubCode);
+  const country = selectedClub?.country ?? "";
+
   const isOther = clubCode === "OTHER";
-  const isCleared = clubCode === "";
 
   return (
     <form action={updateMatchClub} className="flex flex-wrap items-end gap-3">
       <input type="hidden" name="match_id" value={matchId} />
       <input type="hidden" name="country" value={country} />
 
-      <div className="min-w-[200px]">
+      <div className="min-w-[220px]">
         <Select
           label="Club"
           name="club_code"
@@ -96,6 +94,7 @@ function ClubForm({
           {clubs.map((c) => (
             <option key={c.code} value={c.code}>
               {c.name}
+              {c.country ? ` (${c.country})` : ""}
             </option>
           ))}
           <option value="OTHER">Otro…</option>
@@ -103,7 +102,7 @@ function ClubForm({
       </div>
 
       {isOther && (
-        <div className="min-w-[180px]">
+        <div className="min-w-[200px]">
           <Input
             label="Nombre del club"
             name="custom"
@@ -111,17 +110,6 @@ function ClubForm({
             onChange={(e) => setCustom(e.target.value)}
             placeholder="Ej: Club Tiro XYZ"
             required
-          />
-        </div>
-      )}
-
-      {!isOther && !isCleared && (
-        <div className="w-24">
-          <Input
-            label="País"
-            value={country}
-            onChange={(e) => setCountry(e.target.value.toUpperCase())}
-            placeholder="ARG"
           />
         </div>
       )}

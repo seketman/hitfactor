@@ -94,7 +94,6 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
             <EditClubButton
               matchId={match.id}
               currentRegion={match.region}
-              currentCountry={parsedClub.country}
               currentClubCode={parsedClub.clubCode}
               clubs={clubs}
             />
