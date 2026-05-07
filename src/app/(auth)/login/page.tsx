@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Alert } from "@/components/ui/Alert";
 import { login } from "./actions";
 
@@ -38,9 +39,8 @@ export default async function LoginPage({
 
       <form action={login} className="space-y-4">
         <Input label="Email" type="email" name="email" required autoComplete="email" />
-        <Input
+        <PasswordInput
           label="Contraseña"
-          type="password"
           name="password"
           required
           autoComplete="current-password"
