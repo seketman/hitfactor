@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { FeedbackRow, FeedbackType } from "./types";
 
+/**
+ * Mínimo de participaciones (match_entries) que necesita un usuario para
+ * poder enviar feedback. Filtra reportes prematuros de gente que recién
+ * está probando la app sin haber importado un match real todavía.
+ */
+export const FEEDBACK_MIN_ENTRIES = 3;
+
 interface CreateFeedbackInput {
   type: FeedbackType;
   message: string;

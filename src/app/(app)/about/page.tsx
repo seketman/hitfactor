@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { FeedbackForm } from "@/components/FeedbackForm";
 import { requireUser } from "@/lib/supabase/require-user";
-import { listMyFeedback } from "@/lib/db/feedback";
+import { FEEDBACK_MIN_ENTRIES, listMyFeedback } from "@/lib/db/feedback";
+import { countMyMatchEntries } from "@/lib/db/shooters";
 import type { FeedbackStatus, FeedbackType } from "@/lib/db/types";
 import { formatDateTime } from "@/lib/utils";
 
@@ -66,7 +67,11 @@ const STATUS_TONE: Record<
 export default async function AboutPage({ searchParams }: PageProps) {
   const { sent, error } = await searchParams;
   const { supabase, user } = await requireUser();
-  const myReports = await listMyFeedback(supabase, user.id);
+  const [myReports, entryCount] = await Promise.all([
+    listMyFeedback(supabase, user.id),
+    countMyMatchEntries(supabase, user.id),
+  ]);
+  const canSubmit = entryCount >= FEEDBACK_MIN_ENTRIES;
 
   return (
     <PageContainer className="max-w-3xl">
@@ -122,9 +127,38 @@ export default async function AboutPage({ searchParams }: PageProps) {
         </Alert>
       )}
 
-      <Card className="mb-10 px-6 py-6">
-        <FeedbackForm />
-      </Card>
+      {canSubmit ? (
+        <Card className="mb-10 px-6 py-6">
+          <FeedbackForm />
+        </Card>
+      ) : (
+        <Card className="mb-10 px-6 py-6">
+          <p className="text-sm font-medium">
+            Reportá cuando tengas un poco más de uso encima
+          </p>
+          <p className="mt-2 text-sm text-fg-muted">
+            Para mandar bugs o sugerencias necesitás al menos{" "}
+            <span className="font-medium text-fg">
+              {FEEDBACK_MIN_ENTRIES} participaciones
+            </span>{" "}
+            registradas — pueden ser tres torneos distintos, un torneo en tres
+            divisiones, o cualquier combinación. Eso filtra los reportes
+            prematuros y me ayuda a triagear con foco.
+          </p>
+          <p className="mt-3 text-xs text-fg-subtle">
+            Llevás{" "}
+            <span className="font-mono font-medium text-fg">{entryCount}</span>{" "}
+            de {FEEDBACK_MIN_ENTRIES}.{" "}
+            {entryCount === 0
+              ? "Importá tu primer match para arrancar."
+              : `Te ${
+                  FEEDBACK_MIN_ENTRIES - entryCount === 1
+                    ? "falta 1 participación"
+                    : `faltan ${FEEDBACK_MIN_ENTRIES - entryCount} participaciones`
+                }.`}
+          </p>
+        </Card>
+      )}
 
       {myReports.length > 0 && (
         <section>

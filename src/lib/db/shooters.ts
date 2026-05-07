@@ -40,6 +40,30 @@ export async function listMyDisciplines(
 }
 
 /**
+ * Cuenta total de match_entries del usuario, agregando todas sus identidades.
+ * Una "participación" = un match_entry (un match × una división por shooter).
+ * Tres participaciones pueden ser un torneo en 3 divisiones, 3 torneos
+ * distintos, o cualquier combinación.
+ *
+ * Se usa para gatear features (ej: feedback) detrás de un mínimo de actividad.
+ */
+export async function countMyMatchEntries(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<number> {
+  const shooters = await listMyShooters(supabase, userId);
+  if (shooters.length === 0) return 0;
+  const { count } = await supabase
+    .from("match_entries")
+    .select("id", { count: "exact", head: true })
+    .in(
+      "shooter_id",
+      shooters.map((s) => s.id),
+    );
+  return count ?? 0;
+}
+
+/**
  * Devuelve todos los shooters linkeados al usuario.
  *
  * Un usuario puede tener varias identidades (una por cada variante de su

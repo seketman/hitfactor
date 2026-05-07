@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
-import { createFeedback } from "@/lib/db/feedback";
+import { createFeedback, FEEDBACK_MIN_ENTRIES } from "@/lib/db/feedback";
+import { countMyMatchEntries } from "@/lib/db/shooters";
 import type { FeedbackType } from "@/lib/db/types";
 
 const VALID_TYPES: FeedbackType[] = ["bug", "suggestion", "other"];
@@ -39,6 +40,16 @@ export async function submitFeedback(formData: FormData) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) redirect("/login");
+
+  // Gate por mínimo de participaciones — defense in depth, la UI ya esconde
+  // el form pero un cliente malicioso podría postear el formulario igual.
+  const entryCount = await countMyMatchEntries(supabase, userData.user.id);
+  if (entryCount < FEEDBACK_MIN_ENTRIES) {
+    redirectWithError(
+      "/about",
+      `Necesitás al menos ${FEEDBACK_MIN_ENTRIES} participaciones para reportar.`,
+    );
+  }
 
   const { error } = await createFeedback(supabase, userData.user.id, {
     type,
