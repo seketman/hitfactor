@@ -115,49 +115,55 @@ export async function listEntriesByShooters(
 }
 
 /**
- * Resumen de la participación de un shooter en un match específico:
- * el match con disciplina, su match_entry, y todos sus stage_results
- * (ordenados por número de stage).
+ * Match entries del usuario en un match dado. Si participó en varias
+ * divisiones del mismo match (típico FBI: Pistola + PCC en el mismo
+ * Social), devuelve **todas**, ordenadas por match_percentage descendente.
  *
- * Devuelve null si el shooter no participó del match.
+ * Acepta `shooterIds` plural porque un usuario puede tener varias identidades
+ * linkeadas; igual filtramos por todas en una sola query.
  */
-export async function getMyMatchSummary(
+export async function listMyEntriesInMatch(
   supabase: SupabaseClient,
   matchId: string,
-  shooterId: string,
-): Promise<MyMatchSummary | null> {
-  const match = await getMatchById(supabase, matchId);
-  if (!match) return null;
+  shooterIds: string[],
+): Promise<MyMatchSummary["entry"][]> {
+  if (shooterIds.length === 0) return [];
 
-  const { data: entryData } = await supabase
+  const { data } = await supabase
     .from("match_entries")
     .select(
       "id, place, match_points, match_percentage, total_time_seconds, is_dq, power_factor, category, classification, divisions(code, name)",
     )
     .eq("match_id", matchId)
-    .eq("shooter_id", shooterId)
-    .maybeSingle();
+    .in("shooter_id", shooterIds)
+    .order("match_percentage", { ascending: false });
 
-  if (!entryData) return null;
-  const entry = entryData as unknown as MyMatchSummary["entry"];
+  return (data ?? []) as unknown as MyMatchSummary["entry"][];
+}
 
-  const { data: stageData } = await supabase
+/**
+ * Stage results de un match_entry específico, ordenados por número de stage.
+ * Filtramos también por matchId para usar el join filter `stages.match_id`
+ * y evitar leer stages que no son del match actual.
+ */
+export async function listStageResultsForEntry(
+  supabase: SupabaseClient,
+  matchEntryId: string,
+  matchId: string,
+): Promise<MyStageResultRow[]> {
+  const { data } = await supabase
     .from("stage_results")
     .select(
       "id, points, penalties, time_seconds, hit_factor, stage_points, stage_percentage, place, is_dq, stages!inner(id, stage_number, name, match_id)",
     )
-    .eq("match_entry_id", entry.id)
+    .eq("match_entry_id", matchEntryId)
     .eq("stages.match_id", matchId);
 
-  const stageResults =
-    (stageData as unknown as MyStageResultRow[] | null) ?? [];
-
-  // Orden por número de stage (los nulls al final).
-  stageResults.sort((a, b) => {
+  const results = (data as unknown as MyStageResultRow[] | null) ?? [];
+  results.sort((a, b) => {
     const an = a.stages?.stage_number ?? Number.MAX_SAFE_INTEGER;
     const bn = b.stages?.stage_number ?? Number.MAX_SAFE_INTEGER;
     return an - bn;
   });
-
-  return { match, entry, stageResults };
+  return results;
 }

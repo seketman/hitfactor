@@ -213,7 +213,7 @@ export function HistoryTable({
                     </TD>
                     <TD>
                       <Link
-                        href={`/matches/${e.matches?.id}/me`}
+                        href={`/matches/${e.matches?.id}/me?entry=${e.id}`}
                         className="font-medium text-fg hover:text-accent"
                         title="Ver tu detalle del torneo"
                       >

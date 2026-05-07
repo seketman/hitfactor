@@ -7,7 +7,11 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { FirearmSelector } from "@/components/FirearmSelector";
 import { requireUser } from "@/lib/supabase/require-user";
 import { listMyShooters } from "@/lib/db/shooters";
-import { getMyMatchSummary } from "@/lib/db/matches";
+import {
+  getMatchById,
+  listMyEntriesInMatch,
+  listStageResultsForEntry,
+} from "@/lib/db/matches";
 import {
   getMatchFirearmLog,
   listMyFirearms,
@@ -16,7 +20,7 @@ import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
 import { isTimeBasedDiscipline } from "@/lib/disciplines";
 import type { MyMatchSummary } from "@/lib/db/types";
 import { getClubCode, getClubName } from "@/lib/clubs";
-import { formatDate, formatNumber, formatPercent } from "@/lib/utils";
+import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
 
 const POWER_FACTOR_LABELS: Record<string, string> = {
   Maj: "Major",
@@ -25,15 +29,34 @@ const POWER_FACTOR_LABELS: Record<string, string> = {
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ entry?: string }>;
 }
 
-export default async function PersonalMatchPage({ params }: PageProps) {
+export default async function PersonalMatchPage({
+  params,
+  searchParams,
+}: PageProps) {
   const { id } = await params;
+  const { entry: entryParam } = await searchParams;
 
   const { supabase, user } = await requireUser();
   const userId = user.id;
 
-  const myShooters = await listMyShooters(supabase, userId);
+  const [match, myShooters] = await Promise.all([
+    getMatchById(supabase, id),
+    listMyShooters(supabase, userId),
+  ]);
+
+  if (!match) {
+    return (
+      <PageContainer>
+        <BackToDashboard />
+        <Alert tone="warning" title="Match no encontrado">
+          El torneo que estás buscando no existe o fue eliminado.
+        </Alert>
+      </PageContainer>
+    );
+  }
 
   if (myShooters.length === 0) {
     return (
@@ -50,15 +73,15 @@ export default async function PersonalMatchPage({ params }: PageProps) {
     );
   }
 
-  // El usuario puede tener múltiples shooters linkeados (uno por disciplina).
-  // Buscamos cuál participó en este match — el primero que devuelva summary.
-  let summary: Awaited<ReturnType<typeof getMyMatchSummary>> = null;
-  for (const s of myShooters) {
-    summary = await getMyMatchSummary(supabase, id, s.id);
-    if (summary) break;
-  }
+  // Una sola query trae TODAS las entries del usuario en este match (puede
+  // tener varias si participó en varias divisiones, ej. FBI Pistola + PCC).
+  const myEntries = await listMyEntriesInMatch(
+    supabase,
+    id,
+    myShooters.map((s) => s.id),
+  );
 
-  if (!summary) {
+  if (myEntries.length === 0) {
     return (
       <PageContainer>
         <BackToDashboard />
@@ -72,14 +95,23 @@ export default async function PersonalMatchPage({ params }: PageProps) {
     );
   }
 
-  const { match, entry, stageResults } = summary;
+  // Resolver la entry seleccionada:
+  //  - Si vino ?entry=ID en la URL (caso típico: clic desde "Tu historial"),
+  //    intentamos esa.
+  //  - Si no, default al primero (mejor match_percentage).
+  const requestedEntry = entryParam
+    ? myEntries.find((e) => e.id === entryParam)
+    : undefined;
+  const entry = requestedEntry ?? myEntries[0]!;
+
+  const isTimeBased = isTimeBasedDiscipline(match.disciplines);
   const clubCode = getClubCode(match.region);
   const clubName = getClubName(match.region);
-  const isTimeBased = isTimeBasedDiscipline(match.disciplines);
 
-  const [myFirearms, currentFirearmLog] = await Promise.all([
+  const [myFirearms, currentFirearmLog, stageResults] = await Promise.all([
     listMyFirearms(supabase, userId),
     getMatchFirearmLog(supabase, entry.id),
+    listStageResultsForEntry(supabase, entry.id, id),
   ]);
   const suggestedRounds = estimateRoundsFired(
     match.disciplines?.code,
@@ -111,6 +143,14 @@ export default async function PersonalMatchPage({ params }: PageProps) {
           Ver ranking público →
         </Link>
       </header>
+
+      {myEntries.length > 1 && (
+        <DivisionSelector
+          matchId={id}
+          entries={myEntries}
+          activeEntryId={entry.id}
+        />
+      )}
 
       {isTimeBased ? (
         <SteelSummaryCard entry={entry} />
@@ -320,6 +360,44 @@ function SteelStagesTable({ stageResults }: { stageResults: MyMatchSummary["stag
 function stageLabel(r: MyMatchSummary["stageResults"][number]) {
   if (r.stages?.stage_number != null) return `Stage ${r.stages.stage_number}`;
   return r.stages?.name ?? "—";
+}
+
+function DivisionSelector({
+  matchId,
+  entries,
+  activeEntryId,
+}: {
+  matchId: string;
+  entries: MyMatchSummary["entry"][];
+  activeEntryId: string;
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-fg-muted">
+        Tenés {entries.length} participaciones en este match:
+      </span>
+      {entries.map((e) => {
+        const isActive = e.id === activeEntryId;
+        const label = e.divisions?.code ?? "?";
+        return (
+          <Link
+            key={e.id}
+            href={`/matches/${matchId}/me?entry=${e.id}`}
+            scroll={false}
+            className={cn(
+              "rounded-full border px-3 py-0.5 text-xs font-medium transition-colors",
+              isActive
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-border text-fg-muted hover:bg-surface-2 hover:text-fg",
+            )}
+            title={e.divisions?.name ?? undefined}
+          >
+            {label}
+          </Link>
+        );
+      })}
+    </div>
+  );
 }
 
 function BackToDashboard() {
