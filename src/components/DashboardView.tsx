@@ -159,7 +159,11 @@ export async function DashboardView({
             )}
           </Card>
         ) : (
-          <MatchList matches={filteredMatches} userId={userId} />
+          <MatchList
+            matches={filteredMatches}
+            userId={userId}
+            from={isConsolidated ? "/dashboard" : `/dashboard/${disciplineCode}`}
+          />
         )}
       </Section>
     </PageContainer>
@@ -216,6 +220,7 @@ function Section({
 function MatchList({
   matches,
   userId,
+  from,
 }: {
   matches: Array<{
     id: string;
@@ -226,6 +231,8 @@ function MatchList({
     disciplines: { code: string; name: string } | null;
   }>;
   userId: string;
+  /** Ruta de origen para que el match pueda volver acá con "← Volver a matches". */
+  from: string;
 }) {
   return (
     <Card>
@@ -237,7 +244,7 @@ function MatchList({
           return (
             <li key={m.id}>
               <Link
-                href={`/matches/${m.id}`}
+                href={`/matches/${m.id}?from=${encodeURIComponent(from)}`}
                 className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-surface-2/40"
               >
                 <div className="min-w-0">

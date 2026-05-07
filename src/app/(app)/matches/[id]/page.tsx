@@ -29,12 +29,12 @@ import { MatchActionsBar } from "@/components/MatchActionsBar";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; from?: string }>;
 }
 
 export default async function MatchDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, from } = await searchParams;
 
   const { supabase, user } = await requireUser();
   const userId = user.id;
@@ -67,11 +67,15 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   }
   const sortedDivisions = Array.from(byDivision.keys()).sort();
 
-  // Link de volver: si la disciplina es conocida, llevamos al dashboard
-  // filtrado de esa disciplina; si no, al consolidado.
-  const backHref = match.disciplines?.code
-    ? `/dashboard/${match.disciplines.code}`
-    : "/dashboard";
+  // Link de volver: prioriza la ruta de origen (?from=...) cuando viene de
+  // un dashboard, así devolvemos al usuario exactamente a la vista que
+  // estaba mirando (consolidado vs alguna disciplina). Si no, fallback a
+  // la disciplina del match o al consolidado.
+  const backHref = isInternalDashboardPath(from)
+    ? from
+    : match.disciplines?.code
+      ? `/dashboard/${match.disciplines.code}`
+      : "/dashboard";
 
   return (
     <PageContainer>
@@ -237,4 +241,14 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
       })}
     </PageContainer>
   );
+}
+
+/**
+ * Valida que el `from` sea una ruta interna del dashboard. Evita que un link
+ * armado a mano redirija al usuario fuera del dominio (open redirect) y
+ * limita el back link a las dos vistas reales: `/dashboard` y `/dashboard/{code}`.
+ */
+function isInternalDashboardPath(value: string | undefined): value is string {
+  if (typeof value !== "string") return false;
+  return /^\/dashboard(\/[a-z_]+)?$/.test(value);
 }
