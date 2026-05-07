@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Alert } from "@/components/ui/Alert";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { login } from "./actions";
 
 export default async function LoginPage({
@@ -36,6 +37,14 @@ export default async function LoginPage({
           {params.info}
         </Alert>
       )}
+
+      <GoogleSignInButton label="Continuar con Google" />
+
+      <div className="my-5 flex items-center gap-3 text-xs text-fg-subtle">
+        <span className="h-px flex-1 bg-border" aria-hidden />
+        <span>o con tu email</span>
+        <span className="h-px flex-1 bg-border" aria-hidden />
+      </div>
 
       <form action={login} className="space-y-4">
         <Input label="Email" type="email" name="email" required autoComplete="email" />

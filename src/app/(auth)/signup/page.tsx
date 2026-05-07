@@ -3,6 +3,7 @@ import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { signup } from "./actions";
 
 export default async function SignupPage({
@@ -30,6 +31,14 @@ export default async function SignupPage({
           {params.error}
         </Alert>
       )}
+
+      <GoogleSignInButton label="Registrarme con Google" />
+
+      <div className="my-5 flex items-center gap-3 text-xs text-fg-subtle">
+        <span className="h-px flex-1 bg-border" aria-hidden />
+        <span>o con tu email</span>
+        <span className="h-px flex-1 bg-border" aria-hidden />
+      </div>
 
       <form action={signup} className="space-y-4">
         <Input
