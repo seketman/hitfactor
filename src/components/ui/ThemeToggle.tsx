@@ -16,8 +16,18 @@ const MODES: { key: Mode; label: string; icon: typeof Sun }[] = [
 /**
  * Toggle de tema con tres opciones: Claro / Sistema / Oscuro.
  * La elección se persiste por next-themes en localStorage.
+ *
+ * `stretch`: si true, el toggle ocupa todo el ancho del contenedor padre y
+ * los tres botones se reparten equitativamente. Útil en el sidebar para
+ * que no quede desbalanceado contra la fila de usuario+salir.
  */
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  stretch = false,
+}: {
+  className?: string;
+  stretch?: boolean;
+}) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -33,7 +43,8 @@ export function ThemeToggle({ className }: { className?: string }) {
       role="radiogroup"
       aria-label="Modo de color"
       className={cn(
-        "inline-flex items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5",
+        "items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5",
+        stretch ? "flex w-full" : "inline-flex",
         className,
       )}
     >
@@ -49,7 +60,8 @@ export function ThemeToggle({ className }: { className?: string }) {
             title={label}
             onClick={() => setTheme(key)}
             className={cn(
-              "inline-flex h-7 w-7 items-center justify-center rounded transition-colors",
+              "inline-flex h-7 items-center justify-center rounded transition-colors",
+              stretch ? "flex-1" : "w-7",
               active
                 ? "bg-surface text-fg shadow-sm"
                 : "text-fg-muted hover:text-fg",

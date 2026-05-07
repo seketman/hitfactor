@@ -8,13 +8,13 @@ import {
   ChevronRight,
   Menu,
   X,
-  Target,
   Upload,
   LayoutDashboard,
   Crosshair,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { getDisciplineIcon } from "@/components/icons/discipline-icons";
 import { cn } from "@/lib/utils";
 
 const COLLAPSE_STORAGE_KEY = "hitfactor:sidebar-collapsed";
@@ -140,17 +140,20 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
             </p>
           )}
           <ul className="mb-4 space-y-0.5">
-            {disciplines.map((d) => (
-              <NavItem
-                key={d.code}
-                href={`/dashboard/${d.code}`}
-                icon={<Target className="h-4 w-4" aria-hidden />}
-                label={d.name}
-                count={d.count}
-                active={pathname === `/dashboard/${d.code}`}
-                collapsed={collapsed}
-              />
-            ))}
+            {disciplines.map((d) => {
+              const Icon = getDisciplineIcon(d.code);
+              return (
+                <NavItem
+                  key={d.code}
+                  href={`/dashboard/${d.code}`}
+                  icon={<Icon className="h-4 w-4" aria-hidden />}
+                  label={d.name}
+                  count={d.count}
+                  active={pathname === `/dashboard/${d.code}`}
+                  collapsed={collapsed}
+                />
+              );
+            })}
             <NavItem
               href="/dashboard"
               icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}
@@ -185,18 +188,20 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
             collapsed ? "flex flex-col items-center gap-2" : "space-y-2",
           )}
         >
-          <ThemeToggle />
           {!collapsed && (
-            <div className="flex items-center justify-between gap-2 text-sm">
-              <span className="truncate text-fg-muted" title={userName}>
-                {userName}
-              </span>
-              <form action="/auth/signout" method="post">
-                <Button type="submit" variant="ghost" size="sm">
-                  Salir
-                </Button>
-              </form>
-            </div>
+            <>
+              <ThemeToggle stretch />
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="truncate text-fg-muted" title={userName}>
+                  {userName}
+                </span>
+                <form action="/auth/signout" method="post">
+                  <Button type="submit" variant="ghost" size="sm">
+                    Salir
+                  </Button>
+                </form>
+              </div>
+            </>
           )}
           {collapsed && (
             <form action="/auth/signout" method="post">
