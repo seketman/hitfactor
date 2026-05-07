@@ -4,10 +4,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { updateMatchClub } from "@/app/(app)/matches/[id]/actions";
+import {
+  deleteMatch,
+  updateMatchClub,
+} from "@/app/(app)/matches/[id]/actions";
 import type { Club } from "@/lib/db/types";
 
-interface EditClubButtonProps {
+interface MatchActionsBarProps {
   matchId: string;
   /** Region actual del match, ej "ARG-TFALP", "TFALP", o un texto libre. */
   currentRegion: string | null;
@@ -17,38 +20,48 @@ interface EditClubButtonProps {
 }
 
 /**
- * Botón "Editar club" + form inline para que el importador especifique a qué
- * club se llevó a cabo el match. Útil cuando los datos importados no incluyen
- * la región (típico FBI).
+ * Barra de acciones del importador en el detalle de un match. Coordina los
+ * dos posibles estados:
  *
- * El select se popula desde la tabla `clubs` (ver db/clubs.ts). El país
- * se infiere del club seleccionado (es atributo del club, no del torneo).
- * La opción "Otro..." habilita un input free-text para clubs no listados.
+ *  - **Reposo**: muestra los botones "Editar club" y "Eliminar" en línea.
+ *  - **Editando club**: oculta los botones y reemplaza por el form. Cuando
+ *    se guarda o cancela, vuelve al estado de reposo.
+ *
+ * Tener este toggle centralizado evita que el form se renderice apretado al
+ * lado de "Eliminar" y rompa el wrapping en mobile.
  */
-export function EditClubButton({
+export function MatchActionsBar({
   matchId,
   currentRegion,
   currentClubCode,
   clubs,
-}: EditClubButtonProps) {
-  const [open, setOpen] = useState(false);
+}: MatchActionsBarProps) {
+  const [editing, setEditing] = useState(false);
 
-  if (!open) {
+  if (editing) {
     return (
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
-        {currentRegion ? "Editar club" : "Asignar club"}
-      </Button>
+      <ClubForm
+        matchId={matchId}
+        currentRegion={currentRegion}
+        currentClubCode={currentClubCode}
+        clubs={clubs}
+        onCancel={() => setEditing(false)}
+      />
     );
   }
 
   return (
-    <ClubForm
-      matchId={matchId}
-      currentRegion={currentRegion}
-      currentClubCode={currentClubCode}
-      clubs={clubs}
-      onCancel={() => setOpen(false)}
-    />
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+        {currentRegion ? "Editar club" : "Asignar club"}
+      </Button>
+      <form action={deleteMatch}>
+        <input type="hidden" name="match_id" value={matchId} />
+        <Button type="submit" variant="danger" size="sm">
+          Eliminar
+        </Button>
+      </form>
+    </div>
   );
 }
 
@@ -58,7 +71,7 @@ function ClubForm({
   currentClubCode,
   clubs,
   onCancel,
-}: EditClubButtonProps & { onCancel: () => void }) {
+}: MatchActionsBarProps & { onCancel: () => void }) {
   // Estado inicial: si el club actual está en el catálogo, lo preseleccionamos.
   // Si no está pero hay un texto, arrancamos en "Otro..." con ese texto.
   const knownCodes = new Set(clubs.map((c) => c.code));
@@ -79,11 +92,14 @@ function ClubForm({
   const isOther = clubCode === "OTHER";
 
   return (
-    <form action={updateMatchClub} className="flex flex-wrap items-end gap-3">
+    <form
+      action={updateMatchClub}
+      className="w-full space-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-3 sm:space-y-0"
+    >
       <input type="hidden" name="match_id" value={matchId} />
       <input type="hidden" name="country" value={country} />
 
-      <div className="min-w-[220px]">
+      <div className="min-w-0 sm:flex-1 sm:min-w-[220px]">
         <Select
           label="Club"
           name="club_code"
@@ -102,7 +118,7 @@ function ClubForm({
       </div>
 
       {isOther && (
-        <div className="min-w-[200px]">
+        <div className="min-w-0 sm:flex-1 sm:min-w-[200px]">
           <Input
             label="Nombre del club"
             name="custom"

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
@@ -23,8 +24,7 @@ import {
 } from "@/lib/utils";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { claimShooter } from "@/lib/actions/claim";
-import { EditClubButton } from "@/components/EditClubButton";
-import { deleteMatch } from "./actions";
+import { MatchActionsBar } from "@/components/MatchActionsBar";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -64,8 +64,21 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   }
   const sortedDivisions = Array.from(byDivision.keys()).sort();
 
+  // Link de volver: si la disciplina es conocida, llevamos al dashboard
+  // filtrado de esa disciplina; si no, al consolidado.
+  const backHref = match.disciplines?.code
+    ? `/dashboard/${match.disciplines.code}`
+    : "/dashboard";
+
   return (
     <PageContainer>
+      <Link
+        href={backHref}
+        className="mb-4 inline-block text-sm text-fg-muted hover:text-accent"
+      >
+        ← Volver a matches
+      </Link>
+
       {error && (
         <Alert tone="danger" className="mb-6">
           {error}
@@ -90,19 +103,13 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
         </div>
 
         {isImporter && (
-          <div className="flex items-center gap-2">
-            <EditClubButton
+          <div className="w-full sm:w-auto sm:max-w-2xl sm:flex-1 sm:basis-auto">
+            <MatchActionsBar
               matchId={match.id}
               currentRegion={match.region}
               currentClubCode={parsedClub.clubCode}
               clubs={clubs}
             />
-            <form action={deleteMatch}>
-              <input type="hidden" name="match_id" value={match.id} />
-              <Button type="submit" variant="danger" size="sm">
-                Eliminar
-              </Button>
-            </form>
           </div>
         )}
       </header>
