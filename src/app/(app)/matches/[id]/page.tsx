@@ -8,11 +8,13 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
+import { listClubs } from "@/lib/db/clubs";
 import {
   getMatchById,
   listEntriesByMatch,
   listStagesByMatch,
 } from "@/lib/db/matches";
+import { parseRegion } from "@/lib/clubs";
 import {
   formatDate,
   formatDateTime,
@@ -21,6 +23,7 @@ import {
 } from "@/lib/utils";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { claimShooter } from "@/lib/actions/claim";
+import { EditClubButton } from "@/components/EditClubButton";
 import { deleteMatch } from "./actions";
 
 interface PageProps {
@@ -39,15 +42,19 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const match = await getMatchById(supabase, id);
   if (!match) notFound();
 
-  const [importerProfile, entries, stages, myShooters] = await Promise.all([
+  const [importerProfile, entries, stages, myShooters, clubs] = await Promise.all([
     getProfile(supabase, match.imported_by_user_id),
     listEntriesByMatch(supabase, id),
     listStagesByMatch(supabase, id),
     listMyShooters(supabase, userId),
+    listClubs(supabase),
   ]);
 
   const myShooterIds = new Set(myShooters.map((s) => s.id));
   const isImporter = match.imported_by_user_id === userId;
+  const parsedClub = parseRegion(match.region);
+  const clubLabel =
+    parsedClub.clubName ?? parsedClub.clubCode ?? match.region ?? null;
 
   // Agrupar por división
   const byDivision = new Map<string, MatchEntryWithRelations[]>();
@@ -66,12 +73,12 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
         </Alert>
       )}
 
-      <header className="mb-8 flex items-start justify-between gap-4">
-        <div>
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-semibold tracking-tight">{match.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
             <span>{formatDate(match.date)}</span>
-            {match.region && <span>· {match.region}</span>}
+            {clubLabel && <span title={parsedClub.clubCode ?? undefined}>· {clubLabel}</span>}
             {match.disciplines?.name && <span>· {match.disciplines.name}</span>}
           </div>
           <p className="mt-2 text-xs text-fg-subtle">
@@ -84,12 +91,21 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
         </div>
 
         {isImporter && (
-          <form action={deleteMatch}>
-            <input type="hidden" name="match_id" value={match.id} />
-            <Button type="submit" variant="danger" size="sm">
-              Eliminar match
-            </Button>
-          </form>
+          <div className="flex items-center gap-2">
+            <EditClubButton
+              matchId={match.id}
+              currentRegion={match.region}
+              currentCountry={parsedClub.country}
+              currentClubCode={parsedClub.clubCode}
+              clubs={clubs}
+            />
+            <form action={deleteMatch}>
+              <input type="hidden" name="match_id" value={match.id} />
+              <Button type="submit" variant="danger" size="sm">
+                Eliminar
+              </Button>
+            </form>
+          </div>
         )}
       </header>
 

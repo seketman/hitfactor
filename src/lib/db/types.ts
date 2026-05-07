@@ -111,6 +111,12 @@ export interface MyStageResultRow {
   } | null;
 }
 
+export interface Club {
+  code: string;
+  name: string;
+  country: string | null;
+}
+
 export interface Firearm {
   id: string;
   owner_user_id: string;

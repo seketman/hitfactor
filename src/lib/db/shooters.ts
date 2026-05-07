@@ -2,6 +2,44 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Shooter } from "./types";
 
 /**
+ * Disciplinas en las que el usuario tiene al menos una participación.
+ * Se usa para construir el menú lateral con solo las disciplinas relevantes.
+ */
+export async function listMyDisciplines(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Array<{ code: string; name: string; count: number }>> {
+  // Obtener mis shooters (puede haber varias identidades).
+  const shooters = await listMyShooters(supabase, userId);
+  if (shooters.length === 0) return [];
+
+  type Row = {
+    matches: { disciplines: { code: string; name: string } | null } | null;
+  };
+
+  const { data } = await supabase
+    .from("match_entries")
+    .select("matches(disciplines(code, name))")
+    .in(
+      "shooter_id",
+      shooters.map((s) => s.id),
+    );
+
+  const counts = new Map<string, { code: string; name: string; count: number }>();
+  for (const row of (data as unknown as Row[] | null) ?? []) {
+    const d = row.matches?.disciplines;
+    if (!d?.code) continue;
+    const existing = counts.get(d.code);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      counts.set(d.code, { code: d.code, name: d.name, count: 1 });
+    }
+  }
+  return Array.from(counts.values()).sort((a, b) => b.count - a.count);
+}
+
+/**
  * Devuelve todos los shooters linkeados al usuario.
  *
  * Un usuario puede tener varias identidades (una por cada variante de su

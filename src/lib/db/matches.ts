@@ -11,21 +11,6 @@ import type {
 const MATCH_BASE_SELECT =
   "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(code, name, scoring_type)";
 
-/** Matches importados por un usuario, más recientes primero. */
-export async function listImportedByUser(
-  supabase: SupabaseClient,
-  userId: string,
-  limit = 20,
-): Promise<MatchWithDiscipline[]> {
-  const { data } = await supabase
-    .from("matches")
-    .select(MATCH_BASE_SELECT)
-    .eq("imported_by_user_id", userId)
-    .order("date", { ascending: false })
-    .limit(limit);
-  return (data as unknown as MatchWithDiscipline[] | null) ?? [];
-}
-
 /** Todos los matches visibles, más recientes primero. */
 export async function listAllMatches(
   supabase: SupabaseClient,
