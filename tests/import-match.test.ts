@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { FakeSupabase } from "./helpers/supabase-mock";
 import { parsePractiscoreHtml } from "@/lib/parsers/practiscore";
+import { parseFbiCsv } from "@/lib/parsers/fbi-csv";
 import { importParsedMatch, ImportError } from "@/lib/import/import-match";
 
 const FIXTURES = join(__dirname, "fixtures", "practiscore");
@@ -285,5 +286,94 @@ describe("importParsedMatch — Stage results", () => {
     const secondCount = fake.tables.stage_results.rows.length;
 
     expect(secondCount).toBe(firstCount);
+  });
+});
+
+describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match existente", () => {
+  // Caso de uso: el usuario ya importó un CSV de FBI antes del fix que parsea
+  // stages, y ahora vuelve a subir el mismo archivo. El INSERT del match
+  // pega contra la unique constraint y, si trae stages, los agregamos al
+  // match existente sin tocar las entries originales.
+  const FBI_FIXTURES = join(__dirname, "fixtures", "fbi");
+  const SOCIAL3 = readFileSync(
+    join(FBI_FIXTURES, "social3-with-stages.csv"),
+    "utf8",
+  );
+
+  function buildFbiSupabase(): FakeSupabase {
+    const fake = new FakeSupabase();
+    fake.seed("disciplines", [
+      { id: 5, code: "tiro_fbi", name: "Tiro FBI", scoring_type: "points" },
+    ]);
+    fake.seed("divisions", [
+      { id: 50, discipline_id: 5, code: "PIS", name: "Pistola" },
+      { id: 51, discipline_id: 5, code: "REV", name: "Revólver" },
+      { id: 52, discipline_id: 5, code: "MINI", name: "Minirifle" },
+      { id: 53, discipline_id: 5, code: "PCC", name: "PCC" },
+    ]);
+    return fake;
+  }
+
+  it("agrega stages a un match existente cuando el INSERT de matches falla con 23505", async () => {
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL3);
+
+    // Primera carga: crea match + entries + stages. Verificamos baseline.
+    const first = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "social3.csv",
+    );
+    expect(first.existedAlready).toBe(false);
+    expect(first.insertedStages).toBe(parsed.stages.length);
+    const matchId = first.matchId;
+    const entriesBefore = fake.tables.match_entries.rows.length;
+    const stagesBefore = fake.tables.stages.rows.length;
+
+    // Simulamos que el match ya existe en DB: cualquier nuevo INSERT en
+    // matches falla con la unique constraint (lo que pasaría en prod
+    // porque ya está la fila).
+    fake.tables.matches.insertError = {
+      code: "23505",
+      message: "duplicate key",
+    };
+
+    // Re-upload: debería detectar que el match es del mismo user, encontrar
+    // el row existente y agregar/upsertear stages sin volver a insertar
+    // entries.
+    const second = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "social3.csv",
+    );
+    expect(second.existedAlready).toBe(true);
+    expect(second.matchId).toBe(matchId);
+    expect(second.insertedEntries).toBe(0);
+
+    // No se duplican entries.
+    expect(fake.tables.match_entries.rows.length).toBe(entriesBefore);
+    // No se duplican stages (ya existían).
+    expect(fake.tables.stages.rows.length).toBe(stagesBefore);
+  });
+
+  it("rechaza el re-upload si el match existente pertenece a otro usuario", async () => {
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL3);
+
+    // Primera carga la hace OTHER_USER.
+    await importParsedMatch(fake.asClient(), parsed, OTHER_USER, "s.csv");
+    fake.tables.matches.insertError = {
+      code: "23505",
+      message: "duplicate key",
+    };
+
+    // USER_ID no debería poder agregarle stages al match ajeno.
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "s.csv"),
+    ).rejects.toMatchObject({
+      code: "MATCH_ALREADY_EXISTS",
+    });
   });
 });

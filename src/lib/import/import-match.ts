@@ -126,6 +126,46 @@ async function importMatchOverall(
 
   if (matchErr) {
     if (matchErr.code === "23505") {
+      // El match ya existe (UNIQUE en name+date+region+discipline). Si el
+      // archivo trae stages embebidos (Steel, FBI) y el usuario actual es
+      // el dueño del match, agregamos los stages faltantes en lugar de
+      // fallar — caso típico: re-upload del mismo CSV tras una mejora del
+      // parser. attachStagesToMatch es idempotente (chequea existencia
+      // por stage_number y hace upsert de stage_results).
+      if (parsed.stages.length > 0) {
+        const existing = await findExistingMatch(
+          supabase,
+          discipline.id,
+          parsed.name,
+          parsed.date,
+          parsed.region,
+        );
+        if (existing && existing.imported_by_user_id === importerUserId) {
+          const { stagesCount, resultsCount } = await attachStagesToMatch(
+            supabase,
+            parsed,
+            existing.id,
+            divisionByCode,
+          );
+          return {
+            matchId: existing.id,
+            matchName: existing.name,
+            matchDate: parsed.date,
+            disciplineCode: discipline.code,
+            disciplineName: discipline.name,
+            insertedEntries: 0,
+            insertedStages: stagesCount,
+            insertedStageResults: resultsCount,
+            existedAlready: true,
+          };
+        }
+        if (existing && existing.imported_by_user_id !== importerUserId) {
+          throw new ImportError(
+            "Este match ya fue importado por otro usuario.",
+            "MATCH_ALREADY_EXISTS",
+          );
+        }
+      }
       throw new ImportError(
         "Este match ya fue importado por otra persona. Si querés, podés subir solo los stages que falten.",
         "MATCH_ALREADY_EXISTS",
@@ -526,6 +566,31 @@ export function findBestPrefixMatch<T extends { name: string }>(
   }
 
   return best;
+}
+
+/**
+ * Busca un match por su clave única lógica (discipline, name, date, region).
+ * Maneja `region IS NULL` correctamente — Supabase JS requiere `.is()` para
+ * NULL en lugar de `.eq()`. Se usa cuando el INSERT pega contra la unique
+ * constraint y necesitamos recuperar el match existente (ej. para hacer
+ * merge de stages en un re-upload).
+ */
+async function findExistingMatch(
+  supabase: SupabaseClient,
+  disciplineId: number,
+  name: string,
+  date: string,
+  region: string | null,
+): Promise<MatchLookupRow | null> {
+  let q = supabase
+    .from("matches")
+    .select("id, name, imported_by_user_id")
+    .eq("discipline_id", disciplineId)
+    .eq("name", name)
+    .eq("date", date);
+  q = region === null ? q.is("region", null) : q.eq("region", region);
+  const { data } = await q.maybeSingle();
+  return (data as MatchLookupRow | null) ?? null;
 }
 
 async function listSameDayMatchNames(
