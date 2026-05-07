@@ -1,9 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { parseFile } from "@/lib/parsers";
 import { redirectWithError } from "@/lib/redirects";
+import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import {
   importParsedMatch,
@@ -24,9 +24,7 @@ export async function importHtml(formData: FormData) {
 
   const content = await file.text();
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const parsed = parseFile(content);
 
@@ -36,7 +34,7 @@ export async function importHtml(formData: FormData) {
 
   let result: ImportResult;
   try {
-    result = await importParsedMatch(supabase, parsed, userData.user.id, filename);
+    result = await importParsedMatch(supabase, parsed, user.id, filename);
   } catch (e) {
     if (e instanceof ImportError) {
       redirectWithError("/import", e.message);
@@ -44,7 +42,7 @@ export async function importHtml(formData: FormData) {
     throw e;
   }
 
-  await logAction(supabase, userData.user.id, {
+  await logAction(supabase, user.id, {
     action: AUDIT_ACTION.MATCH_IMPORT,
     entityType: "match",
     entityId: result.matchId,

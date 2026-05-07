@@ -4,6 +4,7 @@ import type {
   ParsedMatchEntry,
   ParsedShooter,
 } from "@/lib/types/match";
+import { nullIfEmpty, parseIntOrNull } from "./shared";
 
 /**
  * Parser para resultados de Tiro FBI exportados desde Google Sheets como CSV.
@@ -105,18 +106,18 @@ export function parseFbiCsv(content: string): ParsedMatch {
       // División desconocida: la saltamos en lugar de romper el import.
       continue;
     }
-    const puntos = parseIntSafe(cells[idxPuntos]);
-    const impactos = parseIntSafe(cells[idxImpactos]);
+    const puntos = parseIntOrNull(cells[idxPuntos]);
+    const impactos = parseIntOrNull(cells[idxImpactos]);
     if (puntos === null) continue;
 
     const entry: RawEntry = {
       shooter: {
         fullName: (cells[idxTirador] ?? "").trim(),
         memberNumber: null,
-        region: cleanClub(cells[idxClub]),
+        region: nullIfEmpty(cells[idxClub]),
       },
       divisionCode,
-      category: cleanCategory(cells[idxCategoria]),
+      category: nullIfEmpty(cells[idxCategoria]),
       puntos,
       impactos: impactos ?? 0,
     };
@@ -264,30 +265,10 @@ function parseCsvRow(line: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers de normalización
+// Normalización (FBI-específica: case-insensitive + NFC para comparar headers
+// con/sin acentos en planillas variadas)
 // ---------------------------------------------------------------------------
 
 function normalize(value: string | undefined): string {
-  return (value ?? "")
-    .normalize("NFC")
-    .trim()
-    .toLowerCase();
-}
-
-function parseIntSafe(value: string | undefined): number | null {
-  if (value === undefined) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const n = Number(trimmed);
-  return Number.isFinite(n) ? Math.trunc(n) : null;
-}
-
-function cleanCategory(value: string | undefined): string | null {
-  const v = (value ?? "").trim();
-  return v ? v : null;
-}
-
-function cleanClub(value: string | undefined): string | null {
-  const v = (value ?? "").trim();
-  return v ? v : null;
+  return (value ?? "").normalize("NFC").trim().toLowerCase();
 }

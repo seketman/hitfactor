@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
+import { requireUser } from "@/lib/supabase/require-user";
 import { createFeedback, FEEDBACK_MIN_ENTRIES } from "@/lib/db/feedback";
 import { countMyMatchEntries } from "@/lib/db/shooters";
 import type { FeedbackType } from "@/lib/db/types";
@@ -37,13 +37,11 @@ export async function submitFeedback(formData: FormData) {
     );
   }
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   // Gate por mínimo de participaciones — defense in depth, la UI ya esconde
   // el form pero un cliente malicioso podría postear el formulario igual.
-  const entryCount = await countMyMatchEntries(supabase, userData.user.id);
+  const entryCount = await countMyMatchEntries(supabase, user.id);
   if (entryCount < FEEDBACK_MIN_ENTRIES) {
     redirectWithError(
       "/about",
@@ -51,7 +49,7 @@ export async function submitFeedback(formData: FormData) {
     );
   }
 
-  const { error } = await createFeedback(supabase, userData.user.id, {
+  const { error } = await createFeedback(supabase, user.id, {
     type,
     message,
     pageUrl,

@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
+import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 
 /**
@@ -31,10 +31,8 @@ export async function claimShooter(formData: FormData) {
   const redirectTo = String(formData.get("redirect_to") ?? "");
   if (!shooterId) return;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
-  const userId = userData.user.id;
+  const { supabase, user } = await requireUser();
+  const userId = user.id;
 
   const { data: shooter } = await supabase
     .from("shooters")
@@ -107,29 +105,27 @@ export async function unclaimShooter(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
   if (!shooterId) return;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   // Snapshot del nombre antes de desvincular.
   const { data: shooter } = await supabase
     .from("shooters")
     .select("full_name")
     .eq("id", shooterId)
-    .eq("linked_user_id", userData.user.id)
+    .eq("linked_user_id", user.id)
     .maybeSingle();
 
   const { data: updated } = await supabase
     .from("shooters")
     .update({ linked_user_id: null })
     .eq("id", shooterId)
-    .eq("linked_user_id", userData.user.id)
+    .eq("linked_user_id", user.id)
     .select("id");
 
   // Solo logueamos si el update afectó alguna fila — sino podríamos loggear
   // intentos que no hicieron nada (ej. doble submit, shooter ajeno).
   if (Array.isArray(updated) && updated.length > 0) {
-    await logAction(supabase, userData.user.id, {
+    await logAction(supabase, user.id, {
       action: AUDIT_ACTION.SHOOTER_UNCLAIM,
       entityType: "shooter",
       entityId: shooterId,

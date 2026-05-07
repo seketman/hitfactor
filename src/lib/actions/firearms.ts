@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
+import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 
 /**
@@ -18,18 +18,27 @@ function trimOrNull(value: unknown): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
+/**
+ * Revalida los paths que dependen del catálogo de armas. Si se pasa `id`,
+ * también revalida la página de detalle. Centralizado para no olvidar uno
+ * cuando se agrega una vista nueva que liste/use firearms.
+ */
+function revalidateFirearmPaths(id?: string) {
+  revalidatePath("/firearms");
+  revalidatePath("/dashboard");
+  if (id) revalidatePath(`/firearms/${id}`);
+}
+
 export async function createFirearm(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
     redirectWithError("/firearms", "Falta el nombre");
   }
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const payload = {
-    owner_user_id: userData.user.id,
+    owner_user_id: user.id,
     name,
     brand: trimOrNull(formData.get("brand")),
     model: trimOrNull(formData.get("model")),
@@ -46,7 +55,7 @@ export async function createFirearm(formData: FormData) {
     redirectWithError("/firearms", error.message);
   }
 
-  await logAction(supabase, userData.user.id, {
+  await logAction(supabase, user.id, {
     action: AUDIT_ACTION.FIREARM_CREATE,
     entityType: "firearm",
     entityId: (created as { id?: string } | null)?.id,
@@ -58,8 +67,7 @@ export async function createFirearm(formData: FormData) {
     },
   });
 
-  revalidatePath("/firearms");
-  revalidatePath("/dashboard");
+  revalidateFirearmPaths();
   redirect("/firearms");
 }
 
@@ -70,9 +78,7 @@ export async function updateFirearm(formData: FormData) {
     redirectWithError("/firearms", "Datos incompletos");
   }
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   // Snapshot antes del update para registrar before/after.
   const { data: before } = await supabase
@@ -95,7 +101,7 @@ export async function updateFirearm(formData: FormData) {
     redirectWithError("/firearms", error.message);
   }
 
-  await logAction(supabase, userData.user.id, {
+  await logAction(supabase, user.id, {
     action: AUDIT_ACTION.FIREARM_UPDATE,
     entityType: "firearm",
     entityId: id,
@@ -106,9 +112,7 @@ export async function updateFirearm(formData: FormData) {
     },
   });
 
-  revalidatePath("/firearms");
-  revalidatePath(`/firearms/${id}`);
-  revalidatePath("/dashboard");
+  revalidateFirearmPaths(id);
   redirect("/firearms");
 }
 
@@ -116,9 +120,7 @@ export async function deleteFirearm(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   // Snapshot antes de borrar.
   const { data: snapshot } = await supabase
@@ -140,7 +142,7 @@ export async function deleteFirearm(formData: FormData) {
       caliber: string | null;
     };
     const s = snapshot as unknown as Snap;
-    await logAction(supabase, userData.user.id, {
+    await logAction(supabase, user.id, {
       action: AUDIT_ACTION.FIREARM_DELETE,
       entityType: "firearm",
       entityId: id,
@@ -153,8 +155,7 @@ export async function deleteFirearm(formData: FormData) {
     });
   }
 
-  revalidatePath("/firearms");
-  revalidatePath("/dashboard");
+  revalidateFirearmPaths();
   redirect("/firearms");
 }
 
@@ -170,9 +171,7 @@ export async function setMatchFirearm(formData: FormData) {
 
   if (!matchEntryId) return;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
+  const { supabase, user } = await requireUser();
 
   const errorTarget = matchId ? `/matches/${matchId}/me` : "/dashboard";
 
@@ -213,7 +212,7 @@ export async function setMatchFirearm(formData: FormData) {
 
     // Solo loguear si efectivamente había un log antes.
     if (logBefore) {
-      await logAction(supabase, userData.user.id, {
+      await logAction(supabase, user.id, {
         action: AUDIT_ACTION.MATCH_FIREARM_CLEAR,
         entityType: "match_entry",
         entityId: matchEntryId,
@@ -254,7 +253,7 @@ export async function setMatchFirearm(formData: FormData) {
       .eq("id", firearmId)
       .maybeSingle();
 
-    await logAction(supabase, userData.user.id, {
+    await logAction(supabase, user.id, {
       action: AUDIT_ACTION.MATCH_FIREARM_SET,
       entityType: "match_entry",
       entityId: matchEntryId,

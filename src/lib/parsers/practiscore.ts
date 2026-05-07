@@ -1,14 +1,24 @@
-import { parse, type HTMLElement } from "node-html-parser";
+import { parse } from "node-html-parser";
 import { DISCIPLINE } from "../disciplines";
 import type {
   ParsedMatch,
   ParsedMatchEntry,
   ParsedMatchSource,
-  ParsedShooter,
   ParsedStage,
   ParsedStageResult,
   PowerFactor,
 } from "../types/match";
+import {
+  columnValue,
+  extractDivisionalTableSections,
+  extractGeneratedBy,
+  nullIfEmpty,
+  parseFloatOr,
+  parseFloatOrNull,
+  parseIntOr,
+  parsePercentage,
+  stripDqPrefix,
+} from "./shared";
 
 /**
  * Parser para reportes HTML generados por PractiScore (Tiro Práctico / IPSC).
@@ -22,14 +32,10 @@ import type {
  * tiradores contra `shooters` y la deduplicación de matches se hace después.
  */
 
-interface SectionBlock {
+interface SectionMeta {
   kind: "match" | "stage";
   /** Texto del header tras "Match Results - " o "Stage Results - " */
   title: string;
-  /** Filas de header (th) */
-  headers: string[];
-  /** Filas de datos (tr con tds) */
-  rows: string[][];
 }
 
 const TITLE_DATE_RE = /-\s*(\d{4}-\d{2}-\d{2})\s*$/;
@@ -43,11 +49,11 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
 
   const { name, date } = extractNameAndDate(heading || title);
   const generatedBy = extractGeneratedBy(root);
-  const sections = extractSections(root);
+  const sections = extractDivisionalTableSections<SectionMeta>(root, classifyHead);
 
   // Determinar tipo de archivo a partir de las secciones encontradas.
-  const hasStageSections = sections.some((s) => s.kind === "stage");
-  const hasMatchSections = sections.some((s) => s.kind === "match");
+  const hasStageSections = sections.some((s) => s.meta.kind === "stage");
+  const hasMatchSections = sections.some((s) => s.meta.kind === "match");
 
   let source: ParsedMatchSource;
   if (hasStageSections) {
@@ -55,7 +61,7 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
   } else if (
     hasMatchSections &&
     sections.length === 1 &&
-    /combined/i.test(sections[0].title)
+    /combined/i.test(sections[0].meta.title)
   ) {
     source = "practiscore_combined_html";
   } else {
@@ -72,7 +78,7 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
     const stageName = heading || title;
     const allResults: ParsedStageResult[] = [];
     for (const section of sections) {
-      if (section.kind !== "stage") continue;
+      if (section.meta.kind !== "stage") continue;
       for (const row of section.rows) {
         const result = parseStageRow(section.headers, row);
         if (result) allResults.push(result);
@@ -85,7 +91,7 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
     });
   } else {
     for (const section of sections) {
-      if (section.kind !== "match") continue;
+      if (section.meta.kind !== "match") continue;
       for (const row of section.rows) {
         const entry = parseMatchRow(section.headers, row);
         if (entry) matchEntries.push(entry);
@@ -113,52 +119,12 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
   };
 }
 
-function extractSections(root: HTMLElement): SectionBlock[] {
-  const sections: SectionBlock[] = [];
-
-  // Cada sección empieza con un <td class="division_head"> que contiene
-  // un <b> con el título "Match Results - X" o "Stage Results - X".
-  // Las filas de la sección son los <tr> hermanos siguientes hasta
-  // el próximo division_head.
-  const allRows = root.querySelectorAll("tr");
-  let current: SectionBlock | null = null;
-
-  for (const tr of allRows) {
-    const headerCell = tr.querySelector("td.division_head");
-    if (headerCell) {
-      const titleText = headerCell.querySelector("b")?.textContent?.trim() ?? "";
-      const stageMatch = /^Stage\s+Results\s*-\s*(.+)$/i.exec(titleText);
-      const matchMatch = /^Match\s+Results\s*-\s*(.+)$/i.exec(titleText);
-      if (stageMatch) {
-        if (current) sections.push(current);
-        current = { kind: "stage", title: stageMatch[1].trim(), headers: [], rows: [] };
-      } else if (matchMatch) {
-        if (current) sections.push(current);
-        current = { kind: "match", title: matchMatch[1].trim(), headers: [], rows: [] };
-      } else {
-        // Header genérico que no reconocemos: ignorar.
-      }
-      continue;
-    }
-
-    if (!current) continue;
-
-    // Header row (con th)
-    const ths = tr.querySelectorAll("th");
-    if (ths.length > 0) {
-      current.headers = ths.map((th) => th.textContent.trim());
-      continue;
-    }
-
-    // Data row (con td)
-    const tds = tr.querySelectorAll("td");
-    if (tds.length > 0) {
-      current.rows.push(tds.map((td) => td.textContent.trim()));
-    }
-  }
-
-  if (current) sections.push(current);
-  return sections;
+function classifyHead(titleText: string): SectionMeta | null {
+  const stageMatch = /^Stage\s+Results\s*-\s*(.+)$/i.exec(titleText);
+  if (stageMatch) return { kind: "stage", title: stageMatch[1].trim() };
+  const matchMatch = /^Match\s+Results\s*-\s*(.+)$/i.exec(titleText);
+  if (matchMatch) return { kind: "match", title: matchMatch[1].trim() };
+  return null;
 }
 
 function parseMatchRow(headers: string[], row: string[]): ParsedMatchEntry | null {
@@ -217,53 +183,11 @@ function parseStageRow(headers: string[], row: string[]): ParsedStageResult | nu
   };
 }
 
-function columnValue(headers: string[], row: string[], key: string): string | undefined {
-  const i = headers.findIndex((h) => h === key);
-  if (i < 0) return undefined;
-  return row[i]?.trim();
-}
-
-function stripDqPrefix(name: string): { fullName: string; isDq: boolean } {
-  const m = /^\(DQ\)\s*(.+)$/.exec(name);
-  if (m) return { fullName: m[1].trim(), isDq: true };
-  return { fullName: name.trim(), isDq: false };
-}
-
 function parsePowerFactor(value: string | undefined): PowerFactor {
   if (!value) return null;
   const v = value.trim();
   if (v === "Min" || v === "Maj") return v;
   return null;
-}
-
-function parsePercentage(value: string | undefined): number {
-  if (!value) return 0;
-  const cleaned = value.replace("%", "").trim();
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function parseFloatOr(value: string | undefined, fallback: number): number {
-  if (value === undefined || value === "") return fallback;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function parseFloatOrNull(value: string | undefined): number | null {
-  if (value === undefined || value === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseIntOr(value: string, fallback: number): number {
-  const n = parseInt(value, 10);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function nullIfEmpty(value: string | undefined): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return trimmed === "" ? null : trimmed;
 }
 
 function extractNameAndDate(heading: string): { name: string; date: string } {
@@ -280,9 +204,4 @@ function extractNameAndDate(heading: string): { name: string; date: string } {
 function extractStageNumber(heading: string): number | null {
   const m = STAGE_NUMBER_RE.exec(heading);
   return m ? parseInt(m[1], 10) : null;
-}
-
-function extractGeneratedBy(root: HTMLElement): string | null {
-  const div = root.querySelectorAll("div").find((d) => /Generated by/i.test(d.textContent));
-  return div ? div.textContent.replace(/\s+/g, " ").trim() : null;
 }
