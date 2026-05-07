@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { FirearmSelector } from "@/components/FirearmSelector";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 import { listMyShooters } from "@/lib/db/shooters";
 import { getMyMatchSummary } from "@/lib/db/matches";
 import {
@@ -30,9 +30,8 @@ interface PageProps {
 export default async function PersonalMatchPage({ params }: PageProps) {
   const { id } = await params;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user!.id; // protegido por (app)/layout
+  const { supabase, user } = await requireUser();
+  const userId = user.id;
 
   const myShooters = await listMyShooters(supabase, userId);
 

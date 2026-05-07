@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
 import { listClubs } from "@/lib/db/clubs";
@@ -35,9 +35,8 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const { id } = await params;
   const { error } = await searchParams;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user!.id;
+  const { supabase, user } = await requireUser();
+  const userId = user.id;
 
   const match = await getMatchById(supabase, id);
   if (!match) notFound();

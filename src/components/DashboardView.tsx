@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { HistoryTable } from "@/components/HistoryTable";
 import { StatsOverview } from "@/components/StatsOverview";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
 import {
@@ -37,9 +37,8 @@ export async function DashboardView({
   disciplineCode,
   disciplineName,
 }: DashboardViewProps) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user!.id;
+  const { supabase, user } = await requireUser();
+  const userId = user.id;
   const isConsolidated = disciplineCode === null;
 
   const [profile, myShooters, allMatches, firearmStats] = await Promise.all([

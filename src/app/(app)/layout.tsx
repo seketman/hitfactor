@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 
 /**
@@ -13,16 +12,13 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) redirect("/login");
-
-  const profile = await getProfile(supabase, userData.user.id);
-  const userName = profile?.display_name ?? userData.user.email ?? "—";
+  const { supabase, user } = await requireUser();
+  const profile = await getProfile(supabase, user.id);
+  const userName = profile?.display_name ?? user.email ?? "—";
 
   return (
     <div className="md:flex">
-      <AppSidebar userName={userName} />
+      <AppSidebar userId={user.id} userName={userName} />
       <main className="min-w-0 flex-1">{children}</main>
     </div>
   );

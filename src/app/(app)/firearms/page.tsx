@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 import { listFirearmUsageStats } from "@/lib/db/firearms";
 import { createFirearm, deleteFirearm } from "@/lib/actions/firearms";
 import { formatDate } from "@/lib/utils";
@@ -17,11 +17,8 @@ interface PageProps {
 export default async function FirearmsPage({ searchParams }: PageProps) {
   const { error, new: showNew } = await searchParams;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user!.id;
-
-  const stats = await listFirearmUsageStats(supabase, userId);
+  const { supabase, user } = await requireUser();
+  const stats = await listFirearmUsageStats(supabase, user.id);
 
   return (
     <PageContainer className="max-w-3xl">

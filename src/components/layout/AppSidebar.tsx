@@ -2,16 +2,22 @@ import { createClient } from "@/lib/supabase/server";
 import { listMyDisciplines } from "@/lib/db/shooters";
 import { AppSidebarShell } from "./AppSidebarShell";
 
+interface AppSidebarProps {
+  userId: string;
+  userName: string;
+}
+
 /**
  * Server wrapper: fetcha las disciplinas en las que el usuario tiene al menos
  * una participación y se las pasa al shell client-side. El shell maneja
  * collapse + estado activo + drawer mobile.
+ *
+ * Recibe `userId` como prop desde el layout (que ya verificó autenticación)
+ * para evitar un segundo `auth.getUser()` que puede correr en paralelo con
+ * el layout y romper si hay un mismatch de cookie.
  */
-export async function AppSidebar({ userName }: { userName: string }) {
+export async function AppSidebar({ userId, userName }: AppSidebarProps) {
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData.user!.id;
-
   const disciplines = await listMyDisciplines(supabase, userId);
 
   return <AppSidebarShell userName={userName} disciplines={disciplines} />;
