@@ -26,8 +26,9 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Tus armas</h1>
           <p className="mt-1 text-sm text-fg-muted">
-            Catálogo personal. Asignalas a cada match desde la página de tu
-            participación para llevar el conteo de tiros.
+            Catálogo personal. Asignalas a cada match desde tu página de
+            participación para llevar un registro de su uso y disparos
+            efectuados.
           </p>
         </div>
         {!showNew && stats.length > 0 && (
