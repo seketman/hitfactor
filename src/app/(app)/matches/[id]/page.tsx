@@ -24,6 +24,7 @@ import {
 } from "@/lib/utils";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { claimShooter } from "@/lib/actions/claim";
+import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 
 interface PageProps {
@@ -41,13 +42,15 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const match = await getMatchById(supabase, id);
   if (!match) notFound();
 
-  const [importerProfile, entries, stages, myShooters, clubs] = await Promise.all([
-    getProfile(supabase, match.imported_by_user_id),
-    listEntriesByMatch(supabase, id),
-    listStagesByMatch(supabase, id),
-    listMyShooters(supabase, userId),
-    listClubs(supabase),
-  ]);
+  const [importerProfile, entries, stages, myShooters, clubs, claimAliases] =
+    await Promise.all([
+      getProfile(supabase, match.imported_by_user_id),
+      listEntriesByMatch(supabase, id),
+      listStagesByMatch(supabase, id),
+      listMyShooters(supabase, userId),
+      listClubs(supabase),
+      getMyClaimAliases(supabase, userId),
+    ]);
 
   const myShooterIds = new Set(myShooters.map((s) => s.id));
   const isImporter = match.imported_by_user_id === userId;
@@ -152,10 +155,16 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                   {list.map((e) => {
                     const shooter = e.shooters;
                     const isMine = !!shooter && myShooterIds.has(shooter.id);
-                    // Cualquier shooter no linkeado es claimable: un usuario
-                    // puede tener varias identidades (una por disciplina).
+                    // "Soy yo" aparece solo si:
+                    //  - el shooter no está linkeado a nadie todavía,
+                    //  - y el nombre tiene similitud razonable con alguno de
+                    //    los aliases del usuario (profile + identidades ya
+                    //    linkeadas). En el bootstrap (aliases pobres) no
+                    //    filtramos para no bloquear el primer claim.
                     const canClaim =
-                      !!shooter && shooter.linked_user_id === null;
+                      !!shooter &&
+                      shooter.linked_user_id === null &&
+                      isClaimCandidate(shooter, claimAliases);
                     return (
                       <TR
                         key={e.id}

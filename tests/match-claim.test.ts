@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   areNamesSimilar,
+  buildClaimAliases,
   findClaimCandidates,
+  isClaimCandidate,
   nameTokens,
   normalizeName,
 } from "@/lib/import/match-claim";
@@ -91,6 +93,129 @@ describe("areNamesSimilar", () => {
     expect(
       areNamesSimilar("Martin Ferraro", "FERRARO, Martin Miguel"),
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildClaimAliases — pure function
+// ---------------------------------------------------------------------------
+
+describe("buildClaimAliases", () => {
+  it("colecta nombres del profile + shooters linkeados", () => {
+    const aliases = buildClaimAliases(
+      { display_name: "Diego", full_name: "Diego Demarziani", member_number: null },
+      [
+        { full_name: "Demarziani, Diego", member_number: null },
+        { full_name: "Demarziani Diego", member_number: null },
+      ],
+    );
+    expect(aliases.names).toEqual([
+      "Diego",
+      "Diego Demarziani",
+      "Demarziani, Diego",
+      "Demarziani Diego",
+    ]);
+  });
+
+  it("ignora strings vacíos del profile", () => {
+    const aliases = buildClaimAliases(
+      { display_name: "Diego", full_name: null, member_number: null },
+      [],
+    );
+    expect(aliases.names).toEqual(["Diego"]);
+  });
+
+  it("colecta member_numbers del profile + shooters", () => {
+    const aliases = buildClaimAliases(
+      { display_name: "X", full_name: null, member_number: "12345" },
+      [
+        { full_name: "X", member_number: "12345" }, // duplicado
+        { full_name: "Y", member_number: "67890" },
+      ],
+    );
+    expect([...aliases.memberNumbers].sort()).toEqual(["12345", "67890"]);
+  });
+
+  it("acepta profile null", () => {
+    const aliases = buildClaimAliases(null, []);
+    expect(aliases.names).toEqual([]);
+    expect(aliases.memberNumbers.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isClaimCandidate — pure function
+// ---------------------------------------------------------------------------
+
+describe("isClaimCandidate", () => {
+  it("BOOTSTRAP: si los aliases no son útiles (1 token), devuelve true", () => {
+    // Solo "Diego" (1 token) — areNamesSimilar rechazaría todo. Sin este
+    // bypass, un usuario nuevo nunca podría hacer el primer claim manual.
+    const aliases = buildClaimAliases(
+      { display_name: "Diego" },
+      [],
+    );
+    expect(
+      isClaimCandidate({ full_name: "Pérez, José", member_number: null }, aliases),
+    ).toBe(true);
+  });
+
+  it("BOOTSTRAP: aliases vacíos también devuelven true", () => {
+    const aliases = buildClaimAliases(null, []);
+    expect(
+      isClaimCandidate({ full_name: "Cualquiera", member_number: null }, aliases),
+    ).toBe(true);
+  });
+
+  it("FILTRO ESTRICTO: aliases con >=2 tokens activan el matching", () => {
+    const aliases = buildClaimAliases(
+      { display_name: "Diego", full_name: "Diego Demarziani" },
+      [],
+    );
+    // Match razonable
+    expect(
+      isClaimCandidate({ full_name: "Demarziani, Diego", member_number: null }, aliases),
+    ).toBe(true);
+    // Match con shooter sin parentesco
+    expect(
+      isClaimCandidate({ full_name: "Pérez, José", member_number: null }, aliases),
+    ).toBe(false);
+  });
+
+  it("ALIAS DE SHOOTER LINKEADO: usa nombres ya claimados como referencia", () => {
+    // Profile pobre, pero hay un shooter ya linkeado con nombre completo.
+    const aliases = buildClaimAliases(
+      { display_name: "Diego" },
+      [{ full_name: "Demarziani, Diego D.", member_number: null }],
+    );
+    // "Demarziani Diego" matchea contra "Demarziani, Diego D." (alias del linkeado)
+    expect(
+      isClaimCandidate({ full_name: "Demarziani Diego", member_number: null }, aliases),
+    ).toBe(true);
+    // Un nombre no relacionado sigue rechazado
+    expect(
+      isClaimCandidate({ full_name: "García, Juan", member_number: null }, aliases),
+    ).toBe(false);
+  });
+
+  it("MEMBER NUMBER: match exacto siempre suma", () => {
+    const aliases = buildClaimAliases(
+      { display_name: "X", member_number: "12345" },
+      [],
+    );
+    expect(
+      isClaimCandidate({ full_name: "Apellido Distinto", member_number: "12345" }, aliases),
+    ).toBe(true);
+  });
+
+  it("MEMBER NUMBER: number distinto no genera match por sí solo", () => {
+    const aliases = buildClaimAliases(
+      { display_name: "Diego", full_name: "Diego Demarziani", member_number: "12345" },
+      [],
+    );
+    expect(
+      isClaimCandidate({ full_name: "Pérez, José", member_number: "99999" }, aliases),
+    ).toBe(false);
   });
 });
 

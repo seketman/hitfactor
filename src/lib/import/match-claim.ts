@@ -1,11 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Auto-detección de claim al importar.
+ * Auto-detección de claim al importar y filtrado de "Soy yo" en la vista
+ * pública del match.
  *
- * Después de importar un match, buscamos shooters de ese match cuyo nombre
- * (o número de socio) coincide con el del profile del usuario, para sugerir
- * un "Soy yo" sin que el usuario tenga que ir a buscarlo.
+ * Soporta **múltiples identidades**: un mismo usuario puede tener varios
+ * shooters linkeados (porque el nombre escrito en cada torneo varía:
+ * PractiScore suele ser "Apellido, Nombre", la planilla FBI usa
+ * "Apellido Nombre", etc.). Los aliases para matchear se construyen de:
+ *   - `display_name` y `full_name` del profile.
+ *   - El `full_name` de **todos** los shooters ya linkeados a este usuario.
+ *   - El `member_number` del profile + los de los shooters ya linkeados.
  */
 
 export interface ClaimCandidate {
@@ -17,16 +22,91 @@ export interface ClaimCandidate {
   reason: "name" | "member_number";
 }
 
+export interface ClaimAliases {
+  /** Nombres conocidos del usuario (profile + shooters linkeados). */
+  names: string[];
+  /** Números de socio conocidos. */
+  memberNumbers: Set<string>;
+}
+
+interface ProfileLike {
+  display_name?: string | null;
+  full_name?: string | null;
+  member_number?: string | null;
+}
+
+interface ShooterLike {
+  full_name: string;
+  member_number: string | null;
+}
+
+/**
+ * Construye el set de aliases del usuario a partir del profile + sus shooters
+ * ya linkeados. Pure function — testeable.
+ */
+export function buildClaimAliases(
+  profile: ProfileLike | null,
+  linkedShooters: ShooterLike[],
+): ClaimAliases {
+  const names = [
+    profile?.display_name,
+    profile?.full_name,
+    ...linkedShooters.map((s) => s.full_name),
+  ].filter((s): s is string => typeof s === "string" && s.trim().length > 0);
+
+  const memberNumbers = new Set<string>();
+  if (profile?.member_number) memberNumbers.add(profile.member_number.trim());
+  for (const s of linkedShooters) {
+    if (s.member_number) memberNumbers.add(s.member_number.trim());
+  }
+
+  return { names, memberNumbers };
+}
+
+/**
+ * True si los aliases son útiles para discriminar (i.e., al menos un nombre
+ * con ≥2 tokens, o algún número de socio).
+ *
+ * Con aliases pobres (ej: profile recién creado con display_name "Diego" =
+ * 1 token) no podemos filtrar — `areNamesSimilar` exige ≥2 tokens en común
+ * y rechazaría todo. En ese caso preferimos mostrar "Soy yo" en todos los
+ * shooters no claimados, así el usuario puede hacer su primer claim manual.
+ * Una vez linkeado un shooter con nombre completo (≥2 tokens), los aliases
+ * pasan a ser útiles y el filtro arranca.
+ */
+function hasUsefulAliases(aliases: ClaimAliases): boolean {
+  if (aliases.memberNumbers.size > 0) return true;
+  return aliases.names.some((name) => nameTokens(name).size >= 2);
+}
+
+/**
+ * True si un shooter dado tiene similitud razonable con los aliases del
+ * usuario actual. Pensado para filtrar el botón "Soy yo" en la vista pública
+ * del match.
+ *
+ * Bootstrap: si los aliases no son útiles (1 token o vacíos), devuelve true
+ * para no bloquear el primer claim manual.
+ */
+export function isClaimCandidate(
+  shooter: ShooterLike,
+  aliases: ClaimAliases,
+): boolean {
+  if (!hasUsefulAliases(aliases)) return true;
+
+  if (
+    shooter.member_number != null &&
+    aliases.memberNumbers.has(shooter.member_number.trim())
+  ) {
+    return true;
+  }
+
+  return aliases.names.some((alias) =>
+    areNamesSimilar(alias, shooter.full_name),
+  );
+}
+
 /**
  * Devuelve los shooters de un match que parecen ser el usuario logueado.
- *
- * Soporta **múltiples identidades**: un mismo usuario puede tener varios
- * shooters linkeados (porque el nombre escrito en cada torneo varía: PractiScore
- * suele ser "Apellido, Nombre", la planilla FBI usa "Apellido Nombre", etc.).
- * Por eso, los aliases para matchear se construyen de:
- *   - `display_name` y `full_name` del profile.
- *   - El `full_name` de **todos** los shooters ya linkeados a este usuario.
- *   - El `member_number` del profile + los de los shooters ya linkeados.
  *
  * Reglas:
  *  - Solo considera shooters sin `linked_user_id` (claimables — los ya linkeados
@@ -52,27 +132,13 @@ export async function findClaimCandidates(
       .eq("linked_user_id", userId),
   ]);
 
-  const profile = profileRes.data as
-    | { display_name: string | null; full_name: string | null; member_number: string | null }
-    | null;
-  const linkedShooters = (linkedRes.data ?? []) as Array<{
-    full_name: string;
-    member_number: string | null;
-  }>;
+  const profile = profileRes.data as ProfileLike | null;
+  const linkedShooters = (linkedRes.data ?? []) as ShooterLike[];
+  const aliases = buildClaimAliases(profile, linkedShooters);
 
-  const aliasNames = [
-    profile?.display_name,
-    profile?.full_name,
-    ...linkedShooters.map((s) => s.full_name),
-  ].filter((s): s is string => typeof s === "string" && s.trim().length > 0);
-
-  const aliasMembers = new Set<string>();
-  if (profile?.member_number) aliasMembers.add(profile.member_number.trim());
-  for (const s of linkedShooters) {
-    if (s.member_number) aliasMembers.add(s.member_number.trim());
+  if (aliases.names.length === 0 && aliases.memberNumbers.size === 0) {
+    return [];
   }
-
-  if (aliasNames.length === 0 && aliasMembers.size === 0) return [];
 
   type EntryRow = {
     divisions: { code: string } | null;
@@ -104,9 +170,9 @@ export async function findClaimCandidates(
 
     const memberMatch =
       shooter.member_number !== null &&
-      aliasMembers.has(shooter.member_number.trim());
+      aliases.memberNumbers.has(shooter.member_number.trim());
 
-    const nameMatch = aliasNames.some((alias) =>
+    const nameMatch = aliases.names.some((alias) =>
       areNamesSimilar(alias, shooter.full_name),
     );
 
@@ -123,6 +189,32 @@ export async function findClaimCandidates(
   }
 
   return candidates;
+}
+
+/**
+ * Carga los aliases del usuario actual: profile + shooters ya linkeados.
+ * Lo usa la vista pública del match para filtrar el botón "Soy yo".
+ */
+export async function getMyClaimAliases(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ClaimAliases> {
+  const [profileRes, linkedRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("display_name, full_name, member_number")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase
+      .from("shooters")
+      .select("full_name, member_number")
+      .eq("linked_user_id", userId),
+  ]);
+
+  return buildClaimAliases(
+    profileRes.data as ProfileLike | null,
+    (linkedRes.data ?? []) as ShooterLike[],
+  );
 }
 
 // ---------------------------------------------------------------------------
