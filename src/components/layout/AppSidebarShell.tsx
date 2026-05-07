@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Crosshair,
   History,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -209,14 +210,41 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
                   </Button>
                 </form>
               </div>
+              <div className="border-t border-border pt-2 text-xs text-fg-subtle">
+                <Link
+                  href="/about"
+                  className={cn(
+                    "block rounded-md px-2 py-1 hover:bg-surface-2 hover:text-fg",
+                    pathname === "/about" && "bg-accent-soft text-accent",
+                  )}
+                >
+                  Acerca de & feedback
+                </Link>
+                <p className="mt-1.5 px-2 text-[11px] leading-tight">
+                  Hecho en La Plata por un tirador novato.
+                </p>
+              </div>
             </>
           )}
           {collapsed && (
-            <form action="/auth/signout" method="post">
-              <Button type="submit" variant="ghost" size="sm" aria-label="Salir">
-                <X className="h-4 w-4" aria-hidden />
-              </Button>
-            </form>
+            <>
+              <Link
+                href="/about"
+                aria-label="Acerca de"
+                title="Acerca de"
+                className={cn(
+                  "rounded-md p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg",
+                  pathname === "/about" && "bg-accent-soft text-accent",
+                )}
+              >
+                <Info className="h-4 w-4" aria-hidden />
+              </Link>
+              <form action="/auth/signout" method="post">
+                <Button type="submit" variant="ghost" size="sm" aria-label="Salir">
+                  <X className="h-4 w-4" aria-hidden />
+                </Button>
+              </form>
+            </>
           )}
         </div>
       </aside>

@@ -121,6 +121,27 @@ export interface AuditLogRow {
   created_at: string;
 }
 
+export type FeedbackType = "bug" | "suggestion" | "other";
+export type FeedbackStatus =
+  | "new"
+  | "triaged"
+  | "in_progress"
+  | "done"
+  | "wontdo"
+  | "duplicate";
+
+export interface FeedbackRow {
+  id: number;
+  user_id: string;
+  type: FeedbackType;
+  message: string;
+  page_url: string | null;
+  status: FeedbackStatus;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Club {
   code: string;
   name: string;
