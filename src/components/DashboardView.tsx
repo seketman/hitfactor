@@ -99,7 +99,10 @@ export async function DashboardView({
           </Section>
 
           <Section title={`Tu historial (${myEntries.length})`}>
-            <HistoryTable entries={myEntries} />
+            <HistoryTable
+              entries={myEntries}
+              showDisciplineFilter={isConsolidated}
+            />
           </Section>
         </>
       )}

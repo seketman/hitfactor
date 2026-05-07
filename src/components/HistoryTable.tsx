@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Select } from "@/components/ui/Select";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
-import { formatDate, formatPercent } from "@/lib/utils";
+import { cn, formatDate, formatPercent } from "@/lib/utils";
 import { getClubCode, getClubName } from "@/lib/clubs";
 import type { MyEntryRow } from "@/lib/db/types";
 
@@ -25,7 +25,20 @@ const POWER_FACTOR_LABELS: Record<string, string> = {
   Min: "Minor",
 };
 
-export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
+interface HistoryTableProps {
+  entries: MyEntryRow[];
+  /**
+   * Si false, esconde el filtro de disciplina (se asume que el caller ya
+   * filtró por disciplina vía URL — ej. /dashboard/[discipline]).
+   * Default: true (vista consolidada).
+   */
+  showDisciplineFilter?: boolean;
+}
+
+export function HistoryTable({
+  entries,
+  showDisciplineFilter = true,
+}: HistoryTableProps) {
   const [discipline, setDiscipline] = useState<string>("all");
   const [division, setDivision] = useState<string>("all");
   const [factor, setFactor] = useState<string>("all");
@@ -96,19 +109,26 @@ export function HistoryTable({ entries }: { entries: MyEntryRow[] }) {
 
   return (
     <div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Select
-          label="Disciplina"
-          value={discipline}
-          onChange={(e) => setDiscipline(e.target.value)}
-        >
-          <option value="all">Todas</option>
-          {disciplineOptions.map(([code, name]) => (
-            <option key={code} value={code}>
-              {name}
-            </option>
-          ))}
-        </Select>
+      <div
+        className={cn(
+          "mb-4 grid gap-3 sm:grid-cols-2",
+          showDisciplineFilter ? "lg:grid-cols-5" : "lg:grid-cols-4",
+        )}
+      >
+        {showDisciplineFilter && (
+          <Select
+            label="Disciplina"
+            value={discipline}
+            onChange={(e) => setDiscipline(e.target.value)}
+          >
+            <option value="all">Todas</option>
+            {disciplineOptions.map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        )}
 
         <Select
           label="División"
