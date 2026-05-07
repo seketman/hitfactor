@@ -84,8 +84,8 @@ export default async function AboutPage({ searchParams }: PageProps) {
           progreso por disciplina.
         </p>
         <p className="mt-4 text-sm leading-relaxed text-fg-muted">
-          Lo hizo <span className="font-medium text-fg">Seketman</span> con
-          la ayuda invaluable de{" "}
+          Creado por <span className="font-medium text-fg">Seketman</span>, un
+          tirador novato de La Plata, con la ayuda invaluable de{" "}
           <a
             href="https://claude.com/claude-code"
             target="_blank"
@@ -95,9 +95,6 @@ export default async function AboutPage({ searchParams }: PageProps) {
             Claude
           </a>
           .
-        </p>
-        <p className="mt-2 text-sm text-fg-subtle">
-          Hecho en La Plata por un tirador novato.
         </p>
       </Card>
 

@@ -220,9 +220,6 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
                 >
                   Acerca de & feedback
                 </Link>
-                <p className="mt-1.5 px-2 text-[11px] leading-tight">
-                  Hecho en La Plata por un tirador novato.
-                </p>
               </div>
             </>
           )}
