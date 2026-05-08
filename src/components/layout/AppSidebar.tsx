@@ -5,6 +5,8 @@ import { AppSidebarShell } from "./AppSidebarShell";
 interface AppSidebarProps {
   userId: string;
   userName: string;
+  userEmail?: string | null;
+  memberSince?: string | null;
 }
 
 /**
@@ -16,9 +18,21 @@ interface AppSidebarProps {
  * para evitar un segundo `auth.getUser()` que puede correr en paralelo con
  * el layout y romper si hay un mismatch de cookie.
  */
-export async function AppSidebar({ userId, userName }: AppSidebarProps) {
+export async function AppSidebar({
+  userId,
+  userName,
+  userEmail,
+  memberSince,
+}: AppSidebarProps) {
   const supabase = await createClient();
   const disciplines = await listMyDisciplines(supabase, userId);
 
-  return <AppSidebarShell userName={userName} disciplines={disciplines} />;
+  return (
+    <AppSidebarShell
+      userName={userName}
+      userEmail={userEmail}
+      memberSince={memberSince}
+      disciplines={disciplines}
+    />
+  );
 }

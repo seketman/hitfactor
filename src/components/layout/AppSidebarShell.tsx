@@ -29,6 +29,10 @@ interface DisciplineEntry {
 
 interface AppSidebarShellProps {
   userName: string;
+  /** Email de la cuenta — se muestra en el tooltip del nombre. */
+  userEmail?: string | null;
+  /** Fecha de creación de la cuenta (ISO YYYY-MM-DD). Tooltip-only. */
+  memberSince?: string | null;
   disciplines: DisciplineEntry[];
 }
 
@@ -42,10 +46,26 @@ interface AppSidebarShellProps {
  *
  * Persiste el estado collapsed en localStorage.
  */
-export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps) {
+export function AppSidebarShell({
+  userName,
+  userEmail,
+  memberSince,
+  disciplines,
+}: AppSidebarShellProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Tooltip multilínea para el nombre del usuario. Browsers respetan \n
+  // en el atributo title (Chrome, Safari, Firefox lo renderizan con saltos
+  // de línea reales).
+  const userTooltip = [
+    userName,
+    userEmail || null,
+    memberSince ? `Miembro desde ${memberSince}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   // Hidratar estado desde localStorage solo en cliente.
   useEffect(() => {
@@ -203,7 +223,7 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
             <>
               <ThemeToggle stretch />
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate text-fg-muted" title={userName}>
+                <span className="truncate text-fg-muted" title={userTooltip}>
                   {userName}
                 </span>
                 <form action="/auth/signout" method="post">
@@ -216,7 +236,7 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
                 <Link
                   href="/about"
                   className={cn(
-                    "block rounded-md px-2 py-1 hover:bg-surface-2 hover:text-fg",
+                    "block rounded-md px-2 py-1 text-center hover:bg-surface-2 hover:text-fg",
                     pathname === "/about" && "bg-accent-soft text-accent",
                   )}
                 >
