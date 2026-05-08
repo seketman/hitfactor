@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -130,14 +132,41 @@ function ClubForm({
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Button type="submit" size="sm">
-          Guardar
-        </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
-          Cancelar
-        </Button>
-      </div>
+      <FormButtons onCancel={onCancel} />
     </form>
+  );
+}
+
+/**
+ * Botones del form de club. Sub-componente para poder leer `useFormStatus`
+ * (sólo funciona dentro de un `<form>`). Mientras la action está en flight:
+ *  - "Guardar" muestra spinner + texto "Guardando…" y queda disabled
+ *  - "Cancelar" también queda disabled, para que el usuario no oculte el form
+ *    mid-update y termine confundido sobre si guardó o no
+ */
+function FormButtons({ onCancel }: { onCancel: () => void }) {
+  const { pending } = useFormStatus();
+  return (
+    <div className="flex gap-2">
+      <Button type="submit" size="sm" disabled={pending} aria-busy={pending}>
+        {pending ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            Guardando…
+          </>
+        ) : (
+          "Guardar"
+        )}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={onCancel}
+        disabled={pending}
+      >
+        Cancelar
+      </Button>
+    </div>
   );
 }
