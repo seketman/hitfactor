@@ -5,10 +5,11 @@ import {
   parseSteelChallengeHtml,
 } from "./steel-challenge";
 import { isFbiCsvFormat, parseFbiCsv } from "./fbi-csv";
+import { parseWinmssPdf } from "./winmss-pdf";
 
 /**
- * Punto de entrada único para parsear cualquier reporte soportado.
- * Detecta el formato (HTML PractiScore vs CSV FBI) y delega al parser correcto.
+ * Punto de entrada único para parsear cualquier reporte soportado en
+ * formato texto (HTML PractiScore o CSV FBI). Para PDFs ver `parsePdf`.
  */
 export function parseFile(content: string): ParsedMatch {
   if (isFbiCsvFormat(content)) {
@@ -28,6 +29,15 @@ export function parseHtml(html: string): ParsedMatch {
   return parsePractiscoreHtml(html);
 }
 
+/**
+ * Parsea un PDF (binario) y devuelve un ParsedMatch. Hoy solo soportamos
+ * PDFs WinMSS de ipsc.org.ar. Async porque carga `pdf-parse` dinámicamente.
+ */
+export async function parsePdf(data: Uint8Array): Promise<ParsedMatch> {
+  return parseWinmssPdf(data);
+}
+
 export { parsePractiscoreHtml } from "./practiscore";
 export { parseSteelChallengeHtml, isSteelChallengeFormat } from "./steel-challenge";
 export { parseFbiCsv, isFbiCsvFormat } from "./fbi-csv";
+export { parseWinmssPdf, isWinmssFormat } from "./winmss-pdf";

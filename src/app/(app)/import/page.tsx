@@ -46,8 +46,9 @@ export default async function ImportPage({
       <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Importar resultados</h1>
         <p className="mt-1 text-sm text-fg-muted">
-          Subí un archivo HTML de PractiScore (IPSC / Steel Challenge) o un CSV
-          exportado de Google Sheets para Tiro FBI.
+          Subí un archivo HTML de PractiScore (IPSC / Steel Challenge), un CSV
+          exportado de Google Sheets para Tiro FBI, o un PDF WinMSS de
+          ipsc.org.ar (overall y stages por separado).
         </p>
       </header>
 
@@ -162,6 +163,13 @@ export default async function ImportPage({
             <strong className="text-fg">CSV de Tiro FBI</strong>: planilla
             exportada de Google Sheets (Archivo → Descargar → CSV) con las
             columnas Tirador, Club, Categoría, Disciplina, Impactos y Puntos.
+          </p>
+          <p>
+            <strong className="text-fg">PDF WinMSS</strong> (ipsc.org.ar):
+            archivos históricos de Tiro Práctico. Subí el "overall" primero
+            (crea el match) y después el "stages" para completar los detalles
+            por etapa. La fecha del torneo se toma de la fecha de impresión
+            del archivo.
           </p>
         </div>
       </details>

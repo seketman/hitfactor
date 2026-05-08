@@ -69,7 +69,7 @@ function FormBody({ hasPreviousResult }: { hasPreviousResult: boolean }) {
           <input
             type="file"
             name="file"
-            accept=".html,.htm,.csv"
+            accept=".html,.htm,.csv,.pdf"
             required
             aria-busy={pending}
             onChange={(e) => setFilename(e.target.files?.[0]?.name ?? null)}

@@ -1,7 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { parseFile } from "@/lib/parsers";
+import { parseFile, parsePdf } from "@/lib/parsers";
+import type { ParsedMatch } from "@/lib/types/match";
 import { redirectWithError } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
@@ -18,15 +19,30 @@ export async function importHtml(formData: FormData) {
   }
 
   const filename = file.name;
-  if (!/\.(html?|csv)$/i.test(filename)) {
-    redirectWithError("/import", "Solo se aceptan archivos HTML o CSV");
+  const isPdf = /\.pdf$/i.test(filename);
+  const isText = /\.(html?|csv)$/i.test(filename);
+  if (!isPdf && !isText) {
+    redirectWithError("/import", "Solo se aceptan archivos HTML, CSV o PDF");
   }
-
-  const content = await file.text();
 
   const { supabase, user } = await requireUser();
 
-  const parsed = parseFile(content);
+  // PDFs van como binario; HTML/CSV como texto. Cada rama llama a su
+  // parser: parsePdf es async (carga pdf-parse dinámicamente), parseFile
+  // es sync.
+  let parsed: ParsedMatch;
+  try {
+    if (isPdf) {
+      const buffer = new Uint8Array(await file.arrayBuffer());
+      parsed = await parsePdf(buffer);
+    } else {
+      const content = await file.text();
+      parsed = parseFile(content);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Error parseando el archivo";
+    redirectWithError("/import", msg);
+  }
 
   if (!parsed.name || !parsed.date) {
     redirectWithError("/import", "El archivo no parece ser un reporte válido.");
