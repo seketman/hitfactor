@@ -175,6 +175,12 @@ describe("parseWinmssText — overall", () => {
     expect(parsed.stages).toEqual([]);
   });
 
+  it("extrae el club del título (token uppercase al inicio)", () => {
+    // "TFABA 1er SOCIAL ESCOPETA" → region debería ser "TFABA"
+    const parsed = parseWinmssText(pages(overallClassicPage));
+    expect(parsed.region).toBe("TFABA");
+  });
+
   it("dedupea título duplicado en la misma línea", () => {
     // El primer page tiene "TFABA 1er SOCIAL ESCOPETA TFABA 1er SOCIAL ESCOPETA"
     const parsed = parseWinmssText(pages(overallClassicPage));

@@ -8,6 +8,7 @@ import type {
 } from "../types/match";
 import {
   columnValue,
+  extractClubFromTitle,
   extractDivisionalTableSections,
   extractGeneratedBy,
   nullIfEmpty,
@@ -94,8 +95,11 @@ export function parseSteelChallengeHtml(html: string): ParsedMatch {
     .sort((a, b) => (a.stageNumber ?? 0) - (b.stageNumber ?? 0))
     .map((s) => withStagePlacings(s));
 
+  // Steel reports raramente traen Region por fila, así que el primer no-null
+  // de los shooters suele venir vacío; caemos al título como fallback.
   const region =
-    matchEntries.find((e) => e.shooter.region)?.shooter.region ?? null;
+    matchEntries.find((e) => e.shooter.region)?.shooter.region ??
+    extractClubFromTitle(name);
 
   return {
     discipline: DISCIPLINE.STEEL,

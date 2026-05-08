@@ -5,6 +5,7 @@ import type {
   ParsedStage,
   ParsedStageResult,
 } from "../types/match";
+import { extractClubFromTitle } from "./shared";
 
 /**
  * Parser para PDFs WinMSS (formato usado por ipsc.org.ar para archivos
@@ -179,12 +180,19 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
       results,
     }));
 
+  // En WinMSS la columna "Reg" del PDF es la federación IPSC del
+  // tirador (ARG, CAN), no su club — por eso no la usamos para
+  // match.region. El club suele estar en el título: "TFABA 1er SOCIAL
+  // ESCOPETA" → "TFABA". Si no lo extraemos, queda null y el usuario
+  // lo asigna a mano con "Editar club".
+  const region = extractClubFromTitle(matchName);
+
   return {
     discipline: DISCIPLINE.IPSC,
     source: "winmss_pdf",
     name: matchName,
     date: matchDate,
-    region: null,
+    region,
     matchEntries,
     stages,
     generatedBy: "WinMSS",

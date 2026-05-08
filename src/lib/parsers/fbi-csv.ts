@@ -6,7 +6,12 @@ import type {
   ParsedStage,
   ParsedStageResult,
 } from "@/lib/types/match";
-import { nullIfEmpty, parseIntOrNull } from "./shared";
+import {
+  extractClubFromTitle,
+  nullIfEmpty,
+  parseIntOrNull,
+  pickMostCommon,
+} from "./shared";
 
 /**
  * Parser para resultados de Tiro FBI exportados desde Google Sheets como CSV.
@@ -238,12 +243,20 @@ export function parseFbiCsv(content: string): ParsedMatch {
   // percentage **por división** dentro de cada stage (igual que IPSC/Steel).
   const stages = buildStages(stageCols, byDivision);
 
+  // El club del match: priorizamos el Club más frecuente entre los
+  // tiradores (la columna Club del CSV de FBI suele ser uniforme dentro
+  // de un mismo torneo). Como fallback, intentamos extraerlo del título
+  // — aunque los títulos FBI (ej. "Social 4") raramente lo tienen.
+  const region =
+    pickMostCommon(matchEntries.map((e) => e.shooter.region)) ??
+    extractClubFromTitle(matchName);
+
   return {
     discipline: DISCIPLINE.FBI,
     source: "fbi_csv",
     name: matchName,
     date,
-    region: null,
+    region,
     matchEntries,
     stages,
     generatedBy: null,

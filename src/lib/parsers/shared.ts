@@ -86,6 +86,66 @@ export function nullIfEmpty(value: string | undefined): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
+/**
+ * Intenta extraer el código de club a partir del título del match.
+ *
+ * Convención de los reportes argentinos: el código del club aparece al
+ * inicio o al final del título, en letras MAYÚSCULAS de 3 a 8 caracteres.
+ * Ejemplos reales:
+ *  - "TFABA 1er SOCIAL ESCOPETA" → "TFABA" (leading)
+ *  - "TP ESCOPETA 20/02/26 TFALP" → "TFALP" (trailing)
+ *  - "Social 4" → null (no hay token uppercase)
+ *  - "Final De Curso 2026-03" → null (Final no es uppercase puro)
+ *
+ * No valida contra el catálogo de clubes — devuelve el candidato y el
+ * importer / usuario lo confirma. Si el resultado no es un código real,
+ * el botón "Editar club" del match-detail permite corregirlo.
+ */
+export function extractClubFromTitle(
+  title: string | null | undefined,
+): string | null {
+  if (!title) return null;
+  const trimmed = title.trim();
+  if (!trimmed) return null;
+
+  // Token uppercase al inicio: "TFABA <resto>"
+  const leading = /^([A-Z][A-Z0-9]{2,7})\s/.exec(trimmed);
+  if (leading) return leading[1] ?? null;
+
+  // Token uppercase al final: "<algo> TFALP"
+  const trailing = /\s([A-Z][A-Z0-9]{2,7})$/.exec(trimmed);
+  if (trailing) return trailing[1] ?? null;
+
+  return null;
+}
+
+/**
+ * Devuelve el valor más frecuente entre los no-null. Útil para inferir
+ * el club del match a partir del campo Club de cada tirador (caso FBI:
+ * si la mayoría dice TFALP, el match probablemente se corrió ahí).
+ *
+ * Si la lista está vacía o todos son null, devuelve `null`.
+ * En caso de empate, devuelve el primero que llegó al máximo.
+ */
+export function pickMostCommon<T>(
+  values: ReadonlyArray<T | null | undefined>,
+): T | null {
+  const counts = new Map<T, number>();
+  for (const v of values) {
+    if (v == null) continue;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  let best: T | null = null;
+  let bestCount = 0;
+  for (const [v, c] of counts) {
+    if (c > bestCount) {
+      best = v;
+      bestCount = c;
+    }
+  }
+  return best;
+}
+
 // ---------------------------------------------------------------------------
 // HTML (PractiScore)
 // ---------------------------------------------------------------------------

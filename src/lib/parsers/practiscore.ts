@@ -10,6 +10,7 @@ import type {
 } from "../types/match";
 import {
   columnValue,
+  extractClubFromTitle,
   extractDivisionalTableSections,
   extractGeneratedBy,
   nullIfEmpty,
@@ -99,13 +100,17 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
     }
   }
 
-  // Región del match: tomamos la primera no nula encontrada.
+  // Región del match: priorizamos la primera no nula extraída de la
+  // columna Region de los tiradores. Si no hay (caso típico: archivos
+  // Stage Results donde la columna Region no aparece), intentamos
+  // extraer el club desde el título — patrones tipo "TFALP" al final
+  // de "TP ESCOPETA 20/02/26 TFALP".
   const region =
     matchEntries.find((e) => e.shooter.region)?.shooter.region ??
     stages
       .flatMap((s) => s.results)
       .find((r) => r.shooter.region)?.shooter.region ??
-    null;
+    extractClubFromTitle(name);
 
   return {
     discipline: DISCIPLINE.IPSC,
