@@ -8,7 +8,7 @@ import {
   ChevronRight,
   Menu,
   X,
-  Upload,
+  Trophy,
   LayoutDashboard,
   Crosshair,
   History,
@@ -167,17 +167,19 @@ export function AppSidebarShell({ userName, disciplines }: AppSidebarShellProps)
 
           <ul className="space-y-0.5 border-t border-border pt-4">
             <NavItem
+              href="/matches"
+              icon={<Trophy className="h-4 w-4" aria-hidden />}
+              label="Matches"
+              active={
+                pathname === "/matches" || pathname.startsWith("/matches/")
+              }
+              collapsed={collapsed}
+            />
+            <NavItem
               href="/firearms"
               icon={<Crosshair className="h-4 w-4" aria-hidden />}
               label="Armas"
               active={pathname.startsWith("/firearms")}
-              collapsed={collapsed}
-            />
-            <NavItem
-              href="/import"
-              icon={<Upload className="h-4 w-4" aria-hidden />}
-              label="Importar"
-              active={pathname === "/import"}
               collapsed={collapsed}
             />
             <NavItem

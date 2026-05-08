@@ -67,15 +67,11 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   }
   const sortedDivisions = Array.from(byDivision.keys()).sort();
 
-  // Link de volver: prioriza la ruta de origen (?from=...) cuando viene de
-  // un dashboard, así devolvemos al usuario exactamente a la vista que
-  // estaba mirando (consolidado vs alguna disciplina). Si no, fallback a
-  // la disciplina del match o al consolidado.
-  const backHref = isInternalDashboardPath(from)
-    ? from
-    : match.disciplines?.code
-      ? `/dashboard/${match.disciplines.code}`
-      : "/dashboard";
+  // Link de volver: prioriza la ruta de origen (?from=...) cuando es una
+  // ruta interna válida — así devolvemos al usuario exactamente a la vista
+  // que estaba mirando (matches, dashboard consolidado, o por disciplina).
+  // Fallback: /matches, que es la grilla principal.
+  const backHref = isInternalDashboardPath(from) ? from : "/matches";
 
   return (
     <PageContainer>
@@ -244,11 +240,12 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
 }
 
 /**
- * Valida que el `from` sea una ruta interna del dashboard. Evita que un link
- * armado a mano redirija al usuario fuera del dominio (open redirect) y
- * limita el back link a las dos vistas reales: `/dashboard` y `/dashboard/{code}`.
+ * Valida que el `from` sea una ruta interna válida para volver. Evita open
+ * redirects y limita el back link a las vistas reales:
+ *  - `/matches` (grilla principal)
+ *  - `/dashboard` y `/dashboard/{code}` (vistas de tirador, por compat)
  */
 function isInternalDashboardPath(value: string | undefined): value is string {
   if (typeof value !== "string") return false;
-  return /^\/dashboard(\/[a-z_]+)?$/.test(value);
+  return /^\/matches$|^\/dashboard(\/[a-z_]+)?$/.test(value);
 }

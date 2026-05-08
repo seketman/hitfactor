@@ -10,12 +10,10 @@ import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
 import {
   getDivisionSizes,
-  listAllMatches,
   listEntriesByShooters,
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
 import { listFirearmUsageStats } from "@/lib/db/firearms";
-import { parseRegion } from "@/lib/clubs";
 import { formatDate } from "@/lib/utils";
 import type { DisciplineCode } from "@/lib/disciplines";
 
@@ -41,10 +39,9 @@ export async function DashboardView({
   const userId = user.id;
   const isConsolidated = disciplineCode === null;
 
-  const [profile, myShooters, allMatches, firearmStats] = await Promise.all([
+  const [profile, myShooters, firearmStats] = await Promise.all([
     getProfile(supabase, userId),
     listMyShooters(supabase, userId),
-    listAllMatches(supabase),
     isConsolidated
       ? listFirearmUsageStats(supabase, userId)
       : Promise.resolve([]),
@@ -61,10 +58,6 @@ export async function DashboardView({
         (e) => e.matches?.disciplines?.code === disciplineCode,
       );
 
-  const filteredMatches = isConsolidated
-    ? allMatches
-    : allMatches.filter((m) => m.disciplines?.code === disciplineCode);
-
   const uniqueMatchIds = Array.from(
     new Set(myEntries.map((e) => e.matches?.id).filter((id): id is string => !!id)),
   );
@@ -80,17 +73,12 @@ export async function DashboardView({
 
   return (
     <PageContainer>
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
-          <p className="mt-1 text-sm text-fg-muted">{headerSubtitle}</p>
-        </div>
-        <Link href="/import">
-          <Button>Importar match</Button>
-        </Link>
+      <header className="mb-8">
+        <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
+        <p className="mt-1 text-sm text-fg-muted">{headerSubtitle}</p>
       </header>
 
-      {myEntries.length > 0 && (
+      {myEntries.length > 0 ? (
         <>
           <Section title="Tu performance">
             <StatsOverview
@@ -105,6 +93,8 @@ export async function DashboardView({
             />
           </Section>
         </>
+      ) : (
+        <EmptyState hasIdentities={myShooters.length > 0} />
       )}
 
       {isConsolidated && firearmStats.length > 0 && (
@@ -141,32 +131,42 @@ export async function DashboardView({
           </Card>
         </Section>
       )}
-
-      <Section
-        title={isConsolidated ? "Matches" : `Matches de ${disciplineName ?? "la disciplina"}`}
-      >
-        {filteredMatches.length === 0 ? (
-          <Card className="p-10 text-center">
-            <p className="text-fg-muted">
-              {isConsolidated
-                ? "Todavía no se importó ningún match."
-                : "Todavía no se importó ningún match en esta disciplina."}
-            </p>
-            {isConsolidated && (
-              <Link href="/import" className="mt-4 inline-block">
-                <Button size="sm">Importar el primero</Button>
-              </Link>
-            )}
-          </Card>
-        ) : (
-          <MatchList
-            matches={filteredMatches}
-            userId={userId}
-            from={isConsolidated ? "/dashboard" : `/dashboard/${disciplineCode}`}
-          />
-        )}
-      </Section>
     </PageContainer>
+  );
+}
+
+/**
+ * Estado del dashboard cuando el usuario no tiene aún match_entries:
+ *  - Sin identidades: necesita encontrarse en algún match y hacer "Soy yo"
+ *  - Con identidades pero sin entries: probablemente no se importaron sus matches
+ */
+function EmptyState({ hasIdentities }: { hasIdentities: boolean }) {
+  return (
+    <Card className="p-10 text-center">
+      {hasIdentities ? (
+        <>
+          <p className="font-medium">Tus stats van a aparecer acá</p>
+          <p className="mt-2 text-sm text-fg-muted">
+            En cuanto se importe un match en el que hayas participado, vas a
+            ver tu performance, KPIs e historial.
+          </p>
+          <Link href="/matches" className="mt-4 inline-block">
+            <Button size="sm">Ver matches</Button>
+          </Link>
+        </>
+      ) : (
+        <>
+          <p className="font-medium">Linkeá tu identidad de tirador</p>
+          <p className="mt-2 text-sm text-fg-muted">
+            Buscá tu nombre en el ranking de algún match y dale a "Soy yo"
+            para empezar a ver tus estadísticas acá.
+          </p>
+          <Link href="/matches" className="mt-4 inline-block">
+            <Button size="sm">Ver matches</Button>
+          </Link>
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -217,56 +217,3 @@ function Section({
   );
 }
 
-function MatchList({
-  matches,
-  userId,
-  from,
-}: {
-  matches: Array<{
-    id: string;
-    name: string;
-    date: string;
-    region: string | null;
-    imported_by_user_id: string;
-    disciplines: { code: string; name: string } | null;
-  }>;
-  userId: string;
-  /** Ruta de origen para que el match pueda volver acá con "← Volver a matches". */
-  from: string;
-}) {
-  return (
-    <Card>
-      <ul className="divide-y divide-border">
-        {matches.map((m) => {
-          const isMine = m.imported_by_user_id === userId;
-          const club = parseRegion(m.region);
-          const clubLabel = club.clubName ?? club.clubCode ?? m.region;
-          return (
-            <li key={m.id}>
-              <Link
-                href={`/matches/${m.id}?from=${encodeURIComponent(from)}`}
-                className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-surface-2/40"
-              >
-                <div className="min-w-0">
-                  <p className="flex items-center gap-2 font-medium">
-                    <span className="truncate">{m.name}</span>
-                    {m.disciplines && (
-                      <Badge tone="accent" title={m.disciplines.code}>
-                        {m.disciplines.name}
-                      </Badge>
-                    )}
-                  </p>
-                  <p className="mt-0.5 text-xs text-fg-muted">
-                    {formatDate(m.date)}
-                    {clubLabel && ` · ${clubLabel}`}
-                  </p>
-                </div>
-                {isMine && <Badge>vos importaste</Badge>}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
-  );
-}
