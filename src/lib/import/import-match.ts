@@ -109,7 +109,56 @@ async function importMatchOverall(
   importerUserId: string,
   filename: string,
 ): Promise<ImportResult> {
-  // Insertar match. Si ya existe (UNIQUE constraint), error.
+  // Pre-check: ¿el usuario ya importó un match equivalente?
+  //
+  // Buscamos por (discipline, name, date) **ignorando region** y filtrando por
+  // imported_by_user_id. Esto cubre dos casos:
+  //  1. Re-upload del mismo CSV (region coincide). El INSERT directo pegaría
+  //     contra la unique constraint igual.
+  //  2. Re-upload tras editar el club desde la UI. La region cambió en DB
+  //     pero el CSV trae la region original (o null para FBI), por lo que el
+  //     INSERT no chocaría contra la constraint y crearía un duplicado.
+  //
+  // Si el match existe y el archivo trae stages, los mergeamos en lugar de
+  // crear un nuevo match. Si trae solo entries (caso IPSC simple) reportamos
+  // como ya importado.
+  const existingForUser = await findUserMatch(
+    supabase,
+    discipline.id,
+    parsed.name,
+    parsed.date,
+    importerUserId,
+  );
+
+  if (existingForUser) {
+    if (parsed.stages.length > 0) {
+      const { stagesCount, resultsCount } = await attachStagesToMatch(
+        supabase,
+        parsed,
+        existingForUser.id,
+        divisionByCode,
+      );
+      return {
+        matchId: existingForUser.id,
+        matchName: existingForUser.name,
+        matchDate: parsed.date,
+        disciplineCode: discipline.code,
+        disciplineName: discipline.name,
+        insertedEntries: 0,
+        insertedStages: stagesCount,
+        insertedStageResults: resultsCount,
+        existedAlready: true,
+      };
+    }
+    throw new ImportError(
+      "Este match ya fue importado por vos.",
+      "MATCH_ALREADY_EXISTS",
+    );
+  }
+
+  // No es un re-upload nuestro. Insertamos. Si pega contra la unique
+  // constraint, es porque otro usuario ya lo importó con esa (region) —
+  // reportamos error claro.
   const { data: matchRow, error: matchErr } = await supabase
     .from("matches")
     .insert({
@@ -126,48 +175,8 @@ async function importMatchOverall(
 
   if (matchErr) {
     if (matchErr.code === "23505") {
-      // El match ya existe (UNIQUE en name+date+region+discipline). Si el
-      // archivo trae stages embebidos (Steel, FBI) y el usuario actual es
-      // el dueño del match, agregamos los stages faltantes en lugar de
-      // fallar — caso típico: re-upload del mismo CSV tras una mejora del
-      // parser. attachStagesToMatch es idempotente (chequea existencia
-      // por stage_number y hace upsert de stage_results).
-      if (parsed.stages.length > 0) {
-        const existing = await findExistingMatch(
-          supabase,
-          discipline.id,
-          parsed.name,
-          parsed.date,
-          parsed.region,
-        );
-        if (existing && existing.imported_by_user_id === importerUserId) {
-          const { stagesCount, resultsCount } = await attachStagesToMatch(
-            supabase,
-            parsed,
-            existing.id,
-            divisionByCode,
-          );
-          return {
-            matchId: existing.id,
-            matchName: existing.name,
-            matchDate: parsed.date,
-            disciplineCode: discipline.code,
-            disciplineName: discipline.name,
-            insertedEntries: 0,
-            insertedStages: stagesCount,
-            insertedStageResults: resultsCount,
-            existedAlready: true,
-          };
-        }
-        if (existing && existing.imported_by_user_id !== importerUserId) {
-          throw new ImportError(
-            "Este match ya fue importado por otro usuario.",
-            "MATCH_ALREADY_EXISTS",
-          );
-        }
-      }
       throw new ImportError(
-        "Este match ya fue importado por otra persona. Si querés, podés subir solo los stages que falten.",
+        "Este match ya fue importado por otro usuario.",
         "MATCH_ALREADY_EXISTS",
       );
     }
@@ -569,28 +578,33 @@ export function findBestPrefixMatch<T extends { name: string }>(
 }
 
 /**
- * Busca un match por su clave única lógica (discipline, name, date, region).
- * Maneja `region IS NULL` correctamente — Supabase JS requiere `.is()` para
- * NULL en lugar de `.eq()`. Se usa cuando el INSERT pega contra la unique
- * constraint y necesitamos recuperar el match existente (ej. para hacer
- * merge de stages en un re-upload).
+ * Busca un match del usuario por (discipline, name, date), **ignorando la
+ * region**. Se usa antes de insertar para detectar re-uploads incluso si
+ * el region en DB fue editado por el usuario después del import original
+ * (ej. botón "Editar club" en /matches/[id]).
+ *
+ * Si hay más de uno (caso anómalo de duplicados pre-existentes en DB),
+ * elegimos el más antiguo — asumiendo que ese fue el "original" y que
+ * los más nuevos son ramas erróneas a limpiar.
  */
-async function findExistingMatch(
+async function findUserMatch(
   supabase: SupabaseClient,
   disciplineId: number,
   name: string,
   date: string,
-  region: string | null,
+  importerUserId: string,
 ): Promise<MatchLookupRow | null> {
-  let q = supabase
+  const { data } = await supabase
     .from("matches")
-    .select("id, name, imported_by_user_id")
+    .select("id, name, imported_by_user_id, imported_at")
     .eq("discipline_id", disciplineId)
     .eq("name", name)
-    .eq("date", date);
-  q = region === null ? q.is("region", null) : q.eq("region", region);
-  const { data } = await q.maybeSingle();
-  return (data as MatchLookupRow | null) ?? null;
+    .eq("date", date)
+    .eq("imported_by_user_id", importerUserId)
+    .order("imported_at", { ascending: true })
+    .limit(1);
+  const rows = data as MatchLookupRow[] | null;
+  return rows && rows.length > 0 ? rows[0]! : null;
 }
 
 async function listSameDayMatchNames(

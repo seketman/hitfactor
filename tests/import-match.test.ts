@@ -358,6 +358,45 @@ describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match exis
     expect(fake.tables.stages.rows.length).toBe(stagesBefore);
   });
 
+  it("re-upload tras editar el club mergea en el match original (no duplica)", async () => {
+    // Caso real: el usuario importó el CSV con region=null (FBI no trae
+    // region en el archivo), después editó el club desde la UI a "ARG-TFALP",
+    // y ahora vuelve a subir el mismo CSV. La region en DB cambió pero el
+    // CSV trae null — antes esto creaba un match duplicado porque la unique
+    // constraint no chocaba.
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL3);
+
+    // 1. Primera carga del CSV.
+    const first = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "social3.csv",
+    );
+    const matchId = first.matchId;
+
+    // 2. Usuario edita el club desde la UI: region pasa de null a "ARG-TFALP".
+    const matchRow = fake.tables.matches.rows.find((r) => r.id === matchId)!;
+    matchRow.region = "ARG-TFALP";
+
+    // 3. Re-upload del mismo CSV (parsed.region sigue siendo null).
+    const second = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "social3.csv",
+    );
+
+    // Debería haber detectado el match existente (mismo discipline+name+date+user)
+    // y mergeado en él, sin crear un duplicado.
+    expect(second.existedAlready).toBe(true);
+    expect(second.matchId).toBe(matchId);
+    expect(fake.tables.matches.rows.length).toBe(1);
+    // La region editada se conserva (no la pisamos).
+    expect(matchRow.region).toBe("ARG-TFALP");
+  });
+
   it("rechaza el re-upload si el match existente pertenece a otro usuario", async () => {
     const fake = buildFbiSupabase();
     const parsed = parseFbiCsv(SOCIAL3);
