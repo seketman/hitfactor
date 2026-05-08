@@ -471,15 +471,19 @@ function splitNameFromMeta(rest: string): { name: string; meta: ParsedMeta } {
 
 /**
  * Wrapper async: recibe el binario del PDF y devuelve el ParsedMatch.
- * Carga `pdf-parse` dinámicamente (la lib es pesada y solo se necesita
- * cuando el usuario sube un PDF).
+ *
+ * Usamos `unpdf` (no `pdf-parse`) porque está hecho específicamente para
+ * runtimes serverless (Vercel/Cloudflare) — `pdf-parse` v2 internamente
+ * carga `pdfjs-dist` con build de browser, que requiere globals como
+ * `DOMMatrix` que no existen en Node y rompe el import en producción.
+ *
+ * Carga `unpdf` dinámicamente (~600KB) para no inflar el bundle de
+ * import/page hasta que el usuario efectivamente sube un PDF.
  */
 export async function parseWinmssPdf(data: Uint8Array): Promise<ParsedMatch> {
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data });
-  const result = await parser.getText();
-  await parser.destroy();
+  const { extractText } = await import("unpdf");
+  const result = await extractText(data, { mergePages: false });
   return parseWinmssText(
-    result.pages.map((p) => ({ num: p.num, text: p.text })),
+    result.text.map((text, i) => ({ num: i + 1, text })),
   );
 }
