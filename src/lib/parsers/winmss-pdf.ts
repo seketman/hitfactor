@@ -313,19 +313,33 @@ function extractMatchName(text: string): string {
 }
 
 /**
- * Algunos PDFs WinMSS extraen el título dos veces consecutivas en la
- * misma línea. Detectamos eso y deduplicamos antes de quedarnos con el
- * título limpio.
+ * Algunos PDFs WinMSS repiten el título N veces en la misma línea
+ * (típicamente 2 o 4), con o sin espacio entre repeticiones — ej.
+ * "TFABA 1er SOCIAL ESCOPETATFABA 1er SOCIAL ESCOPETA..." (sin espacio)
+ * o "TFABA 1er SOCIAL ESCOPETA TFABA 1er SOCIAL ESCOPETA" (con espacio).
+ *
+ * Buscamos el prefijo más corto que, repetido K veces (con o sin separador
+ * de espacio entre repeticiones), reproduce la línea entera.
  */
 function dedupeTitle(line: string): string {
-  const tokens = line.split(/\s+/);
-  if (tokens.length >= 2 && tokens.length % 2 === 0) {
-    const half = tokens.length / 2;
-    const a = tokens.slice(0, half).join(" ");
-    const b = tokens.slice(half).join(" ");
-    if (a === b) return a;
+  const n = line.length;
+  // Probamos longitudes de prefijo crecientes — el más corto gana.
+  for (let len = 1; len <= Math.floor(n / 2); len++) {
+    const prefix = line.slice(0, len);
+    if (matchesRepetition(line, prefix)) return prefix.trim();
   }
   return line;
+}
+
+function matchesRepetition(line: string, prefix: string): boolean {
+  let i = prefix.length;
+  while (i < line.length) {
+    // Saltamos espacios opcionales entre repeticiones.
+    if (line[i] === " ") i++;
+    if (line.slice(i, i + prefix.length) !== prefix) return false;
+    i += prefix.length;
+  }
+  return i === line.length;
 }
 
 function extractDate(text: string): string {

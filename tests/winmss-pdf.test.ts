@@ -187,6 +187,18 @@ describe("parseWinmssText — overall", () => {
     expect(parsed.name).toBe("TFABA 1er SOCIAL ESCOPETA");
     expect(parsed.name).not.toContain("TFABA 1er SOCIAL ESCOPETA TFABA");
   });
+
+  it("dedupea título repetido 4× sin espacios entre repeticiones", () => {
+    // Caso real visto con `unpdf`: el título aparece concatenado 4 veces
+    // sin separador, terminando en "ESCOPETATFABA..." dentro de la misma línea.
+    const quadrupled = `OPEN -- Overall Match Results
+TFABA 1er SOCIAL ESCOPETATFABA 1er SOCIAL ESCOPETATFABA 1er SOCIAL ESCOPETATFABA 1er SOCIAL ESCOPETA Printed mayo 2, 2026 at 16:17
+% Points CompetitorCompetitor Cat Reg Cls Tag ICS
+1 100,00 100,0000 1 Doe, John ARG
+World Classification System used Page 1`;
+    const parsed = parseWinmssText(pages(quadrupled));
+    expect(parsed.name).toBe("TFABA 1er SOCIAL ESCOPETA");
+  });
 });
 
 describe("parseWinmssText — stages", () => {
