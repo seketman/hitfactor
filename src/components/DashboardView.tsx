@@ -2,7 +2,6 @@ import Link from "next/link";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import { HistoryTable } from "@/components/HistoryTable";
 import { StatsOverview } from "@/components/StatsOverview";
 import { requireUser } from "@/lib/supabase/require-user";
@@ -13,8 +12,6 @@ import {
   listEntriesByShooters,
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
-import { listFirearmUsageStats } from "@/lib/db/firearms";
-import { formatDate } from "@/lib/utils";
 import type { DisciplineCode } from "@/lib/disciplines";
 
 interface DashboardViewProps {
@@ -26,10 +23,12 @@ interface DashboardViewProps {
 
 /**
  * Vista del dashboard. Server Component que se reutiliza desde dos rutas:
- *  - `/dashboard` (consolidado, disciplineCode=null): incluye TODAS las
- *    disciplinas + sección "Tus armas".
- *  - `/dashboard/[discipline]`: filtra a una disciplina; oculta la sección
- *    "Tus armas" para no saturar.
+ *  - `/dashboard` (consolidado, disciplineCode=null): muestra todas las
+ *    disciplinas agregadas
+ *  - `/dashboard/[discipline]`: filtra a una disciplina específica
+ *
+ * Foco: información del tirador (KPIs + historial). El listado de matches
+ * vive en `/matches` y el catálogo de armas en `/firearms`.
  */
 export async function DashboardView({
   disciplineCode,
@@ -39,12 +38,9 @@ export async function DashboardView({
   const userId = user.id;
   const isConsolidated = disciplineCode === null;
 
-  const [profile, myShooters, firearmStats] = await Promise.all([
+  const [profile, myShooters] = await Promise.all([
     getProfile(supabase, userId),
     listMyShooters(supabase, userId),
-    isConsolidated
-      ? listFirearmUsageStats(supabase, userId)
-      : Promise.resolve([]),
   ]);
 
   const allEntries = await listEntriesByShooters(
@@ -95,41 +91,6 @@ export async function DashboardView({
         </>
       ) : (
         <EmptyState hasIdentities={myShooters.length > 0} />
-      )}
-
-      {isConsolidated && firearmStats.length > 0 && (
-        <Section title="Tus armas">
-          <Card>
-            <ul className="divide-y divide-border">
-              {firearmStats.map(({ firearm, totalRounds, totalMatches, lastUsedDate }) => (
-                <li key={firearm.id}>
-                  <Link
-                    href={`/firearms/${firearm.id}`}
-                    className="flex flex-wrap items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-2/40"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{firearm.name}</p>
-                      <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-fg-muted">
-                        {firearm.brand && <span>{firearm.brand}</span>}
-                        {firearm.model && <span>{firearm.model}</span>}
-                        {firearm.caliber && <Badge>{firearm.caliber}</Badge>}
-                      </p>
-                    </div>
-                    <div className="text-right text-sm">
-                      <p className="font-mono text-fg">
-                        {totalRounds.toLocaleString("es-AR")} tiros
-                      </p>
-                      <p className="text-xs text-fg-subtle">
-                        {totalMatches} torneo{totalMatches === 1 ? "" : "s"}
-                        {lastUsedDate && ` · últ. ${formatDate(lastUsedDate)}`}
-                      </p>
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </Section>
       )}
     </PageContainer>
   );
