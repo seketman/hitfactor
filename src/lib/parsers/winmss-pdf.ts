@@ -162,8 +162,9 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
   }
 
   if (!matchName) {
+    const snippet = (pages[0]?.text ?? "").slice(0, 300).replace(/\s+/g, " ");
     throw new Error(
-      "No se pudo extraer el nombre del match del PDF. ¿Es un archivo WinMSS válido?",
+      `No se pudo extraer el nombre del match del PDF. ¿Es un archivo WinMSS válido? Inicio del texto: "${snippet}"`,
     );
   }
   if (!matchDate) {
@@ -273,35 +274,42 @@ function extractMatchName(text: string): string {
     .map((l) => l.trim())
     .filter(Boolean);
 
-  for (const line of lines) {
-    if (/Overall\s+(Match|Stage)\s+Results/i.test(line)) continue;
-    if (/^Stage\s+\d+\s*--/i.test(line)) continue;
-    if (/^World\s+Classification/i.test(line)) continue;
-    if (/^Page\s+\d+/i.test(line)) continue;
-    if (/^%\s+Points/i.test(line)) continue;
-    if (/^HIT\s+STAGE/i.test(line)) continue;
-    if (/^PTS\s+TIME/i.test(line)) continue;
-    if (/^STAGE\s+(POINTS|PERCENT)/i.test(line)) continue;
-    if (/^COMPETITOR/i.test(line)) continue;
-    // Continuación de la línea "Printed mayo X," → "2026 at 16:17"
-    if (/^\d{4}\s+at\s+/i.test(line)) continue;
-
-    // Stripeamos el segmento "Printed mes DD, YYYY at HH:MM" si aparece
-    // mezclado con el título en la misma línea.
-    const stripped = line
+  // Stripeamos noise inline en vez de skip-line — algunos PDFs concatenan
+  // el título con otros elementos en la misma línea ("Stage 1 -- Etapa 1
+  // TFABA 1er SOCIAL ESCOPETA Printed ..."), y skip-line los descartaba
+  // junto con el título.
+  const candidates: string[] = [];
+  for (const raw of lines) {
+    const stripped = raw
+      .replace(/[A-Z][A-Z0-9\s]*?\s*--\s*Overall\s+(Match|Stage)\s+Results/gi, "")
+      .replace(/Stage\s+\d+\s*--\s*Etapa\s*\d*/gi, "")
       .replace(
-        /Printed\s+[a-záéíóúñ]+\s+\d{1,2},?(\s+\d{4}(\s+at\s+[\d:]+)?)?/i,
+        /Printed\s+[a-záéíóúñ]+\s+\d{1,2},?(\s+\d{4}(\s+at\s+[\d:]+)?)?/gi,
         "",
       )
+      .replace(/World\s+Classification\s+System(\s+used)?/gi, "")
+      .replace(/Page\s+\d+/gi, "")
+      .replace(/\d{4}\s+at\s+[\d:]+/g, "")
       .replace(/\s+/g, " ")
       .trim();
 
     if (!stripped) continue;
+    if (/^%\s+Points/i.test(stripped)) continue;
+    if (/^HIT\s+STAGE/i.test(stripped)) continue;
+    if (/^PTS\s+TIME/i.test(stripped)) continue;
+    if (/^STAGE\s+(POINTS|PERCENT)/i.test(stripped)) continue;
+    if (/^COMPETITOR/i.test(stripped)) continue;
     // Filas de datos siempre arrancan con un dígito.
     if (/^\d/.test(stripped)) continue;
-    return dedupeTitle(stripped);
+    candidates.push(dedupeTitle(stripped));
   }
-  return "";
+
+  if (candidates.length === 0) return "";
+  // El título es la línea con más sustancia — los fragmentos sueltos suelen
+  // ser cortos ("Page", residuos de stripping). Empata con el primero que
+  // llegó al máximo, así que en archivos overall normales sigue ganando la
+  // primera ocurrencia del título.
+  return candidates.reduce((a, b) => (b.length > a.length ? b : a));
 }
 
 /**
