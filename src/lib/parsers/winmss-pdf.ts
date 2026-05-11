@@ -145,13 +145,13 @@ const KNOWN_ICS = new Set(["RO"]);
  * aparece en los archivos overall, no en stages.
  */
 export function isWinmssFormat(text: string): boolean {
-  // Soporta dos formatos:
+  // Soporta tres formatos:
   //  - WinMSS clásico: "X -- Overall Match Results", mes en español.
-  //  - ESS (Electronic Scoring System): "X - Results Overall", "Printed:"
-  //    con mes en inglés.
+  //  - ESS overall: "X - Results Overall", "Printed:" con mes en inglés.
+  //  - ESS by-stage: "X - Results by Stage" + subheader "Stage <Div> - Stage NN".
   const hasHeader =
     /Overall\s+(Match|Stage)\s+Results/i.test(text) ||
-    /-\s+Results\s+(Overall|Stage\s+\d+)/i.test(text);
+    /-\s+Results\s+(Overall|Stage\s+\d+|by\s+Stage)/i.test(text);
   const hasPrinted = /Printed[:\s]+[A-Za-záéíóúñ]+\s+\d{1,2}/i.test(text);
   return hasHeader && hasPrinted;
 }
@@ -204,7 +204,7 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
           divisionCode: parsed.divisionCode,
         });
       }
-    } else {
+    } else if (parsed.kind === "stage") {
       if (parsed.results.length === 0) {
         console.warn(
           `[winmss-pdf] página ${page.num} (${parsed.divisionCode}, stage ${parsed.stageNumber}): 0 resultados parseados. Texto: ${page.text
@@ -223,6 +223,20 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
           ...result,
           divisionCode: parsed.divisionCode,
         });
+      }
+    } else {
+      // DQ page: las entries ya traen su divisionCode resuelto (la división
+      // viene en la fila misma, no en un section header).
+      if (parsed.entries.length === 0) {
+        console.warn(
+          `[winmss-pdf] página ${page.num} (DQ): 0 filas parseadas. Texto: ${page.text
+            .slice(0, 500)
+            .replace(/\s+/g, " ")
+            .trim()}`,
+        );
+      }
+      for (const entry of parsed.entries) {
+        matchEntries.push(entry);
       }
     }
   }
@@ -292,20 +306,62 @@ interface StagePageResult {
   results: Array<Omit<ParsedStageResult, "divisionCode">>;
 }
 
-function parsePage(text: string): OverallPageResult | StagePageResult | null {
-  // Dos formatos soportados:
-  //  - WinMSS clásico: "X -- Overall (Match|Stage) Results"
-  //  - ESS: "X - Results Overall" (overall) y "X - Results Stage N" (stages)
+/**
+ * Reporte "Disqualified Shooters" que WinMSS genera como página aparte.
+ * No tiene header "Overall ... Results" pero sí "Disqualified Shooters" y
+ * filas con shape `<bib> <División> <Apellido>, <Nombre>` (la división
+ * viene en la fila misma, no en un section header). Por eso cada entry
+ * ya trae su `divisionCode` resuelto.
+ */
+interface DqPageResult {
+  kind: "dq";
+  matchName: string;
+  date: string;
+  entries: ParsedMatchEntry[];
+}
+
+function parsePage(
+  text: string,
+): OverallPageResult | StagePageResult | DqPageResult | null {
+  // Reporte de DQs (WinMSS clásico genera una página aparte con la lista
+  // de tiradores DQ). No tiene "Overall ... Results" pero sí "Disqualified
+  // Shooters". Lo detectamos primero porque su layout no encaja con
+  // ninguno de los otros formatos.
+  //
+  // Devolvemos matchName/date vacíos para que esta página no contribuya al
+  // nombre del match (el title/fecha vienen de las páginas overall que se
+  // procesan antes).
+  if (/Disqualified\s+Shooters/i.test(text)) {
+    return {
+      kind: "dq",
+      matchName: "",
+      date: "",
+      entries: parseDqPageRows(text),
+    };
+  }
+
+  // Tres formatos de páginas con ranking:
+  //  - WinMSS clásico: "X -- Overall (Match|Stage) Results" + filas 8-col en stages.
+  //  - ESS overall: "X - Results Overall"
+  //  - ESS by-stage: "X - Results by Stage" + subheader "Stage <Div> - Stage NN"
+  //    con filas 5-col (mismo shape que overall — no hay raw hits/time/factor).
   const overallMatch =
     /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Match\s+Results/i.exec(text) ??
     /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Overall(?!\s+Stage)/i.exec(text);
   const stageHeaderMatch =
     /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Stage\s+Results/i.exec(text) ??
     /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Stage\s+\d+/i.exec(text);
+  const essByStageMatch =
+    /([A-Z][A-Z\s]*?)\s+-\s*Results\s+by\s+Stage/i.exec(text);
 
-  if (!overallMatch && !stageHeaderMatch) return null;
+  if (!overallMatch && !stageHeaderMatch && !essByStageMatch) return null;
 
-  const divisionRaw = (overallMatch?.[1] ?? stageHeaderMatch?.[1] ?? "")
+  const divisionRaw = (
+    overallMatch?.[1] ??
+    stageHeaderMatch?.[1] ??
+    essByStageMatch?.[1] ??
+    ""
+  )
     .trim()
     .replace(/\s+/g, " ")
     .toUpperCase();
@@ -340,13 +396,20 @@ function parsePage(text: string): OverallPageResult | StagePageResult | null {
   const stageNum = extractStageNumber(text);
   if (stageNum == null) return null;
 
+  // ESS by-stage usa filas de 5 columnas (place, %, points, bib, name) — el
+  // mismo shape que overall, no las 8 columnas del stage WinMSS clásico (que
+  // incluyen ptsHit, time, factor).
+  const results = essByStageMatch
+    ? parseEssStageRows(text)
+    : parseStageRows(text);
+
   return {
     kind: "stage",
     divisionCode,
     stageNumber: stageNum,
     matchName,
     date,
-    results: parseStageRows(text),
+    results,
   };
 }
 
@@ -381,8 +444,15 @@ function extractMatchName(text: string): string {
       .replace(/\d+\s+of\s+\d+/g, "") // ESS footer "1 of 8"
       .replace(/\d{4}\s+at\s+[\d:]+/g, "")
       .replace(/\d{4}\s+\d{1,2}:\d{2}(:\d{2})?/g, "") // ESS "2026 21:33:24"
-      // ESS header: "X - Results Overall" o "X - Results Stage N"
-      .replace(/[A-Z][A-Z0-9\s]*?\s+-\s*Results\s+(Overall|Stage\s+\d+)/gi, "")
+      // ESS header: "X - Results Overall" o "X - Results Stage N" o
+      // "X - Results by Stage" (formato stages ESS).
+      .replace(
+        /[A-Z][A-Z0-9\s]*?\s+-\s*Results\s+(Overall|Stage\s+\d+|by\s+Stage)/gi,
+        "",
+      )
+      // ESS by-stage subheader: "Stage Classic - Stage 01" (donde "Classic"
+      // es el nombre de la división y "01" el número del stage).
+      .replace(/Stage\s+[A-Za-z][A-Za-z\s]*?\s+-\s*Stage\s+\d+/gi, "")
       .replace(
         /Printed:?\s+[A-Za-z]+\s+\d{1,2},?(\s+\d{4})?(\s+[\d:]+)?/gi,
         "",
@@ -396,8 +466,15 @@ function extractMatchName(text: string): string {
     if (/^PTS\s+TIME/i.test(stripped)) continue;
     if (/^STAGE\s+(POINTS|PERCENT)/i.test(stripped)) continue;
     if (/^COMPETITOR/i.test(stripped)) continue;
-    // Filas de datos siempre arrancan con un dígito.
-    if (/^\d/.test(stripped)) continue;
+    // Filas de datos: place seguido de un valor numérico (decimal o entero)
+    // con un espacio entre medio — patrón "1 100.00 640.0000 ..." o "1 110
+    // 20,78 ...". Antes filtrábamos por `^\d` pero eso rompe títulos como
+    // "3RA FECHA COPA SOCIAL" (TF Lomas de Zamora), que empiezan con dígito
+    // pero no son filas — el "3" no va seguido de espacio.
+    if (/^\s*\d+\s+\d/.test(stripped)) continue;
+    // Filas DQ del formato ESS (sin columnas %/points): terminan en " DQ".
+    // Ej.: "39 SGUERA, Santino Eduardo DQ".
+    if (/\sDQ\s*$/i.test(stripped)) continue;
     // Línea con muchos tokens de header de columna concatenados — ocurre
     // cuando unpdf extrae la tabla column-major y repite cada header N
     // veces sin espacios entre ellos, ej:
@@ -504,8 +581,15 @@ function extractDate(text: string): string {
 }
 
 function extractStageNumber(text: string): number | null {
-  const m = /Stage\s+(\d+)\s*--/i.exec(text);
-  return m ? parseInt(m[1]!, 10) : null;
+  // WinMSS clásico: "Stage 1 -- Etapa 1"
+  const winmss = /Stage\s+(\d+)\s*--/i.exec(text);
+  if (winmss) return parseInt(winmss[1]!, 10);
+  // ESS by-stage: "Stage Classic - Stage 01" (subheader donde el primer
+  // token después de "Stage" es el nombre de la división, y el número
+  // viene en el segundo "Stage NN").
+  const ess = /Stage\s+[A-Za-z][A-Za-z\s]*?\s+-\s*Stage\s+(\d+)/i.exec(text);
+  if (ess) return parseInt(ess[1]!, 10);
+  return null;
 }
 
 /**
@@ -629,6 +713,140 @@ function parseStageRows(
   return out;
 }
 
+/**
+ * Filas de stage en formato ESS by-Stage: `<place> <%> <points> <bib#> <name>`.
+ * Mismo shape que las filas de overall (5 columnas) — ESS by-stage no expone
+ * raw hits, time, ni hit factor. Sólo posición, % del stage y puntos del stage.
+ *
+ * Ejemplo: "1 100.00 155.0000 58 SILVA, Lucas ARG"
+ */
+function parseEssStageRows(
+  text: string,
+): Array<Omit<ParsedStageResult, "divisionCode">> {
+  const ROW_RE = /^\s*(\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+)\s+(.+?)\s*$/;
+  const DQ_ROW_RE = /^\s*(\d+)\s+(.+?)\s+DQ\s*$/;
+  const out: Array<Omit<ParsedStageResult, "divisionCode">> = [];
+  for (const line of text.split(/\n/)) {
+    const m = ROW_RE.exec(line);
+    if (m) {
+      const place = parseInt(m[1]!, 10);
+      const stagePct = parseDecimalComma(m[2]!);
+      const stagePoints = parseDecimalComma(m[3]!);
+      const { name } = splitNameFromMeta(m[5]!);
+      if (!name) continue;
+      const isDq = stagePoints === 0;
+      out.push({
+        shooter: { fullName: name, memberNumber: null, region: null },
+        classification: null,
+        powerFactor: null,
+        points: null,
+        penalties: null,
+        timeSeconds: null,
+        hitFactor: null,
+        stagePoints,
+        stagePercentage: stagePct,
+        place: isDq ? 0 : place,
+        hits: null,
+        isDq,
+      });
+      continue;
+    }
+    const dq = DQ_ROW_RE.exec(line);
+    if (dq) {
+      const { name } = splitNameFromMeta(dq[2]!);
+      if (!name) continue;
+      out.push({
+        shooter: { fullName: name, memberNumber: null, region: null },
+        classification: null,
+        powerFactor: null,
+        points: null,
+        penalties: null,
+        timeSeconds: null,
+        hitFactor: null,
+        stagePoints: 0,
+        stagePercentage: 0,
+        place: 0,
+        hits: null,
+        isDq: true,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Filas del reporte "Disqualified Shooters" de WinMSS clásico: el shape
+ * es `<bib> <Division (1-2 palabras)> <Apellido>, <Nombre>`. La división
+ * viene en la fila — no en un section header — así que la resolvemos
+ * acá greedy-matching contra DIVISION_NAME_TO_CODE (primero 3 palabras,
+ * después 2, después 1).
+ *
+ * Ejemplo: "51 Production Prieto, Gonzalo Martin"
+ *          → bib=51, división=Production (→ P), apellido="Prieto",
+ *            nombre="Gonzalo Martin".
+ *
+ * Devolvemos `ParsedMatchEntry` con isDq=true, place/points/% en 0 (no los
+ * conocemos: el reporte de DQs solo lista nombres). Si la fila no matchea
+ * (línea de footer, header de tabla, etc.) se ignora silenciosamente.
+ */
+function parseDqPageRows(text: string): ParsedMatchEntry[] {
+  const out: ParsedMatchEntry[] = [];
+  for (const rawLine of text.split(/\n/)) {
+    const line = rawLine.trim();
+    // Fila empieza con bib (un entero) seguido de contenido con coma.
+    const m = /^(\d+)\s+(.+?,\s*.+)$/.exec(line);
+    if (!m) continue;
+    const rest = m[2]!;
+    const commaIdx = rest.indexOf(",");
+    if (commaIdx < 0) continue;
+    const beforeComma = rest.slice(0, commaIdx).trim();
+    // Mantenemos la coma + espacio en la parte "después" para reconstruir
+    // el fullName "Apellido, Nombre" como aparece en el resto del parser.
+    const afterComma = rest.slice(commaIdx);
+
+    const tokens = beforeComma.split(/\s+/);
+    // Necesitamos al menos división (1+ palabras) + apellido (1+ palabras).
+    if (tokens.length < 2) continue;
+
+    // Greedy: probamos primero nombres de división largos (hasta 3 palabras
+    // por las dudas) y bajamos. El primer match gana.
+    let divisionCode: string | null = null;
+    let apellido = "";
+    for (
+      let divLen = Math.min(3, tokens.length - 1);
+      divLen >= 1;
+      divLen--
+    ) {
+      const divCandidate = tokens.slice(0, divLen).join(" ").toUpperCase();
+      const code =
+        DIVISION_NAME_TO_CODE[divCandidate] ??
+        DIVISION_NAME_TO_CODE[divCandidate.replace(/\s+/g, "")];
+      if (code) {
+        divisionCode = code;
+        apellido = tokens.slice(divLen).join(" ");
+        break;
+      }
+    }
+    if (!divisionCode || !apellido) continue;
+
+    const fullName = `${apellido}${afterComma}`.trim();
+    out.push({
+      shooter: { fullName, memberNumber: null, region: null },
+      divisionCode,
+      classification: null,
+      powerFactor: null,
+      category: null,
+      place: 0,
+      matchPoints: 0,
+      matchPercentage: 0,
+      totalTimeSeconds: null,
+      hits: null,
+      isDq: true,
+    });
+  }
+  return out;
+}
+
 function parseDecimalComma(value: string): number {
   // WinMSS usa coma decimal (formato es-AR): "100,00" → 100, "525,0000" → 525.
   const n = Number(value.replace(",", "."));
@@ -695,18 +913,36 @@ function splitNameFromMeta(rest: string): { name: string; meta: ParsedMeta } {
  * import/page hasta que el usuario efectivamente sube un PDF.
  */
 export async function parseWinmssPdf(data: Uint8Array): Promise<ParsedMatch> {
+  const tLoadStart = Date.now();
   const { getDocumentProxy } = await import("unpdf");
   const doc = await getDocumentProxy(data);
+  const tLoad = Date.now() - tLoadStart;
+
+  let tGetTextContent = 0;
+  let tReconstruct = 0;
   const pages: WinmssPage[] = [];
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i);
+    const tGtc = Date.now();
     const content = await page.getTextContent();
-    pages.push({
-      num: i,
-      text: reconstructTextByPosition(content.items as unknown[]),
-    });
+    tGetTextContent += Date.now() - tGtc;
+    const tRec = Date.now();
+    const text = reconstructTextByPosition(content.items as unknown[]);
+    tReconstruct += Date.now() - tRec;
+    pages.push({ num: i, text });
   }
-  return parseWinmssText(pages);
+
+  const tParseStart = Date.now();
+  const result = parseWinmssText(pages);
+  const tParse = Date.now() - tParseStart;
+
+  console.log(
+    `[winmss-pdf] pages=${doc.numPages} bytes=${data.byteLength} ` +
+      `load=${tLoad}ms getTextContent=${tGetTextContent}ms ` +
+      `reconstruct=${tReconstruct}ms parseText=${tParse}ms`,
+  );
+
+  return result;
 }
 
 /**

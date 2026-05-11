@@ -13,6 +13,13 @@ import {
 } from "@/lib/import/import-match";
 
 export async function importHtml(formData: FormData) {
+  // Instrumentación de tiempos: queremos saber dónde se va el tiempo
+  // (parser vs DB) y poder estimar futuros imports. Loguea al final un
+  // resumen tipo "[import] file=X parse=Yms import=Zms total=Wms" más
+  // el timestamp de inicio en ISO para correlacionar con logs externos.
+  const startedAt = new Date();
+  const t0 = Date.now();
+
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) {
     redirectWithError("/import", "Elegí un archivo");
@@ -25,12 +32,17 @@ export async function importHtml(formData: FormData) {
     redirectWithError("/import", "Solo se aceptan archivos HTML, CSV o PDF");
   }
 
+  console.log(
+    `[import] start ${startedAt.toISOString()} file=${filename} size=${file.size}b`,
+  );
+
   const { supabase, user } = await requireUser();
 
   // PDFs van como binario; HTML/CSV como texto. Cada rama llama a su
   // parser: parsePdf es async (carga pdf-parse dinámicamente), parseFile
   // es sync.
   let parsed: ParsedMatch;
+  const tParseStart = Date.now();
   try {
     if (isPdf) {
       const buffer = new Uint8Array(await file.arrayBuffer());
@@ -43,12 +55,14 @@ export async function importHtml(formData: FormData) {
     const msg = e instanceof Error ? e.message : "Error parseando el archivo";
     redirectWithError("/import", msg);
   }
+  const tParse = Date.now() - tParseStart;
 
   if (!parsed.name || !parsed.date) {
     redirectWithError("/import", "El archivo no parece ser un reporte válido.");
   }
 
   let result: ImportResult;
+  const tImportStart = Date.now();
   try {
     result = await importParsedMatch(supabase, parsed, user.id, filename);
   } catch (e) {
@@ -57,6 +71,13 @@ export async function importHtml(formData: FormData) {
     }
     throw e;
   }
+  const tImport = Date.now() - tImportStart;
+
+  const tTotal = Date.now() - t0;
+  console.log(
+    `[import] done file=${filename} parse=${tParse}ms import=${tImport}ms ` +
+      `total=${tTotal}ms (${formatDurationHuman(tTotal)})`,
+  );
 
   await logAction(supabase, user.id, {
     action: AUDIT_ACTION.MATCH_IMPORT,
@@ -84,4 +105,12 @@ export async function importHtml(formData: FormData) {
     existed: result.existedAlready ? "1" : "0",
   });
   redirect(`/import?${params.toString()}`);
+}
+
+function formatDurationHuman(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  return `${m}m${s % 60}s`;
 }

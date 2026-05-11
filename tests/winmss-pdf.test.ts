@@ -188,6 +188,173 @@ Printed May 11, 2026 21:33:24 ESS - Electronic Scoring System 2 of 8`;
   });
 });
 
+describe("parseWinmssText — formato TF Lomas de Zamora (título arranca con dígito)", () => {
+  // Variante de WinMSS clásico donde el club nombra el match como "3RA
+  // FECHA COPA SOCIAL" — el título arranca con un dígito. Antes el filtro
+  // /^\d/ de extractMatchName lo descartaba como si fuera fila de datos.
+  // El resto del formato es idéntico al WinMSS clásico (mes inglés en
+  // "Printed May 6, 2026 at 6:36", decimales con punto, footer "World
+  // Classification System used").
+  const lomasOpenPage = `OPEN -- Overall Match Results
+3RA FECHA COPA SOCIAL
+Printed May 6, 2026 at 6:36
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 640.0000 14 Disanti, Thomas Diego ARG C
+2 82.75 529.5751 46 Pereyra, Esteban Emilio ARG B
+3 77.54 496.2763 31 Hay Chaia, Matias ARG
+World Classification System used Page 1`;
+
+  it("detecta el formato como WinMSS válido", () => {
+    expect(isWinmssFormat(lomasOpenPage)).toBe(true);
+  });
+
+  it("extrae título que arranca con dígito ('3RA FECHA COPA SOCIAL')", () => {
+    const parsed = parseWinmssText(pages(lomasOpenPage));
+    expect(parsed.name).toBe("3RA FECHA COPA SOCIAL");
+  });
+
+  it("extrae fecha del 'Printed' (mes en inglés, formato 'May 6, 2026')", () => {
+    const parsed = parseWinmssText(pages(lomasOpenPage));
+    expect(parsed.date).toBe("2026-05-06");
+  });
+
+  it("parsea filas con decimales en punto", () => {
+    const parsed = parseWinmssText(pages(lomasOpenPage));
+    expect(parsed.matchEntries).toHaveLength(3);
+    const winner = parsed.matchEntries[0];
+    expect(winner?.shooter.fullName).toBe("Disanti, Thomas Diego");
+    expect(winner?.matchPercentage).toBe(100);
+    expect(winner?.matchPoints).toBe(640);
+    expect(winner?.divisionCode).toBe("O");
+  });
+});
+
+describe("parseWinmssText — página de Disqualified Shooters (WinMSS clásico)", () => {
+  // WinMSS genera una página aparte con la lista final de DQs cuando hay
+  // al menos uno. Formato típico: `<bib> <División (1-2 palabras)>
+  // <Apellido>, <Nombre>`. La división aparece en cada fila (no en
+  // section header) y los nombres vienen en title case ("Production",
+  // "PCC Optic"), no en uppercase.
+  const lomasOverallPage = `OPEN -- Overall Match Results
+3RA FECHA COPA SOCIAL
+Printed May 6, 2026 at 6:36
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 640.0000 14 Disanti, Thomas Diego ARG C
+World Classification System used Page 1`;
+
+  const dqPage = `Printed May 6, 2026 at 6:36
+3RA FECHA COPA SOCIAL
+Disqualified Shooters
+No. Division Name
+51 Production Prieto, Gonzalo Martin
+1 Disqualifications
+Page 1 of 1`;
+
+  it("parsea fila '<bib> Production <Apellido>, <Nombre>'", () => {
+    const parsed = parseWinmssText(pages(lomasOverallPage, dqPage));
+    const dq = parsed.matchEntries.find((e) => e.isDq);
+    expect(dq).toBeDefined();
+    expect(dq?.shooter.fullName).toBe("Prieto, Gonzalo Martin");
+    expect(dq?.divisionCode).toBe("P");
+    expect(dq?.place).toBe(0);
+    expect(dq?.matchPoints).toBe(0);
+  });
+
+  it("resuelve división multi-palabra (greedy '<bib> Production Optics <Apellido>, <Nombre>')", () => {
+    const dqMulti = `Printed May 6, 2026 at 6:36
+3RA FECHA COPA SOCIAL
+Disqualified Shooters
+No. Division Name
+7 Production Optics Lagunas Labarca, Leoncio Arturo
+1 Disqualifications
+Page 1 of 1`;
+    const parsed = parseWinmssText(pages(lomasOverallPage, dqMulti));
+    const dq = parsed.matchEntries.find((e) => e.isDq);
+    expect(dq?.shooter.fullName).toBe("Lagunas Labarca, Leoncio Arturo");
+    expect(dq?.divisionCode).toBe("PO");
+  });
+
+  it("la página DQ no rompe el nombre/fecha del match (vienen de páginas overall previas)", () => {
+    const parsed = parseWinmssText(pages(lomasOverallPage, dqPage));
+    expect(parsed.name).toBe("3RA FECHA COPA SOCIAL");
+    expect(parsed.date).toBe("2026-05-06");
+  });
+
+  it("ignora líneas que no son filas de DQ (header, footer, '1 Disqualifications')", () => {
+    const parsed = parseWinmssText(pages(lomasOverallPage, dqPage));
+    // Solo el shooter DQ, no "Disqualifications" como entry fantasma.
+    const dqs = parsed.matchEntries.filter((e) => e.isDq);
+    expect(dqs).toHaveLength(1);
+  });
+});
+
+describe("parseWinmssText — formato ESS by-Stage", () => {
+  // Tercer formato: PDFs de stages generados por ESS. Diferencias clave:
+  //  - Header: "X - Results by Stage" (no "Stage Results" ni "Stage N")
+  //  - Subheader: "Stage <Division> - Stage NN" (nombre de div + número)
+  //  - Filas de 5 columnas (place, %, points, bib, name) — sin raw hits,
+  //    time ni hit factor (no las expone ESS en este reporte).
+  const essByStage01 = `TFABA - 19 - SEGUNDO SOCIAL PISTOLA 9 MAYO 2026 - Handgun
+Printed: May 11, 2026 21:34:08
+CLASSIC - Results by Stage
+Stage Classic - Stage 01
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 155.0000 58 SILVA, Lucas ARG
+2 79.04 122.5174 51 FAVAREL, Leandro Carlos ARG
+Printed May 11, 2026 21:34:08 ESS`;
+
+  const essByStage02 = `TFABA - 19 - SEGUNDO SOCIAL PISTOLA 9 MAYO 2026 - Handgun
+Printed: May 11, 2026 21:34:08
+CLASSIC - Results by Stage
+Stage Classic - Stage 02
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 80.0000 51 FAVAREL, Leandro Carlos ARG
+2 65.00 52.0000 58 SILVA, Lucas ARG
+Printed May 11, 2026 21:34:08 ESS`;
+
+  it("detecta el formato como WinMSS válido", () => {
+    expect(isWinmssFormat(essByStage01)).toBe(true);
+  });
+
+  it("extrae stage_number del subheader 'Stage Classic - Stage 01'", () => {
+    const parsed = parseWinmssText(pages(essByStage01));
+    expect(parsed.stages).toHaveLength(1);
+    expect(parsed.stages[0]?.stageNumber).toBe(1);
+  });
+
+  it("agrupa múltiples stages bajo el mismo match", () => {
+    const parsed = parseWinmssText(pages(essByStage01, essByStage02));
+    expect(parsed.stages).toHaveLength(2);
+    expect(parsed.stages.map((s) => s.stageNumber)).toEqual([1, 2]);
+  });
+
+  it("parsea filas de 5 columnas (sin raw hits/time/factor)", () => {
+    const parsed = parseWinmssText(pages(essByStage01));
+    const results = parsed.stages[0]?.results ?? [];
+    expect(results).toHaveLength(2);
+    const winner = results.find((r) => r.shooter.fullName === "SILVA, Lucas");
+    expect(winner?.stagePercentage).toBe(100);
+    expect(winner?.stagePoints).toBe(155);
+    expect(winner?.place).toBe(1);
+    // ESS by-stage no expone estos campos — quedan null.
+    expect(winner?.points).toBeNull();
+    expect(winner?.timeSeconds).toBeNull();
+    expect(winner?.hitFactor).toBeNull();
+  });
+
+  it("extrae el título del match limpiando subheaders ESS", () => {
+    const parsed = parseWinmssText(pages(essByStage01));
+    expect(parsed.name).toBe(
+      "TFABA - 19 - SEGUNDO SOCIAL PISTOLA 9 MAYO 2026 - Handgun",
+    );
+  });
+
+  it("toma la división del header 'CLASSIC - Results by Stage'", () => {
+    const parsed = parseWinmssText(pages(essByStage01));
+    expect(parsed.stages[0]?.results[0]?.divisionCode).toBe("CL");
+  });
+});
+
 describe("parseWinmssText — overall", () => {
   it("extrae nombre y fecha del match", () => {
     const parsed = parseWinmssText(pages(overallClassicPage));
