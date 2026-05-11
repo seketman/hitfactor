@@ -309,8 +309,8 @@ async function importStages(
  * están — no los borramos para no romper claims/firearms vinculados a
  * ellos por FK.
  *
- * Resolución de shooters: secuencial y cacheada para evitar duplicados
- * por carrera cuando un mismo nombre aparece en varias divisiones.
+ * Resolución de shooters: bulk via `resolveShootersBulk` (una sola query
+ * para todos los nombres en lugar de N round-trips).
  *
  * Devuelve la cantidad de entries que se procesaron (insertados +
  * actualizados — no distinguimos).
@@ -321,15 +321,15 @@ async function upsertMatchEntries(
   matchId: string,
   divisionByCode: Map<string, number>,
 ): Promise<number> {
-  const shooterCache = new Map<string, string>();
+  const shooterCache = await resolveShootersBulk(
+    supabase,
+    parsed.matchEntries.map((e) => e.shooter),
+  );
+
   const entryRows = [];
   for (const entry of parsed.matchEntries) {
-    const cacheKey = shooterCacheKey(entry.shooter);
-    let shooterId = shooterCache.get(cacheKey);
-    if (!shooterId) {
-      shooterId = await findOrCreateShooter(supabase, entry.shooter);
-      shooterCache.set(cacheKey, shooterId);
-    }
+    const shooterId = shooterCache.get(shooterCacheKey(entry.shooter));
+    if (!shooterId) continue; // safety: no debería pasar tras resolveShootersBulk
     const divisionId = requireDivision(divisionByCode, entry.divisionCode);
     entryRows.push(mapMatchEntryToRow(entry, matchId, shooterId, divisionId));
   }
@@ -358,73 +358,96 @@ async function attachStagesToMatch(
   matchId: string,
   divisionByCode: Map<string, number>,
 ): Promise<{ stagesCount: number; resultsCount: number }> {
+  if (parsed.stages.length === 0) return { stagesCount: 0, resultsCount: 0 };
+
+  // `stageNumber` puede ser null si el parser no lo pudo determinar;
+  // no podemos asociarlo a una fila concreta de la tabla `stages`, así
+  // que filtramos a no-null antes de cualquier resolución.
+  const stagesWithNumber = parsed.stages.filter(
+    (s): s is typeof s & { stageNumber: number } => s.stageNumber != null,
+  );
+  if (stagesWithNumber.length === 0) {
+    return { stagesCount: 0, resultsCount: 0 };
+  }
+
+  // -- 1. Resolución bulk de stages (1 SELECT + opcionalmente 1 INSERT
+  //       en lugar de N round-trips, uno por stage).
+  const { data: existingStagesData } = await supabase
+    .from("stages")
+    .select("id, stage_number")
+    .eq("match_id", matchId);
+  const stageIdByNumber = new Map<number, string>();
+  for (const s of existingStagesData ?? []) {
+    stageIdByNumber.set(s.stage_number as number, s.id as string);
+  }
+  const newStageRows = stagesWithNumber
+    .filter((s) => !stageIdByNumber.has(s.stageNumber))
+    .map((s) => ({
+      match_id: matchId,
+      stage_number: s.stageNumber,
+      name: s.name,
+    }));
   let stagesCount = 0;
-  let resultsCount = 0;
-
-  for (const stage of parsed.stages) {
-    // Insertar stage (puede existir si reimportan)
-    const { data: existingStage } = await supabase
+  if (newStageRows.length > 0) {
+    const { data: created, error: stageErr } = await supabase
       .from("stages")
-      .select("id")
-      .eq("match_id", matchId)
-      .eq("stage_number", stage.stageNumber)
-      .maybeSingle();
-
-    let stageId: string;
-    if (existingStage) {
-      stageId = existingStage.id;
-    } else {
-      const { data: newStage, error: stageErr } = await supabase
-        .from("stages")
-        .insert({
-          match_id: matchId,
-          stage_number: stage.stageNumber,
-          name: stage.name,
-        })
-        .select("id")
-        .single();
-      if (stageErr) {
-        throw new ImportError(stageErr.message, "STAGE_INSERT_FAILED");
-      }
-      stageId = newStage!.id;
-      stagesCount++;
+      .insert(newStageRows)
+      .select("id, stage_number");
+    if (stageErr) {
+      throw new ImportError(stageErr.message, "STAGE_INSERT_FAILED");
     }
+    for (const s of created ?? []) {
+      stageIdByNumber.set(s.stage_number as number, s.id as string);
+    }
+    stagesCount = newStageRows.length;
+  }
 
-    // Para cada resultado, encontrar match_entry correspondiente
-    const stageResultRows = [];
+  // -- 2. Resolución bulk de shooters (1-2 round-trips en lugar de N).
+  const allParsedShooters = stagesWithNumber.flatMap((s) =>
+    s.results.map((r) => r.shooter),
+  );
+  const shooterCache = await resolveShootersBulk(supabase, allParsedShooters);
+
+  // -- 3. Resolución bulk de match_entries: 1 SELECT trae todos los
+  //       entries del match. Construimos dos índices locales para resolver
+  //       el lookup (shooter, division) en O(1) sin más round-trips.
+  const { data: allEntriesData } = await supabase
+    .from("match_entries")
+    .select("id, shooter_id, division_id")
+    .eq("match_id", matchId);
+  const entryByShooterDiv = new Map<string, string>();
+  const entriesByShooter = new Map<string, string[]>();
+  for (const e of allEntriesData ?? []) {
+    const shooterId = e.shooter_id as string;
+    const entryId = e.id as string;
+    entryByShooterDiv.set(`${shooterId}|${e.division_id}`, entryId);
+    const arr = entriesByShooter.get(shooterId) ?? [];
+    arr.push(entryId);
+    entriesByShooter.set(shooterId, arr);
+  }
+
+  // -- 4. Loop sin round-trips: armamos un único batch con TODOS los
+  //       stage_results y hacemos un solo upsert al final.
+  const stageResultRows: ReturnType<typeof mapStageResultToRow>[] = [];
+  for (const stage of stagesWithNumber) {
+    const stageId = stageIdByNumber.get(stage.stageNumber);
+    if (!stageId) continue; // no debería pasar tras paso 1
     for (const result of stage.results) {
-      const shooterId = await findOrCreateShooter(supabase, result.shooter);
+      const shooterId = shooterCache.get(shooterCacheKey(result.shooter));
+      if (!shooterId) continue; // safety: no debería pasar tras paso 2
       const divisionId = requireDivision(divisionByCode, result.divisionCode);
 
-      // Buscamos primero por (match, shooter, division) — el caso típico.
-      const { data: matchEntry } = await supabase
-        .from("match_entries")
-        .select("id")
-        .eq("match_id", matchId)
-        .eq("shooter_id", shooterId)
-        .eq("division_id", divisionId)
-        .maybeSingle();
-
-      let entryId = matchEntry?.id as string | undefined;
-
+      let entryId = entryByShooterDiv.get(`${shooterId}|${divisionId}`);
       if (!entryId) {
         // Fallback: el tirador no aparece en esa división. Pasa cuando el
         // PDF de stages usa un nombre de división distinto al del overall
         // para los mismos tiradores (caso WinMSS de TFABA: "PISTOLA" en el
-        // overall sale como "PRODUCTION" en el stages PDF).
-        //
-        // Si el tirador tiene exactamente UNA entry en este match
-        // (sin importar la división), la usamos. Si tiene varias (compite
-        // en múltiples divisiones), no podemos resolver sin ambigüedad y
-        // skipeamos con warning.
-        const { data: allEntries } = await supabase
-          .from("match_entries")
-          .select("id")
-          .eq("match_id", matchId)
-          .eq("shooter_id", shooterId);
-        const entries = (allEntries ?? []) as { id: string }[];
+        // overall sale como "PRODUCTION" en el stages PDF). Si el tirador
+        // tiene exactamente UNA entry en el match (en otra división), la
+        // usamos. Si tiene varias, skipeamos con warning.
+        const entries = entriesByShooter.get(shooterId) ?? [];
         if (entries.length === 1) {
-          entryId = entries[0]!.id;
+          entryId = entries[0]!;
         } else if (entries.length > 1) {
           console.warn(
             `[stage-attach] tirador con ${entries.length} entries en el match (división ${result.divisionCode}): no se puede resolver sin ambigüedad`,
@@ -439,19 +462,19 @@ async function attachStagesToMatch(
 
       stageResultRows.push(mapStageResultToRow(result, stageId, entryId));
     }
-
-    if (stageResultRows.length > 0) {
-      const { error: resErr } = await supabase
-        .from("stage_results")
-        .upsert(stageResultRows, { onConflict: "stage_id,match_entry_id" });
-      if (resErr) {
-        throw new ImportError(resErr.message, "STAGE_RESULTS_INSERT_FAILED");
-      }
-      resultsCount += stageResultRows.length;
-    }
   }
 
-  return { stagesCount, resultsCount };
+  // -- 5. UPSERT batched de TODOS los stage_results en una sola call.
+  if (stageResultRows.length === 0) {
+    return { stagesCount, resultsCount: 0 };
+  }
+  const { error: resErr } = await supabase
+    .from("stage_results")
+    .upsert(stageResultRows, { onConflict: "stage_id,match_entry_id" });
+  if (resErr) {
+    throw new ImportError(resErr.message, "STAGE_RESULTS_INSERT_FAILED");
+  }
+  return { stagesCount, resultsCount: stageResultRows.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -461,6 +484,99 @@ async function attachStagesToMatch(
 /** Clave de cache para deduplicar tiradores dentro del mismo import. */
 function shooterCacheKey(s: ParsedShooter): string {
   return `${s.fullName.trim().toLowerCase()}|${s.memberNumber ?? ""}`;
+}
+
+/**
+ * Resuelve un batch de shooters parseados a sus `id`s de DB en pocas
+ * round-trips, en lugar de un round-trip por shooter como hacía la
+ * versión per-row.
+ *
+ * Estrategia:
+ *  1. Dedup por `shooterCacheKey` (lowercase fullName + memberNumber).
+ *  2. 1 SELECT con `.in('full_name', uniqueNames)` para encontrar los
+ *     que YA existen (case-sensitive). Los matches se indexan por la
+ *     misma key que usamos para dedup.
+ *  3. Para los que NO matchearon en (2), fallback a `findOrCreateShooter`
+ *     per-row, que usa `ilike` (case-insensitive) e inserta si tampoco
+ *     existe con otra capitalización. En la mayoría de los re-uploads la
+ *     lista de misses queda en 0; en imports frescos resolveremos N
+ *     round-trips, pero al menos no nos repetimos entre divisiones.
+ *
+ * Devuelve un `Map<shooterCacheKey, shooterId>` listo para ser consultado
+ * por el caller sin más round-trips.
+ */
+async function resolveShootersBulk(
+  supabase: SupabaseClient,
+  parsedShooters: ParsedShooter[],
+): Promise<Map<string, string>> {
+  const cache = new Map<string, string>();
+
+  const uniqueByKey = new Map<string, ParsedShooter>();
+  for (const s of parsedShooters) {
+    if (!s.fullName?.trim()) continue;
+    uniqueByKey.set(shooterCacheKey(s), s);
+  }
+  const unique = [...uniqueByKey.values()];
+  if (unique.length === 0) return cache;
+
+  // Bulk fetch case-sensitive. Para PDFs/CSVs del mismo origen (caso
+  // típico de re-upload) los nombres en DB tienen exactamente la misma
+  // capitalización, así que el hit rate acá es ~100%.
+  const names = [...new Set(unique.map((s) => s.fullName))];
+  const { data: rows } = await supabase
+    .from("shooters")
+    .select("id, full_name, member_number, linked_user_id, created_at")
+    .in("full_name", names);
+
+  const dbByKey = new Map<
+    string,
+    Array<{
+      id: string;
+      linked: boolean;
+      createdAt: string;
+    }>
+  >();
+  for (const row of rows ?? []) {
+    const key = shooterCacheKey({
+      fullName: row.full_name as string,
+      memberNumber: (row.member_number as string | null) ?? null,
+      region: null,
+    });
+    const arr = dbByKey.get(key) ?? [];
+    arr.push({
+      id: row.id as string,
+      linked: row.linked_user_id != null,
+      createdAt: (row.created_at as string) ?? "",
+    });
+    dbByKey.set(key, arr);
+  }
+
+  const missing: ParsedShooter[] = [];
+  for (const s of unique) {
+    const key = shooterCacheKey(s);
+    const candidates = dbByKey.get(key);
+    if (!candidates || candidates.length === 0) {
+      missing.push(s);
+      continue;
+    }
+    // Mismo criterio que findOrCreateShooter: preferimos los que ya tienen
+    // claim (linked_user_id != null) para no romper el linkeo, después
+    // los más viejos.
+    candidates.sort((a, b) => {
+      if (a.linked !== b.linked) return a.linked ? -1 : 1;
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+    cache.set(key, candidates[0]!.id);
+  }
+
+  // Fallback per-row para los misses. Usa ilike (recupera case-variants)
+  // y crea si no existe.
+  for (const s of missing) {
+    const id = await findOrCreateShooter(supabase, s);
+    cache.set(shooterCacheKey(s), id);
+  }
+
+  return cache;
 }
 
 async function findOrCreateShooter(

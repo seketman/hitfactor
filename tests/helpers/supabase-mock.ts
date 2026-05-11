@@ -104,6 +104,12 @@ class QueryBuilder {
     return this;
   }
 
+  in(col: string, vals: readonly unknown[]): this {
+    const set = new Set(vals);
+    this.filters.push((row) => set.has(row[col]));
+    return this;
+  }
+
   order(col: string, opts?: { ascending?: boolean }): this {
     this.orderClauses.push({ col, asc: opts?.ascending ?? true });
     return this;
