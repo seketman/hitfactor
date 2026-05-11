@@ -82,6 +82,16 @@ export interface ShooterStats {
   /** Tu mejor cantidad de impactos. Null si no hay matches con hits. */
   bestHits: MatchHighlight | null;
   /**
+   * Desvío estándar muestral de impactos en matches con hits.
+   * Null si hay menos de 2 matches con hits.
+   */
+  consistencyHits: number | null;
+  /**
+   * Pendiente de la regresión lineal de impactos vs orden cronológico,
+   * en "impactos por torneo". Null si <2 matches con hits.
+   */
+  trajectoryHitsSlope: number | null;
+  /**
    * Percentil promedio dentro de tu división (place/total × 100).
    * Más bajo = mejor (top 10% > top 30%). Null si no hay datos de tamaño.
    */
@@ -161,6 +171,10 @@ export function computeShooterStats(
   const bestHitsPoint = withHits.length
     ? withHits.reduce((best, p) => (p.hits > best.hits ? p : best))
     : null;
+  const consistencyHits = standardDeviation(withHits.map((p) => p.hits));
+  const trajectoryHitsSlope = linearRegressionSlope(
+    withHits.map((p, i) => ({ x: i, y: p.hits })),
+  );
 
   // Percentiles: solo sobre matches con totalInDivision conocido.
   const withPercentile = scored.filter(
@@ -218,6 +232,8 @@ export function computeShooterStats(
           divisionCode: bestHitsPoint.divisionCode,
         }
       : null,
+    consistencyHits,
+    trajectoryHitsSlope,
     avgPercentile,
     bestPercentile: bestPercentilePoint
       ? {

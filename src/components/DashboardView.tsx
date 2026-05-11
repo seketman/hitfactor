@@ -12,7 +12,7 @@ import {
   listEntriesByShooters,
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
-import type { DisciplineCode } from "@/lib/disciplines";
+import { DISCIPLINE, type DisciplineCode } from "@/lib/disciplines";
 
 interface DashboardViewProps {
   /** Filtra entries y matches a esta disciplina. Null = vista consolidada. */
@@ -79,6 +79,9 @@ export async function DashboardView({
           <Section title="Tu performance">
             <StatsOverview
               stats={computeShooterStats(myEntries, { divisionSizes })}
+              primaryMetric={
+                disciplineCode === DISCIPLINE.FBI ? "hits" : "percentage"
+              }
             />
           </Section>
 

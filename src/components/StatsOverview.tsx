@@ -9,21 +9,35 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
  * Bloque de KPIs + chart para el historial del tirador.
  * Se renderiza solo si hay al menos un torneo válido (no DQ).
  *
- * Si el tirador tiene matches con impactos (Tiro FBI), aparecen también:
- *  - KPIs de impactos (promedio / mejor)
- *  - Gráfica adicional de evolución de impactos
+ * Métrica primaria:
+ *  - `"percentage"` (default): la fila superior y los KPIs derivados
+ *    (consistencia/tendencia) usan Match %. Caso por defecto para vistas
+ *    consolidadas e IPSC/Steel.
+ *  - `"hits"`: la fila superior y los derivados usan impactos. Se activa
+ *    en vistas FBI-only, donde los impactos son el criterio primario.
+ *
+ * Si hay matches con `hits` y la vista NO es FBI-only, agregamos igual una
+ * fila extra de 4 KPIs de impactos para que el tirador siga viendo su
+ * progreso por esa dimensión.
  */
-export function StatsOverview({ stats }: { stats: ShooterStats }) {
+export function StatsOverview({
+  stats,
+  primaryMetric = "percentage",
+}: {
+  stats: ShooterStats;
+  primaryMetric?: "percentage" | "hits";
+}) {
   if (stats.scoredMatches === 0) return null;
 
-  // ¿Hay al menos 2 puntos con impactos? Si sí, mostramos KPIs y gráfica
-  // de impactos además de los de %. (≥2 porque la gráfica necesita 2 puntos.)
   const hitsTimelineCount = stats.timeline.filter((p) => p.hits !== null).length;
   const hasHits = hitsTimelineCount >= 2;
+  const showHitsAsPrimary = primaryMetric === "hits" && hasHits;
+  // Si los hits son la primaria, no necesitamos una fila extra.
+  const showHitsExtraRow = !showHitsAsPrimary && hasHits;
 
   return (
     <div className="space-y-4">
-      {/* Fila 1: rendimiento crudo */}
+      {/* Fila 1: performance — métrica primaria */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Torneos disputados"
@@ -34,32 +48,63 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
               : undefined
           }
         />
-        <KpiCard
-          label="Promedio %"
-          value={formatPercent(stats.avgPercentage)}
-          hint={
-            stats.topDivision ? `Top div: ${stats.topDivision.code}` : undefined
-          }
-        />
-        <KpiCard
-          label="Mejor %"
-          value={
-            stats.bestPercentage
-              ? formatPercent(stats.bestPercentage.value)
-              : "—"
-          }
-          hint={
-            stats.bestPercentage ? (
-              <Link
-                href={`/matches/${stats.bestPercentage.matchId}/me`}
-                className="hover:text-accent"
-                title={stats.bestPercentage.matchName}
-              >
-                {formatDate(stats.bestPercentage.date)}
-              </Link>
-            ) : undefined
-          }
-        />
+
+        {showHitsAsPrimary ? (
+          <>
+            <KpiCard
+              label="Promedio impactos"
+              value={stats.avgHits !== null ? stats.avgHits.toFixed(1) : "—"}
+              hint={`sobre ${hitsTimelineCount} torneo${hitsTimelineCount === 1 ? "" : "s"}`}
+            />
+            <KpiCard
+              label="Mejor impactos"
+              value={stats.bestHits ? String(stats.bestHits.value) : "—"}
+              hint={
+                stats.bestHits ? (
+                  <Link
+                    href={`/matches/${stats.bestHits.matchId}/me`}
+                    className="hover:text-accent"
+                    title={stats.bestHits.matchName}
+                  >
+                    {formatDate(stats.bestHits.date)}
+                  </Link>
+                ) : undefined
+              }
+            />
+          </>
+        ) : (
+          <>
+            <KpiCard
+              label="Promedio %"
+              value={formatPercent(stats.avgPercentage)}
+              hint={
+                stats.topDivision
+                  ? `Top div: ${stats.topDivision.code}`
+                  : undefined
+              }
+            />
+            <KpiCard
+              label="Mejor %"
+              value={
+                stats.bestPercentage
+                  ? formatPercent(stats.bestPercentage.value)
+                  : "—"
+              }
+              hint={
+                stats.bestPercentage ? (
+                  <Link
+                    href={`/matches/${stats.bestPercentage.matchId}/me`}
+                    className="hover:text-accent"
+                    title={stats.bestPercentage.matchName}
+                  >
+                    {formatDate(stats.bestPercentage.date)}
+                  </Link>
+                ) : undefined
+              }
+            />
+          </>
+        )}
+
         <KpiCard
           label="Mejor puesto"
           value={stats.bestPlace ? `#${stats.bestPlace.value}` : "—"}
@@ -77,21 +122,18 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
         />
       </div>
 
-      {/* Fila de KPIs de impactos (Tiro FBI) */}
-      {hasHits && (
+      {/* Fila extra de impactos: solo en vistas donde no son la primaria
+          pero igual hay datos (ej. consolidado con FBI mezclado). */}
+      {showHitsExtraRow && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label="Promedio impactos"
-            value={
-              stats.avgHits !== null ? stats.avgHits.toFixed(1) : "—"
-            }
+            value={stats.avgHits !== null ? stats.avgHits.toFixed(1) : "—"}
             hint={`sobre ${hitsTimelineCount} torneo${hitsTimelineCount === 1 ? "" : "s"} FBI`}
           />
           <KpiCard
             label="Mejor impactos"
-            value={
-              stats.bestHits ? String(stats.bestHits.value) : "—"
-            }
+            value={stats.bestHits ? String(stats.bestHits.value) : "—"}
             hint={
               stats.bestHits ? (
                 <Link
@@ -104,17 +146,25 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
               ) : undefined
             }
           />
+          <ConsistencyHitsCard value={stats.consistencyHits} />
+          <SlopeHitsCard slope={stats.trajectoryHitsSlope} />
         </div>
       )}
 
-      {/* Fila 2: KPIs derivados (estado actual + proyección) */}
+      {/* Fila 2: KPIs derivados — consistencia / tendencia siguen primaryMetric */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <PercentileCard
-          avg={stats.avgPercentile}
-          best={stats.bestPercentile}
-        />
-        <ConsistencyCard value={stats.consistency} />
-        <SlopeCard slope={stats.trajectorySlope} />
+        <PercentileCard avg={stats.avgPercentile} best={stats.bestPercentile} />
+        {showHitsAsPrimary ? (
+          <>
+            <ConsistencyHitsCard value={stats.consistencyHits} />
+            <SlopeHitsCard slope={stats.trajectoryHitsSlope} />
+          </>
+        ) : (
+          <>
+            <ConsistencyCard value={stats.consistency} />
+            <SlopeCard slope={stats.trajectorySlope} />
+          </>
+        )}
         <CadenceCard cadence={stats.cadence} />
       </div>
 
@@ -257,12 +307,32 @@ function ConsistencyCard({ value }: { value: number | null }) {
     );
   }
   // Convención: <10 sólido, 10-20 normal, >20 volátil.
-  const tag =
-    value < 10 ? "sólido" : value < 20 ? "normal" : "volátil";
+  const tag = value < 10 ? "sólido" : value < 20 ? "normal" : "volátil";
   return (
     <KpiCard
       label="Consistencia"
       value={`±${value.toFixed(1)}%`}
+      hint={`${tag} · menor = más predecible`}
+    />
+  );
+}
+
+function ConsistencyHitsCard({ value }: { value: number | null }) {
+  if (value === null) {
+    return (
+      <KpiCard
+        label="Consistencia impactos"
+        value="—"
+        hint="Necesitás al menos 2 torneos FBI"
+      />
+    );
+  }
+  // FBI: 40 impactos máx. Umbrales: <2 sólido, 2-5 normal, >5 volátil.
+  const tag = value < 2 ? "sólido" : value < 5 ? "normal" : "volátil";
+  return (
+    <KpiCard
+      label="Consistencia impactos"
+      value={`±${value.toFixed(1)}`}
       hint={`${tag} · menor = más predecible`}
     />
   );
@@ -307,6 +377,51 @@ function SlopeCard({ slope }: { slope: number | null }) {
       </p>
       <p className="mt-1 text-xs text-fg-subtle">
         {isFlat ? "regresión lineal sobre tu historial" : "% por torneo (regresión lineal)"}
+      </p>
+    </Card>
+  );
+}
+
+function SlopeHitsCard({ slope }: { slope: number | null }) {
+  if (slope === null) {
+    return (
+      <KpiCard
+        label="Tendencia impactos"
+        value="—"
+        hint="Necesitás al menos 2 torneos FBI"
+      />
+    );
+  }
+  // Umbrales: <0.1 impactos/torneo se considera plano.
+  const ABS_THRESHOLD = 0.1;
+  const isFlat = Math.abs(slope) < ABS_THRESHOLD;
+  const isUp = !isFlat && slope > 0;
+  const Icon = isFlat ? Minus : isUp ? TrendingUp : TrendingDown;
+  const tone = isFlat
+    ? "text-fg-muted"
+    : isUp
+      ? "text-success"
+      : "text-danger";
+  const sign = slope > 0 ? "+" : "";
+
+  return (
+    <Card className="px-5 py-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
+        Tendencia impactos
+      </p>
+      <p
+        className={cn(
+          "mt-1.5 inline-flex items-center gap-1.5 font-mono text-2xl font-semibold tabular-nums",
+          tone,
+        )}
+      >
+        <Icon className="h-5 w-5" aria-hidden />
+        {isFlat ? "Estable" : `${sign}${slope.toFixed(1)}`}
+      </p>
+      <p className="mt-1 text-xs text-fg-subtle">
+        {isFlat
+          ? "regresión lineal sobre tu historial"
+          : "impactos por torneo (regresión lineal)"}
       </p>
     </Card>
   );
