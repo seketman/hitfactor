@@ -288,6 +288,18 @@ World Classification System used Page 1`;
     expect(() => parseWinmssText(pages(noTitlePage))).toThrow(/nombre/i);
   });
 
+  it("lanza error si no se extrae ninguna fila (PDF column-major roto)", () => {
+    // Caso real: unpdf extrae las celdas column-major y produce líneas con
+    // headers concatenados ("PointsPointsPointsPoints%%%%..."). Las regex
+    // de fila no matchean, el resultado es matchEntries=[] y stages=[].
+    // Antes generaba un match vacío con título garbage — ahora lanza error.
+    const columnMajorPage = `OPEN -- Overall Match Results
+PointsPointsPointsPoints%%%% CompetitorCompetitorCompetitorCompetitor RegRegRegRegCatCatCatCat TagTagTagTag ICSICSICSICSClsClsClsCls
+Printed mayo 8, 2026 at 14:12
+World Classification System used Page 1`;
+    expect(() => parseWinmssText(pages(columnMajorPage))).toThrow(/fila/i);
+  });
+
   it("lanza error si no se encuentra la fecha", () => {
     const noDatePage = `OPEN -- Overall Match Results
 Some Match

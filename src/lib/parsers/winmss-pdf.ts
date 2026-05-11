@@ -172,6 +172,15 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
       "No se pudo extraer la fecha del PDF (esperaba 'Printed mes DD, YYYY').",
     );
   }
+  // Si no extraemos ni entries ni stages, abortamos en lugar de crear un
+  // match vacío. Pasaba ocasionalmente con PDFs cuyas filas `unpdf` extrae
+  // en orden column-major (cada celda en lugar de cada row) y las regex
+  // de fila no matchean nada.
+  if (matchEntries.length === 0 && stagesByNum.size === 0) {
+    throw new Error(
+      "El PDF se identificó como WinMSS pero no se pudo extraer ninguna fila de resultados. Probá con otro archivo o avisame con el nombre del torneo.",
+    );
+  }
 
   const stages: ParsedStage[] = Array.from(stagesByNum.entries())
     .sort(([a], [b]) => a - b)
@@ -301,6 +310,13 @@ function extractMatchName(text: string): string {
     if (/^COMPETITOR/i.test(stripped)) continue;
     // Filas de datos siempre arrancan con un dígito.
     if (/^\d/.test(stripped)) continue;
+    // Línea con muchos tokens de header de columna concatenados — ocurre
+    // cuando unpdf extrae la tabla column-major y repite cada header N
+    // veces sin espacios entre ellos, ej:
+    //   "PointsPointsPointsPoints%%%% CompetitorCompetitor... Reg... Cat..."
+    // El test es robusto a orden/separadores: si la línea contiene ≥3 de
+    // los nombres de columna conocidos, la descartamos.
+    if (looksLikeColumnHeaders(stripped)) continue;
     candidates.push(dedupeTitle(stripped));
   }
 
@@ -310,6 +326,32 @@ function extractMatchName(text: string): string {
   // llegó al máximo, así que en archivos overall normales sigue ganando la
   // primera ocurrencia del título.
   return candidates.reduce((a, b) => (b.length > a.length ? b : a));
+}
+
+// Nombres de columna que aparecen en las tablas de WinMSS (overall + stages).
+// Se chequean como substrings case-insensitive para tolerar concatenaciones
+// sin espacios producidas por unpdf en algunos PDFs.
+const COLUMN_HEADER_TOKENS = [
+  "Points",
+  "Competitor",
+  "Stage",
+  "Factor",
+  "Percent",
+];
+
+/**
+ * `true` si la línea parece compuesta principalmente por nombres de columna
+ * (3+ ocurrencias de tokens conocidos). Usamos esto para descartar líneas
+ * de header tabular cuando `unpdf` las extrae en formato column-major y
+ * concatena los nombres sin espacios.
+ */
+function looksLikeColumnHeaders(line: string): boolean {
+  const lower = line.toLowerCase();
+  let count = 0;
+  for (const token of COLUMN_HEADER_TOKENS) {
+    if (lower.includes(token.toLowerCase())) count++;
+  }
+  return count >= 3;
 }
 
 /**
