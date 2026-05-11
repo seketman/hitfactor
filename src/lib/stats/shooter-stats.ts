@@ -1,4 +1,4 @@
-import type { MyEntryRow } from "../db/types";
+import type { MyEntryRow, MyStageRow } from "../db/types";
 
 /**
  * Estadísticas agregadas de un tirador a partir de su historial completo
@@ -63,6 +63,26 @@ export interface CadenceStats {
   daysSinceLastMatch: number | null;
 }
 
+/**
+ * KPIs agregados cross-matches a nivel de stage. Computados sobre
+ * stage_results no-DQ del usuario. Null si no hay datos suficientes.
+ */
+export interface StageStats {
+  /** Total de stages contabilizados (no-DQ). */
+  scoredStages: number;
+  /** % de stages ganados (place === 1). 0-100. */
+  winRate: number;
+  /** % de stages en podio (place 1..3). 0-100. */
+  podiumRate: number;
+  /**
+   * % de stages con al menos una penalty (penalties > 0). Null si no hay
+   * datos de penalties (FBI y Steel no las registran).
+   */
+  penaltyRate: number | null;
+  /** Mejor stage_percentage registrado. 0 si no hay datos. */
+  bestStagePercentage: number;
+}
+
 export interface ShooterStats {
   /** Total de torneos disputados (incluye DQ). */
   totalMatches: number;
@@ -110,6 +130,11 @@ export interface ShooterStats {
   trajectorySlope: number | null;
   /** Cadencia reciente. Null si no hay matches. */
   cadence: CadenceStats | null;
+  /**
+   * KPIs por stage agregados sobre el historial. Null si no hay stage_results
+   * (típico cuando los matches importados son solo overall sin stages).
+   */
+  stageStats: StageStats | null;
   /** Disciplina con más participaciones. */
   topDiscipline: DisciplineBreakdown | null;
   /** División con más participaciones. */
@@ -129,6 +154,11 @@ export interface ComputeShooterStatsOptions {
   divisionSizes?: Map<string, number>;
   /** Fecha "ahora" para cómputo de cadencia (testabilidad). */
   now?: Date;
+  /**
+   * Stage results del usuario para los matches incluidos en `entries`.
+   * Si no se pasa, `stageStats` queda en null.
+   */
+  stageResults?: MyStageRow[];
 }
 
 const CADENCE_WINDOW_DAYS = 90;
@@ -196,6 +226,7 @@ export function computeShooterStats(
 
   const now = options.now ?? new Date();
   const cadence = computeCadence(points, now);
+  const stageStats = computeStageStats(options.stageResults);
 
   const byDiscipline = aggregateByDiscipline(scored);
   const byDivision = aggregateByDivision(scored);
@@ -247,6 +278,7 @@ export function computeShooterStats(
     consistency,
     trajectorySlope,
     cadence,
+    stageStats,
     topDiscipline: byDiscipline[0] ?? null,
     topDivision: byDivision[0] ?? null,
     byDiscipline,
@@ -338,6 +370,48 @@ function computeCadence(
   const matchesPerMonth = (recentCount / CADENCE_WINDOW_DAYS) * 30;
 
   return { matchesPerMonth, daysSinceLastMatch };
+}
+
+/**
+ * Agrega KPIs cross-matches sobre stage_results. Filtra DQs y stages sin
+ * place (sucede ocasionalmente con datos parciales).
+ *
+ * `penaltyRate` es null cuando ningún stage del usuario tiene penalties
+ * registrados — caso normal para FBI y Steel.
+ */
+function computeStageStats(
+  rows: MyStageRow[] | undefined,
+): StageStats | null {
+  if (!rows || rows.length === 0) return null;
+  const scored = rows.filter((r) => !r.is_dq && r.place !== null);
+  if (scored.length === 0) return null;
+
+  let wins = 0;
+  let podiums = 0;
+  let bestPct = 0;
+  for (const r of scored) {
+    if (r.place === 1) wins++;
+    if (r.place !== null && r.place <= 3) podiums++;
+    if (r.stage_percentage > bestPct) bestPct = r.stage_percentage;
+  }
+
+  // Penalty rate: solo computamos si al menos algún stage tiene penalties
+  // no-null. En caso contrario (FBI/Steel) devolvemos null.
+  const withPenaltyData = scored.filter((r) => r.penalties !== null);
+  const penaltyRate =
+    withPenaltyData.length > 0
+      ? (withPenaltyData.filter((r) => Number(r.penalties) > 0).length /
+          withPenaltyData.length) *
+        100
+      : null;
+
+  return {
+    scoredStages: scored.length,
+    winRate: (wins / scored.length) * 100,
+    podiumRate: (podiums / scored.length) * 100,
+    penaltyRate,
+    bestStagePercentage: bestPct,
+  };
 }
 
 function parseIsoDate(iso: string): Date | null {

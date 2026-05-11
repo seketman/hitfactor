@@ -168,6 +168,29 @@ export function StatsOverview({
         <CadenceCard cadence={stats.cadence} />
       </div>
 
+      {/* Por stage: KPIs cross-matches a nivel de stage (top 3, ganados,
+          penalties, mejor %). Aparece solo cuando hay stage_results. */}
+      {stats.stageStats && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Tasa de podios"
+            value={`${stats.stageStats.podiumRate.toFixed(0)}%`}
+            hint={`stages top 3 · ${stats.stageStats.scoredStages} contabilizados`}
+          />
+          <KpiCard
+            label="Stages ganados"
+            value={`${stats.stageStats.winRate.toFixed(0)}%`}
+            hint="stages con #1"
+          />
+          <PenaltyRateCard rate={stats.stageStats.penaltyRate} />
+          <KpiCard
+            label="Mejor stage %"
+            value={formatPercent(stats.stageStats.bestStagePercentage)}
+            hint="máximo % de stage"
+          />
+        </div>
+      )}
+
       {/* Chart de evolución del Match % */}
       <Card className="px-5 py-4">
         <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
@@ -424,6 +447,27 @@ function SlopeHitsCard({ slope }: { slope: number | null }) {
           : "impactos por torneo (regresión lineal)"}
       </p>
     </Card>
+  );
+}
+
+function PenaltyRateCard({ rate }: { rate: number | null }) {
+  if (rate === null) {
+    return (
+      <KpiCard
+        label="Tasa de penalties"
+        value="—"
+        hint="no aplica a esta disciplina"
+      />
+    );
+  }
+  // Convención: <10% bajo, 10-25% normal, >25% alto.
+  const tag = rate < 10 ? "bajo" : rate < 25 ? "normal" : "alto";
+  return (
+    <KpiCard
+      label="Tasa de penalties"
+      value={`${rate.toFixed(0)}%`}
+      hint={`${tag} · stages con penalties`}
+    />
   );
 }
 

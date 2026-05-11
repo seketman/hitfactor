@@ -10,6 +10,7 @@ import { listMyShooters } from "@/lib/db/shooters";
 import {
   getDivisionSizes,
   listEntriesByShooters,
+  listMyStageResultsForEntries,
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
 import { DISCIPLINE, type DisciplineCode } from "@/lib/disciplines";
@@ -57,7 +58,13 @@ export async function DashboardView({
   const uniqueMatchIds = Array.from(
     new Set(myEntries.map((e) => e.matches?.id).filter((id): id is string => !!id)),
   );
-  const divisionSizes = await getDivisionSizes(supabase, uniqueMatchIds);
+  const [divisionSizes, myStageResults] = await Promise.all([
+    getDivisionSizes(supabase, uniqueMatchIds),
+    listMyStageResultsForEntries(
+      supabase,
+      myEntries.map((e) => e.id),
+    ),
+  ]);
 
   const headerTitle = isConsolidated
     ? `Hola, ${profile?.display_name ?? "tirador"}`
@@ -78,7 +85,10 @@ export async function DashboardView({
         <>
           <Section title="Tu performance">
             <StatsOverview
-              stats={computeShooterStats(myEntries, { divisionSizes })}
+              stats={computeShooterStats(myEntries, {
+                divisionSizes,
+                stageResults: myStageResults,
+              })}
               primaryMetric={
                 disciplineCode === DISCIPLINE.FBI ? "hits" : "percentage"
               }

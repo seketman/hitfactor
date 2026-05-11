@@ -97,6 +97,17 @@ export interface MyEntryRow {
   } | null;
 }
 
+/**
+ * Fila liviana de stage_results del usuario para agregación cross-matches.
+ * No incluye joins — solo los campos necesarios para computar KPIs.
+ */
+export interface MyStageRow {
+  place: number | null;
+  penalties: number | null;
+  stage_percentage: number;
+  is_dq: boolean;
+}
+
 /** Mi resultado en un stage individual con la info del stage embebida. */
 export interface MyStageResultRow {
   id: string;

@@ -373,6 +373,74 @@ describe("computeShooterStats — timeline", () => {
   });
 });
 
+describe("computeShooterStats — stage stats", () => {
+  it("null cuando no se pasan stage results", () => {
+    const s = computeShooterStats([entry()]);
+    expect(s.stageStats).toBeNull();
+  });
+
+  it("null cuando todos los stages son DQ", () => {
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 1, penalties: null, stage_percentage: 100, is_dq: true },
+        { place: 2, penalties: null, stage_percentage: 80, is_dq: true },
+      ],
+    });
+    expect(s.stageStats).toBeNull();
+  });
+
+  it("computa winRate, podiumRate y bestStagePercentage", () => {
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 1, penalties: null, stage_percentage: 100, is_dq: false },
+        { place: 2, penalties: null, stage_percentage: 95, is_dq: false },
+        { place: 4, penalties: null, stage_percentage: 80, is_dq: false },
+        { place: 5, penalties: null, stage_percentage: 70, is_dq: false },
+      ],
+    });
+    expect(s.stageStats?.scoredStages).toBe(4);
+    expect(s.stageStats?.winRate).toBe(25); // 1 de 4
+    expect(s.stageStats?.podiumRate).toBe(50); // 2 de 4 (place 1 y 2)
+    expect(s.stageStats?.bestStagePercentage).toBe(100);
+  });
+
+  it("penaltyRate null cuando ningún stage tiene penalties (FBI/Steel)", () => {
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 1, penalties: null, stage_percentage: 100, is_dq: false },
+        { place: 2, penalties: null, stage_percentage: 80, is_dq: false },
+      ],
+    });
+    expect(s.stageStats?.penaltyRate).toBeNull();
+  });
+
+  it("penaltyRate cuenta % de stages con penalties > 0 (IPSC)", () => {
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 1, penalties: 0, stage_percentage: 100, is_dq: false },
+        { place: 2, penalties: 5, stage_percentage: 80, is_dq: false },
+        { place: 3, penalties: 0, stage_percentage: 70, is_dq: false },
+        { place: 4, penalties: 10, stage_percentage: 60, is_dq: false },
+      ],
+    });
+    // 2 de 4 stages con penalties > 0 = 50%
+    expect(s.stageStats?.penaltyRate).toBe(50);
+  });
+
+  it("ignora DQs y stages sin place", () => {
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 1, penalties: null, stage_percentage: 100, is_dq: false },
+        { place: null, penalties: null, stage_percentage: 0, is_dq: false },
+        { place: 1, penalties: null, stage_percentage: 100, is_dq: true },
+      ],
+    });
+    // Solo el primer stage cuenta.
+    expect(s.stageStats?.scoredStages).toBe(1);
+    expect(s.stageStats?.winRate).toBe(100);
+  });
+});
+
 describe("computeShooterStats — impactos (FBI)", () => {
   it("null para avgHits/bestHits cuando ningún entry tiene hits", () => {
     const s = computeShooterStats([

@@ -5,6 +5,7 @@ import type {
   MyEntryRow,
   MyMatchSummary,
   MyStageResultRow,
+  MyStageRow,
   Stage,
 } from "./types";
 
@@ -175,4 +176,23 @@ export async function listStageResultsForEntry(
     return an - bn;
   });
   return results;
+}
+
+/**
+ * Trae todos los stage_results del usuario cruzados con sus match_entries.
+ * Versión liviana (solo los campos para agregar KPIs cross-matches). Si la
+ * lista de entry IDs viene vacía o si Supabase devuelve null, retorna `[]`.
+ *
+ * Para filtrar por disciplina: filtrar `entryIds` antes de llamar.
+ */
+export async function listMyStageResultsForEntries(
+  supabase: SupabaseClient,
+  entryIds: string[],
+): Promise<MyStageRow[]> {
+  if (entryIds.length === 0) return [];
+  const { data } = await supabase
+    .from("stage_results")
+    .select("place, penalties, stage_percentage, is_dq")
+    .in("match_entry_id", entryIds);
+  return (data as MyStageRow[] | null) ?? [];
 }
