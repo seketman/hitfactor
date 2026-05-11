@@ -439,6 +439,11 @@ function extractMatchName(text: string): string {
         "",
       )
       .replace(/World\s+Classification\s+System(\s+used)?/gi, "")
+      // Variante: clubes que usan una tabla de clasificación propia (no la
+      // de IPSC). Aparece en el footer del overall PDF del torneo NOCTURNO
+      // ABRIL ATGQ 2026 (Quilmes). Si no la stripeamos termina ganando como
+      // candidato a título por ser más larga que el nombre real.
+      .replace(/User\s+Defined\s+Classification(\s+used)?/gi, "")
       .replace(/ESS\s*-\s*Electronic\s+Scoring\s+System/gi, "")
       .replace(/Page\s+\d+/gi, "")
       .replace(/\d+\s+of\s+\d+/g, "") // ESS footer "1 of 8"

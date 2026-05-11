@@ -188,6 +188,26 @@ Printed May 11, 2026 21:33:24 ESS - Electronic Scoring System 2 of 8`;
   });
 });
 
+describe("parseWinmssText — footer 'User Defined Classification used'", () => {
+  // Bug encontrado con el PDF de NOCTURNO ABRIL ATGQ 2026 (Quilmes): el
+  // club usa una tabla de clasificación custom y el footer pasa a ser
+  // "User Defined Classification used" en vez del estándar "World
+  // Classification System used". Si no lo stripeamos, gana como candidato
+  // a título por ser más largo que el nombre real.
+  const userDefinedPage = `CLASSIC -- Overall Match Results
+NOCTURNO ABRIL ATGQ 2026
+Printed abril 30, 2026 at 23:39
+% Points Competitor Cat Reg Cls Tag ICS
+1 100,00 366,8255 38 GRADALSKI, Victor Martin ARG
+2 86,11 315,8691 27 PINTOS, Gustavo S ARG
+User Defined Classification used Page 1`;
+
+  it("strippea el footer custom y extrae el título real", () => {
+    const parsed = parseWinmssText(pages(userDefinedPage));
+    expect(parsed.name).toBe("NOCTURNO ABRIL ATGQ 2026");
+  });
+});
+
 describe("parseWinmssText — formato TF Lomas de Zamora (título arranca con dígito)", () => {
   // Variante de WinMSS clásico donde el club nombra el match como "3RA
   // FECHA COPA SOCIAL" — el título arranca con un dígito. Antes el filtro

@@ -290,6 +290,68 @@ describe("importParsedMatch — Stage results", () => {
 
     expect(secondCount).toBe(firstCount);
   });
+
+  it("trata el PDF de stages WinMSS como stage import aunque traiga DQs", async () => {
+    // Reproduce el bug del usuario: el PDF de stages de WinMSS incluye al
+    // final una página "Disqualified Shooters" con DQ entries. Antes esto
+    // hacía que `parsed.matchEntries.length > 0` ruteara el archivo como
+    // un overall import — creando un match nuevo con solo el DQ + stages,
+    // duplicando el match real (o creando uno espurio si el overall no se
+    // había importado todavía).
+    const parsed = {
+      discipline: "ipsc" as const,
+      source: "winmss_pdf" as const,
+      name: "TP ESCOPETA 20/02/26 TFALP", // mismo nombre que el match overall del beforeEach
+      date: "2026-02-20",
+      region: null,
+      generatedBy: "WinMSS",
+      // Solo una entry DQ (la página "Disqualified Shooters" del PDF de stages).
+      matchEntries: [
+        {
+          shooter: {
+            fullName: "MOLLEA, Marcelo Daniel",
+            memberNumber: null,
+            region: null,
+          },
+          divisionCode: "P",
+          classification: null,
+          powerFactor: null,
+          category: null,
+          place: 0,
+          matchPoints: 0,
+          matchPercentage: 0,
+          totalTimeSeconds: null,
+          hits: null,
+          isDq: true,
+        },
+      ],
+      stages: [
+        {
+          stageNumber: 1,
+          name: "Stage 1",
+          results: [],
+        },
+      ],
+    };
+
+    const result = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "stages.pdf",
+    );
+
+    // Debería ser un stage import: existedAlready=true (mergeó con el
+    // match overall del beforeEach), no creó un match nuevo.
+    expect(result.existedAlready).toBe(true);
+    expect(fake.tables.matches.rows).toHaveLength(1);
+
+    // La DQ se upserteó contra el match existente.
+    const mollea = fake.tables.match_entries.rows.find(
+      (e) => e.is_dq === true,
+    );
+    expect(mollea).toBeDefined();
+  });
 });
 
 describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match existente", () => {

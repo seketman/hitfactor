@@ -68,7 +68,15 @@ export async function importParsedMatch(
   const divisionByCode = new Map<string, number>();
   for (const d of divisionsData) divisionByCode.set(d.code, d.id);
 
-  const isStageImport = parsed.stages.length > 0 && parsed.matchEntries.length === 0;
+  // Si hay stages, lo tratamos como stage import. Si ADEMÁS vienen entries
+  // pero todas son DQ, igualmente es stage import: el PDF de stages de
+  // WinMSS clásico incluye al final la página "Disqualified Shooters", que
+  // nuestro parser captura como entries con isDq=true. Esas entries no
+  // significan que el archivo sea un overall — el overall está en otro PDF
+  // separado. Las upsertearemos contra el match existente desde dentro de
+  // importStages.
+  const realEntries = parsed.matchEntries.filter((e) => !e.isDq);
+  const isStageImport = parsed.stages.length > 0 && realEntries.length === 0;
 
   if (isStageImport) {
     return importStages(
@@ -274,6 +282,20 @@ async function importStages(
   const matchId = matchRow.id;
   const matchName = matchRow.name;
 
+  // Si el archivo trae entries (en stages-only de WinMSS, son las DQs que
+  // aparecen en la página "Disqualified Shooters" al final del PDF), las
+  // mergeamos contra el match existente. Es no-op cuando ya las teníamos
+  // del overall, y captura cualquier DQ que no hubiera quedado registrada.
+  let insertedEntries = 0;
+  if (parsed.matchEntries.length > 0) {
+    insertedEntries = await upsertMatchEntries(
+      supabase,
+      parsed,
+      matchId,
+      divisionByCode,
+    );
+  }
+
   const { stagesCount, resultsCount } = await attachStagesToMatch(
     supabase,
     parsed,
@@ -287,7 +309,7 @@ async function importStages(
     matchDate: parsed.date,
     disciplineCode: discipline.code,
     disciplineName: discipline.name,
-    insertedEntries: 0,
+    insertedEntries,
     insertedStages: stagesCount,
     insertedStageResults: resultsCount,
     existedAlready: true,
