@@ -102,6 +102,9 @@ function FirearmForm({
 
   const isClearing = !firearmId;
 
+  const canSuggest =
+    !isClearing && suggestedRounds !== null && !current;
+
   return (
     <form action={setMatchFirearm} className="space-y-3">
       <input type="hidden" name="match_entry_id" value={matchEntryId} />
@@ -133,14 +136,22 @@ function FirearmForm({
           onChange={(e) => setRounds(e.target.value)}
           disabled={isClearing}
           hint={
-            !isClearing && suggestedRounds !== null && !current
-              ? `estimado: ${suggestedRounds}`
-              : undefined
+            canSuggest ? (
+              <button
+                type="button"
+                onClick={() => setRounds(String(suggestedRounds))}
+                className="text-fg-subtle underline-offset-2 hover:text-accent hover:underline"
+              >
+                estimado: {suggestedRounds} (usar)
+              </button>
+            ) : undefined
           }
         />
       </div>
 
-      <SubmitButton isUpdate={!!current} isClearing={isClearing} />
+      <div className="flex justify-end">
+        <SubmitButton isUpdate={!!current} isClearing={isClearing} />
+      </div>
     </form>
   );
 }
@@ -154,11 +165,19 @@ function SubmitButton({
 }) {
   const { pending } = useFormStatus();
 
+  // Secondary para no robar atención visual — el card ya está enmarcado y la
+  // acción es de bajo riesgo (guardar tiros). Tamaño md para alinear h-10 con
+  // los inputs del mismo row.
   return (
-    <Button type="submit" size="sm" disabled={pending} aria-busy={pending}>
+    <Button
+      type="submit"
+      variant="secondary"
+      disabled={pending}
+      aria-busy={pending}
+    >
       {pending ? (
         <>
-          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Guardando…
         </>
       ) : isUpdate ? (
