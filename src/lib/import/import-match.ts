@@ -119,9 +119,14 @@ async function importMatchOverall(
   //     pero el CSV trae la region original (o null para FBI), por lo que el
   //     INSERT no chocaría contra la constraint y crearía un duplicado.
   //
-  // Si el match existe y el archivo trae stages, los mergeamos en lugar de
-  // crear un nuevo match. Si trae solo entries (caso IPSC simple) reportamos
-  // como ya importado.
+  // Si el match ya existe lo MERGEAMOS en lugar de fallar: upsert de
+  // match_entries por (match_id, shooter_id, division_id) + upsert de
+  // stage_results vía attachStagesToMatch. Esto permite re-importar un
+  // archivo corregido (o con campos nuevos del parser, ej. `hits` para FBI)
+  // sin perder los datos asociados al match: club editado a mano
+  // (matches.region), claims tirador→usuario (shooters.linked_user_id) y
+  // armas registradas (firearms) viven fuera de match_entries/stage_results
+  // y se preservan.
   const existingForUser = await findUserMatch(
     supabase,
     discipline.id,
@@ -131,29 +136,35 @@ async function importMatchOverall(
   );
 
   if (existingForUser) {
+    const upsertedEntries = await upsertMatchEntries(
+      supabase,
+      parsed,
+      existingForUser.id,
+      divisionByCode,
+    );
+    let stagesCount = 0;
+    let resultsCount = 0;
     if (parsed.stages.length > 0) {
-      const { stagesCount, resultsCount } = await attachStagesToMatch(
+      const r = await attachStagesToMatch(
         supabase,
         parsed,
         existingForUser.id,
         divisionByCode,
       );
-      return {
-        matchId: existingForUser.id,
-        matchName: existingForUser.name,
-        matchDate: parsed.date,
-        disciplineCode: discipline.code,
-        disciplineName: discipline.name,
-        insertedEntries: 0,
-        insertedStages: stagesCount,
-        insertedStageResults: resultsCount,
-        existedAlready: true,
-      };
+      stagesCount = r.stagesCount;
+      resultsCount = r.resultsCount;
     }
-    throw new ImportError(
-      "Este match ya fue importado por vos.",
-      "MATCH_ALREADY_EXISTS",
-    );
+    return {
+      matchId: existingForUser.id,
+      matchName: existingForUser.name,
+      matchDate: parsed.date,
+      disciplineCode: discipline.code,
+      disciplineName: discipline.name,
+      insertedEntries: upsertedEntries,
+      insertedStages: stagesCount,
+      insertedStageResults: resultsCount,
+      existedAlready: true,
+    };
   }
 
   // No es un re-upload nuestro. Insertamos. Si pega contra la unique
@@ -184,37 +195,12 @@ async function importMatchOverall(
   }
   const matchId = matchRow!.id as string;
 
-  // Resolver/crear shooters e insertar match_entries.
-  //
-  // OJO con la concurrencia: si llamamos findOrCreateShooter en paralelo para
-  // el mismo nombre (ej. un tirador que aparece en varias divisiones del
-  // mismo CSV), las queries SELECT corren antes de cualquier INSERT y ambas
-  // ven que el shooter no existe → terminamos creando duplicados.
-  //
-  // Por eso resolvemos shooters de forma SECUENCIAL y CACHEADA: una sola
-  // llamada a findOrCreateShooter por tirador único.
-  const shooterCache = new Map<string, string>();
-  const entryRows = [];
-  for (const entry of parsed.matchEntries) {
-    const cacheKey = shooterCacheKey(entry.shooter);
-    let shooterId = shooterCache.get(cacheKey);
-    if (!shooterId) {
-      shooterId = await findOrCreateShooter(supabase, entry.shooter);
-      shooterCache.set(cacheKey, shooterId);
-    }
-    const divisionId = requireDivision(divisionByCode, entry.divisionCode);
-    entryRows.push(mapMatchEntryToRow(entry, matchId, shooterId, divisionId));
-  }
-
-  if (entryRows.length > 0) {
-    const { error: entryErr } = await supabase.from("match_entries").insert(entryRows);
-    if (entryErr) {
-      throw new ImportError(
-        `Error insertando resultados: ${entryErr.message}`,
-        "MATCH_ENTRIES_INSERT_FAILED",
-      );
-    }
-  }
+  const insertedEntries = await upsertMatchEntries(
+    supabase,
+    parsed,
+    matchId,
+    divisionByCode,
+  );
 
   // Si el archivo trae stages embebidos (caso Steel Challenge), los
   // insertamos en la misma operación.
@@ -237,7 +223,7 @@ async function importMatchOverall(
     matchDate: parsed.date,
     disciplineCode: discipline.code,
     disciplineName: discipline.name,
-    insertedEntries: entryRows.length,
+    insertedEntries,
     insertedStages,
     insertedStageResults,
     existedAlready: false,
@@ -306,6 +292,60 @@ async function importStages(
     insertedStageResults: resultsCount,
     existedAlready: true,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Match entries upsert (idempotente, usado tanto en primer import como
+// en re-upload)
+// ---------------------------------------------------------------------------
+
+/**
+ * Resuelve shooters y hace UPSERT de match_entries con onConflict en
+ * `(match_id, shooter_id, division_id)` — la unique constraint del schema.
+ *
+ * Idempotente: si el match ya tenía estos entries, los actualiza con los
+ * datos del archivo (place, points, hits, etc.). Si trae entries nuevos,
+ * los inserta. Los entries en DB que NO estén en el archivo quedan como
+ * están — no los borramos para no romper claims/firearms vinculados a
+ * ellos por FK.
+ *
+ * Resolución de shooters: secuencial y cacheada para evitar duplicados
+ * por carrera cuando un mismo nombre aparece en varias divisiones.
+ *
+ * Devuelve la cantidad de entries que se procesaron (insertados +
+ * actualizados — no distinguimos).
+ */
+async function upsertMatchEntries(
+  supabase: SupabaseClient,
+  parsed: ParsedMatch,
+  matchId: string,
+  divisionByCode: Map<string, number>,
+): Promise<number> {
+  const shooterCache = new Map<string, string>();
+  const entryRows = [];
+  for (const entry of parsed.matchEntries) {
+    const cacheKey = shooterCacheKey(entry.shooter);
+    let shooterId = shooterCache.get(cacheKey);
+    if (!shooterId) {
+      shooterId = await findOrCreateShooter(supabase, entry.shooter);
+      shooterCache.set(cacheKey, shooterId);
+    }
+    const divisionId = requireDivision(divisionByCode, entry.divisionCode);
+    entryRows.push(mapMatchEntryToRow(entry, matchId, shooterId, divisionId));
+  }
+
+  if (entryRows.length === 0) return 0;
+
+  const { error } = await supabase
+    .from("match_entries")
+    .upsert(entryRows, { onConflict: "match_id,shooter_id,division_id" });
+  if (error) {
+    throw new ImportError(
+      `Error insertando resultados: ${error.message}`,
+      "MATCH_ENTRIES_INSERT_FAILED",
+    );
+  }
+  return entryRows.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +499,7 @@ function mapMatchEntryToRow(
     match_points: entry.matchPoints,
     match_percentage: entry.matchPercentage,
     total_time_seconds: entry.totalTimeSeconds,
+    hits: entry.hits,
     is_dq: entry.isDq,
   };
 }
@@ -478,6 +519,7 @@ function mapStageResultToRow(
     stage_points: result.stagePoints,
     stage_percentage: result.stagePercentage,
     place: result.place || null,
+    hits: result.hits,
     is_dq: result.isDq,
   };
 }

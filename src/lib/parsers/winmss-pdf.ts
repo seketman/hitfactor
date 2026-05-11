@@ -387,6 +387,7 @@ function parseOverallRows(
       matchPoints,
       matchPercentage,
       totalTimeSeconds: null,
+      hits: null, // IPSC scoring es hit factor, no impactos.
       // Si el tirador terminó con 0 puntos, lo marcamos como DQ.
       isDq: matchPoints === 0,
     });
@@ -436,6 +437,7 @@ function parseStageRows(
       stagePoints,
       stagePercentage: stagePct,
       place: isDq ? 0 : place,
+      hits: null,
       isDq,
     });
   }

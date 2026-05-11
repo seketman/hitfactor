@@ -177,9 +177,15 @@ export function parseFbiCsv(content: string): ParsedMatch {
     const stages = new Map<number, RawStage>();
     for (const sc of stageCols) {
       const shots = cells.slice(sc.startIdx, sc.startIdx + SHOTS_PER_STAGE);
-      const stagePoints = shots.reduce((acc, v) => acc + parseShot(v), 0);
+      let stagePoints = 0;
+      let stageHits = 0;
+      for (const v of shots) {
+        const p = parseShot(v);
+        stagePoints += p;
+        if (p > 0) stageHits++;
+      }
       const isDq = hasNonNumericMarker(shots);
-      stages.set(sc.number, { stagePoints, isDq });
+      stages.set(sc.number, { stagePoints, hits: stageHits, isDq });
     }
 
     const entry: RawEntry = {
@@ -234,6 +240,7 @@ export function parseFbiCsv(content: string): ParsedMatch {
         matchPercentage:
           winnerPuntos > 0 ? (e.puntos / winnerPuntos) * 100 : 0,
         totalTimeSeconds: null,
+        hits: e.impactos,
         isDq: false,
       });
     });
@@ -265,6 +272,7 @@ export function parseFbiCsv(content: string): ParsedMatch {
 
 interface RawStage {
   stagePoints: number;
+  hits: number;
   isDq: boolean;
 }
 
@@ -345,6 +353,7 @@ function buildStages(
       for (const sc of stageCols) {
         const raw = entry.stages.get(sc.number) ?? {
           stagePoints: 0,
+          hits: 0,
           isDq: false,
         };
         stageMap.get(sc.number)!.results.push({
@@ -359,6 +368,7 @@ function buildStages(
           stagePoints: raw.stagePoints,
           stagePercentage: 0, // se completa en withStagePlacings
           place: 0, // se completa en withStagePlacings
+          hits: raw.hits,
           isDq: raw.isDq,
         });
       }

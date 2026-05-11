@@ -164,6 +164,7 @@ describe("importParsedMatch — Match overall", () => {
           matchPoints: 100,
           matchPercentage: 100,
           totalTimeSeconds: null,
+          hits: null,
           isDq: false,
         },
         {
@@ -176,6 +177,7 @@ describe("importParsedMatch — Match overall", () => {
           matchPoints: 95,
           matchPercentage: 95,
           totalTimeSeconds: null,
+          hits: null,
           isDq: false,
         },
         {
@@ -188,6 +190,7 @@ describe("importParsedMatch — Match overall", () => {
           matchPoints: 90,
           matchPercentage: 90,
           totalTimeSeconds: null,
+          hits: null,
           isDq: false,
         },
       ],
@@ -350,9 +353,11 @@ describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match exis
     );
     expect(second.existedAlready).toBe(true);
     expect(second.matchId).toBe(matchId);
-    expect(second.insertedEntries).toBe(0);
+    // `insertedEntries` ahora refleja "entries procesados" (upserteados) —
+    // no son entries nuevos, son los que ya existían siendo actualizados.
+    expect(second.insertedEntries).toBeGreaterThan(0);
 
-    // No se duplican entries.
+    // Lo importante: la cantidad en DB no crece (upsert con onConflict).
     expect(fake.tables.match_entries.rows.length).toBe(entriesBefore);
     // No se duplican stages (ya existían).
     expect(fake.tables.stages.rows.length).toBe(stagesBefore);

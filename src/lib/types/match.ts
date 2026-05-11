@@ -44,6 +44,13 @@ export interface ParsedMatchEntry {
   matchPercentage: number;
   /** Tiempo total para disciplinas time-based (Steel Challenge). NULL para IPSC. */
   totalTimeSeconds: number | null;
+  /**
+   * Cantidad de disparos acertados (impactos). Sólo aplica a disciplinas
+   * donde el blanco es de zonas con puntaje y donde el ranking primario
+   * se ordena por impactos antes que por puntaje (Tiro FBI). NULL para
+   * IPSC y Steel Challenge.
+   */
+  hits: number | null;
   isDq: boolean;
 }
 
@@ -62,6 +69,8 @@ export interface ParsedStageResult {
   stagePoints: number;
   stagePercentage: number;
   place: number;
+  /** Impactos del stage (Tiro FBI: 0..5). NULL para IPSC y Steel. */
+  hits: number | null;
   isDq: boolean;
 }
 

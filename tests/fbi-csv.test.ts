@@ -117,6 +117,16 @@ describe("parseFbiCsv — Social 4", () => {
     expect(aceto?.isDq).toBe(false);
   });
 
+  it("popula hits con la columna Impactos del CSV (criterio primario de ranking FBI)", () => {
+    // Cada entry FBI debe traer hits >= 0 desde la columna Impactos.
+    for (const e of parsed.matchEntries) {
+      expect(e.hits).not.toBeNull();
+      expect(e.hits).toBeGreaterThanOrEqual(0);
+      // FBI: 40 disparos puntuables máx por match (8 stages × 5).
+      expect(e.hits).toBeLessThanOrEqual(40);
+    }
+  });
+
   it("places por división son contiguos desde 1", () => {
     const byDivision = new Map<string, number[]>();
     for (const e of parsed.matchEntries) {
@@ -162,6 +172,24 @@ describe("parseFbiCsv — stages (Social 3)", () => {
       (r) => r.shooter.fullName === "Mariperisena, Matías",
     );
     expect(matias?.stagePoints).toBe(49);
+  });
+
+  it("cuenta hits por stage (disparos no-cero, max 5)", () => {
+    // Stoker Oscar — Tirada 4: 5 disparos no-cero → hits = 5.
+    const t4 = parsed.stages.find((s) => s.stageNumber === 4)!;
+    const stoker = t4.results.find(
+      (r) => r.shooter.fullName === "Stoker Oscar",
+    );
+    expect(stoker?.hits).toBe(5);
+
+    // En general, todos los stage results de FBI tienen hits 0..5.
+    for (const stage of parsed.stages) {
+      for (const r of stage.results) {
+        expect(r.hits).not.toBeNull();
+        expect(r.hits).toBeGreaterThanOrEqual(0);
+        expect(r.hits).toBeLessThanOrEqual(5);
+      }
+    }
   });
 
   it("la suma de stages T1..T8 de un shooter coincide con su matchPoints", () => {

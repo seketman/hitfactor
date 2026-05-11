@@ -155,6 +155,7 @@ function parseMatchRow(headers: string[], row: string[]): ParsedMatchEntry | nul
     matchPoints: parseFloatOr(get("Match Pts"), 0),
     matchPercentage: parsePercentage(get("Match %")),
     totalTimeSeconds: null, // IPSC no usa tiempo total; queda explícito.
+    hits: null, // IPSC no usa impactos — el scoring es hit factor.
     isDq,
   };
 }
@@ -184,6 +185,7 @@ function parseStageRow(headers: string[], row: string[]): ParsedStageResult | nu
     stagePoints: parseFloatOr(get("Stage Pts"), 0),
     stagePercentage: parsePercentage(get("Stage %")),
     place: parseIntOr(get("Place") ?? "", 0),
+    hits: null,
     isDq,
   };
 }

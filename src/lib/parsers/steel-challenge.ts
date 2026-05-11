@@ -171,6 +171,7 @@ function parseEntryRow(
     matchPoints: 0,
     matchPercentage: parsePercentage(get("%")),
     totalTimeSeconds: totalTime,
+    hits: null, // Steel scoring es time-based, no impactos.
     isDq,
   };
 }
@@ -191,6 +192,7 @@ function buildStageResult(
     stagePoints: 0,
     stagePercentage: 0, // se completa en withStagePlacings
     place: 0,
+    hits: null,
     isDq: entry.isDq,
   };
 }

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { createClient } from "@/lib/supabase/server";
 import { findClaimCandidates } from "@/lib/import/match-claim";
 import { claimShooter } from "@/lib/actions/claim";
+import { DismissOnSubmit } from "./DismissOnSubmit";
 import { ImportForm } from "./ImportForm";
 
 export default async function ImportPage({
@@ -52,34 +53,42 @@ export default async function ImportPage({
         </p>
       </header>
 
-      {params.error && (
-        <Alert tone="danger" title="No se pudo importar" className="mb-6">
-          {params.error}
-        </Alert>
-      )}
-
-      {params.ok === "1" && (
-        <Alert tone="success" title={`Importado: ${params.name}`} className="mb-6">
-          <ul className="mt-1 list-disc space-y-0.5 pl-5">
-            {params.discipline && (
-              <li>
-                Disciplina: <strong className="text-fg">{params.discipline}</strong>
-              </li>
-            )}
-            {params.entries && Number(params.entries) > 0 && (
-              <li>{params.entries} resultados de tiradores</li>
-            )}
-            {params.stages && Number(params.stages) > 0 && (
-              <li>{params.stages} stage(s) nuevos</li>
-            )}
-            {params.stageResults && Number(params.stageResults) > 0 && (
-              <li>{params.stageResults} resultados de stages</li>
-            )}
-            {params.existed === "1" && (
-              <li>El match ya existía — solo se agregaron stages.</li>
-            )}
-          </ul>
-        </Alert>
+      {(params.error || params.ok === "1") && (
+        <DismissOnSubmit key={resultKey(params)}>
+          {params.error && (
+            <Alert tone="danger" title="No se pudo importar" className="mb-6">
+              {params.error}
+            </Alert>
+          )}
+          {params.ok === "1" && (
+            <Alert
+              tone="success"
+              title={`Importado: ${params.name}`}
+              className="mb-6"
+            >
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {params.discipline && (
+                  <li>
+                    Disciplina:{" "}
+                    <strong className="text-fg">{params.discipline}</strong>
+                  </li>
+                )}
+                {params.entries && Number(params.entries) > 0 && (
+                  <li>{params.entries} resultados de tiradores</li>
+                )}
+                {params.stages && Number(params.stages) > 0 && (
+                  <li>{params.stages} stage(s) nuevos</li>
+                )}
+                {params.stageResults && Number(params.stageResults) > 0 && (
+                  <li>{params.stageResults} resultados de stages</li>
+                )}
+                {params.existed === "1" && (
+                  <li>El match ya existía — solo se agregaron stages.</li>
+                )}
+              </ul>
+            </Alert>
+          )}
+        </DismissOnSubmit>
       )}
 
       {candidates.length > 0 && params.matchId && (
