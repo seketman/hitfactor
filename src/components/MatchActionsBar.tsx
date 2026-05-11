@@ -19,6 +19,12 @@ interface MatchActionsBarProps {
   /** Code del club detectado en el region actual, null si no se mapeó al catálogo. */
   currentClubCode: string | null;
   clubs: Club[];
+  /**
+   * Ruta desde donde llegó el usuario al detalle (ej "/matches" o
+   * "/dashboard"). Se pasa a la action de delete para que devuelva al
+   * usuario al mismo listado del que vino. Ya viene validada por la page.
+   */
+  from?: string;
 }
 
 /**
@@ -37,6 +43,7 @@ export function MatchActionsBar({
   currentRegion,
   currentClubCode,
   clubs,
+  from,
 }: MatchActionsBarProps) {
   const [editing, setEditing] = useState(false);
 
@@ -59,6 +66,7 @@ export function MatchActionsBar({
       </Button>
       <form action={deleteMatch}>
         <input type="hidden" name="match_id" value={matchId} />
+        {from && <input type="hidden" name="from" value={from} />}
         <Button type="submit" variant="danger" size="sm">
           Eliminar
         </Button>

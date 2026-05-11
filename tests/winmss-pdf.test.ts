@@ -87,6 +87,107 @@ describe("isWinmssFormat", () => {
   });
 });
 
+describe("parseWinmssText — formato ESS (Electronic Scoring System)", () => {
+  // Fixture sintético del segundo formato que vemos: ESS, no WinMSS.
+  // Diferencias clave: header "X - Results Overall" (single dash), mes en
+  // inglés ("Printed: May 11, 2026"), decimal con punto, footer "ESS -
+  // Electronic Scoring System ... N of N".
+  const essOverall = `TFABA - 19 - SEGUNDO SOCIAL PISTOLA 9 MAYO 2026 - Handgun
+Printed: May 11, 2026 21:33:24
+CLASSIC - Results Overall
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 970.0000 58 SILVA, Lucas ARG
+2 61.64 597.9520 51 FAVAREL, Leandro Carlos ARG
+Printed May 11, 2026 21:33:24 ESS - Electronic Scoring System 1 of 8`;
+
+  it("detecta formato ESS como WinMSS válido", () => {
+    expect(isWinmssFormat(essOverall)).toBe(true);
+  });
+
+  it("extrae división con '-' (sin doble dash)", () => {
+    const parsed = parseWinmssText(pages(essOverall));
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("CL");
+    expect(parsed.matchEntries).toHaveLength(2);
+  });
+
+  it("prioriza la fecha del título (9 MAYO 2026) sobre Printed (May 11)", () => {
+    // El título dice "9 MAYO 2026" — fecha real del match. El "Printed:
+    // May 11, 2026" es cuando se generó el PDF. Tomamos la del título.
+    const parsed = parseWinmssText(pages(essOverall));
+    expect(parsed.date).toBe("2026-05-09");
+  });
+
+  it("cae al 'Printed:' cuando el título no tiene fecha embebida", () => {
+    const noTitleDate = essOverall.replace("9 MAYO 2026 - Handgun", "Handgun");
+    const parsed = parseWinmssText(pages(noTitleDate));
+    expect(parsed.date).toBe("2026-05-11");
+  });
+
+  it("parsea decimales con punto (100.00 → 100)", () => {
+    const parsed = parseWinmssText(pages(essOverall));
+    const winner = parsed.matchEntries.find(
+      (e) => e.shooter.fullName === "SILVA, Lucas",
+    );
+    expect(winner?.matchPercentage).toBe(100);
+    expect(winner?.matchPoints).toBe(970);
+  });
+
+  it("extrae el título completo (ignorando header división, Printed, footer)", () => {
+    const parsed = parseWinmssText(pages(essOverall));
+    expect(parsed.name).toBe(
+      "TFABA - 19 - SEGUNDO SOCIAL PISTOLA 9 MAYO 2026 - Handgun",
+    );
+  });
+
+  it("mapea 'OPTICS' (ESS) → CO (Carry Optics)", () => {
+    const opticsPage = essOverall.replace(
+      "CLASSIC - Results Overall",
+      "OPTICS - Results Overall",
+    );
+    const parsed = parseWinmssText(pages(opticsPage));
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("CO");
+  });
+
+  it("captura filas DQ del formato ESS (sin columna place/%/points)", () => {
+    const withDq = `TFABA - 19 - SEGUNDO SOCIAL PISTOLA 9 MAYO 2026 - Handgun
+Printed: May 11, 2026 21:33:24
+PRODUCTION - Results Overall
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 970.0000 10 SERRANO, Fernando ARG
+2 50.00 485.0000 44 MEDAVAR, Pablo ARG
+                              39 SGUERA, Santino Eduardo                                  DQ
+Printed May 11, 2026 21:33:24 ESS - Electronic Scoring System 2 of 8`;
+    const parsed = parseWinmssText(pages(withDq));
+    expect(parsed.matchEntries).toHaveLength(3);
+    const dq = parsed.matchEntries.find(
+      (e) => e.shooter.fullName === "SGUERA, Santino Eduardo",
+    );
+    expect(dq).toBeDefined();
+    expect(dq?.isDq).toBe(true);
+    expect(dq?.matchPoints).toBe(0);
+    expect(dq?.matchPercentage).toBe(0);
+    expect(dq?.divisionCode).toBe("P");
+  });
+
+  it("mapea 'PC OPTICS' → PCCO y 'PC IRON' → PCC", () => {
+    const pcoPage = essOverall.replace(
+      "CLASSIC - Results Overall",
+      "PC OPTICS - Results Overall",
+    );
+    expect(parseWinmssText(pages(pcoPage)).matchEntries[0]?.divisionCode).toBe(
+      "PCCO",
+    );
+
+    const pcIronPage = essOverall.replace(
+      "CLASSIC - Results Overall",
+      "PC IRON - Results Overall",
+    );
+    expect(
+      parseWinmssText(pages(pcIronPage)).matchEntries[0]?.divisionCode,
+    ).toBe("PCC");
+  });
+});
+
 describe("parseWinmssText — overall", () => {
   it("extrae nombre y fecha del match", () => {
     const parsed = parseWinmssText(pages(overallClassicPage));
@@ -110,6 +211,19 @@ describe("parseWinmssText — overall", () => {
   it("mapea PISTOLA → PIS (división TFABA genérica)", () => {
     const parsed = parseWinmssText(pages(overallPistolaPage));
     expect(parsed.matchEntries[0]?.divisionCode).toBe("PIS");
+  });
+
+  it("tolera kerning roto: 'P ISTOLA' (espacio espurio) → PIS", () => {
+    // Caso real: en algunos PDFs `unpdf` extrae la "P" y el resto del
+    // nombre como items separados y nuestra reconstrucción los une con
+    // espacio. El lookup debe seguir resolviendo.
+    const brokenKerning = overallPistolaPage.replace(
+      "PISTOLA --",
+      "P ISTOLA --",
+    );
+    const parsed = parseWinmssText(pages(brokenKerning));
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PIS");
+    expect(parsed.matchEntries.length).toBeGreaterThan(0);
   });
 
   it("parsea place, percentage y puntos correctamente", () => {

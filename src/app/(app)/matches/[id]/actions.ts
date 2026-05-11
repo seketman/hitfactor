@@ -2,13 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { redirectWithError } from "@/lib/redirects";
+import { redirectWithError, safeBackPath } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 
 export async function deleteMatch(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
   if (!matchId) return;
+  // Ruta a la que volver al terminar — viene del form de la página actual
+  // (típico "/matches" o "/dashboard/{disciplina}"). Si no se pasa o es
+  // inválida, caemos a /matches (la grilla principal de matches).
+  const from = formData.get("from");
+  const backTo = safeBackPath(
+    typeof from === "string" ? from : null,
+    "/matches",
+  );
 
   const { supabase, user } = await requireUser();
 
@@ -46,7 +54,7 @@ export async function deleteMatch(formData: FormData) {
     });
   }
 
-  redirect("/dashboard?info=" + encodeURIComponent("Match eliminado"));
+  redirect(`${backTo}?info=${encodeURIComponent("Match eliminado")}`);
 }
 
 /**

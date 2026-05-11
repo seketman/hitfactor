@@ -28,6 +28,7 @@ import { claimShooter } from "@/lib/actions/claim";
 import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 import { isHitsBasedDiscipline } from "@/lib/disciplines";
+import { isInternalAppPath } from "@/lib/redirects";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -76,7 +77,8 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   // ruta interna válida — así devolvemos al usuario exactamente a la vista
   // que estaba mirando (matches, dashboard consolidado, o por disciplina).
   // Fallback: /matches, que es la grilla principal.
-  const backHref = isInternalDashboardPath(from) ? from : "/matches";
+  const validFrom = isInternalAppPath(from) ? from : null;
+  const backHref = validFrom ?? "/matches";
 
   return (
     <PageContainer>
@@ -117,6 +119,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
               currentRegion={match.region}
               currentClubCode={parsedClub.clubCode}
               clubs={clubs}
+              from={validFrom ?? undefined}
             />
           </div>
         )}
@@ -268,13 +271,3 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   );
 }
 
-/**
- * Valida que el `from` sea una ruta interna válida para volver. Evita open
- * redirects y limita el back link a las vistas reales:
- *  - `/matches` (grilla principal)
- *  - `/dashboard` y `/dashboard/{code}` (vistas de tirador, por compat)
- */
-function isInternalDashboardPath(value: string | undefined): value is string {
-  if (typeof value !== "string") return false;
-  return /^\/matches$|^\/dashboard(\/[a-z_]+)?$/.test(value);
-}

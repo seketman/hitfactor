@@ -396,6 +396,7 @@ async function attachStagesToMatch(
       const shooterId = await findOrCreateShooter(supabase, result.shooter);
       const divisionId = requireDivision(divisionByCode, result.divisionCode);
 
+      // Buscamos primero por (match, shooter, division) — el caso típico.
       const { data: matchEntry } = await supabase
         .from("match_entries")
         .select("id")
@@ -404,13 +405,39 @@ async function attachStagesToMatch(
         .eq("division_id", divisionId)
         .maybeSingle();
 
-      if (!matchEntry) {
-        // El tirador aparece en el stage pero no en el match overall.
-        // Lo skipeamos silenciosamente — puede pasar con DQs raros.
-        continue;
+      let entryId = matchEntry?.id as string | undefined;
+
+      if (!entryId) {
+        // Fallback: el tirador no aparece en esa división. Pasa cuando el
+        // PDF de stages usa un nombre de división distinto al del overall
+        // para los mismos tiradores (caso WinMSS de TFABA: "PISTOLA" en el
+        // overall sale como "PRODUCTION" en el stages PDF).
+        //
+        // Si el tirador tiene exactamente UNA entry en este match
+        // (sin importar la división), la usamos. Si tiene varias (compite
+        // en múltiples divisiones), no podemos resolver sin ambigüedad y
+        // skipeamos con warning.
+        const { data: allEntries } = await supabase
+          .from("match_entries")
+          .select("id")
+          .eq("match_id", matchId)
+          .eq("shooter_id", shooterId);
+        const entries = (allEntries ?? []) as { id: string }[];
+        if (entries.length === 1) {
+          entryId = entries[0]!.id;
+        } else if (entries.length > 1) {
+          console.warn(
+            `[stage-attach] tirador con ${entries.length} entries en el match (división ${result.divisionCode}): no se puede resolver sin ambigüedad`,
+          );
+          continue;
+        } else {
+          // No hay entries: el tirador aparece en stages pero no en
+          // overall. Caso de DQ raro o re-import parcial. Skipeamos.
+          continue;
+        }
       }
 
-      stageResultRows.push(mapStageResultToRow(result, stageId, matchEntry.id));
+      stageResultRows.push(mapStageResultToRow(result, stageId, entryId));
     }
 
     if (stageResultRows.length > 0) {

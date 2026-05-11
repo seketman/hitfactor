@@ -49,6 +49,35 @@ const SPANISH_MONTHS: Record<string, number> = {
   diciembre: 12,
 };
 
+// PDFs generados por ESS (Electronic Scoring System) usan meses en inglés.
+// Acepta nombre completo y abreviado.
+const ENGLISH_MONTHS: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+  jan: 1,
+  feb: 2,
+  mar: 3,
+  apr: 4,
+  jun: 6,
+  jul: 7,
+  aug: 8,
+  sep: 9,
+  sept: 9,
+  oct: 10,
+  nov: 11,
+  dec: 12,
+};
+
 /**
  * Mapea el nombre de la sección que aparece en el PDF (división) al
  * `code` de la tabla `divisions` de IPSC.
@@ -73,6 +102,8 @@ const DIVISION_NAME_TO_CODE: Record<string, string> = {
   "PCC OPTIC": "PCCO",
   "PCC OPTICS": "PCCO",
   "CARRY OPTICS": "CO",
+  // ESS llama "OPTICS" a Carry Optics. Ambas mapean al mismo code.
+  OPTICS: "CO",
   REVOLVER: "R",
   CLASSIC: "CL",
   "SG CLASSIC": "CL",
@@ -80,6 +111,10 @@ const DIVISION_NAME_TO_CODE: Record<string, string> = {
   // TFABA-specific: sección genérica de pistola (no se subdivide en
   // eventos sociales). Ver migración 0013.
   PISTOLA: "PIS",
+  // ESS usa "PC IRON" (Pistol Caliber sin óptica) y "PC OPTICS"
+  // (con óptica). Equivalentes a PCC y PCCO respectivamente.
+  "PC IRON": "PCC",
+  "PC OPTICS": "PCCO",
 };
 
 // Tokens cortos uppercase que aparecen como columnas de metadata en las
@@ -110,10 +145,15 @@ const KNOWN_ICS = new Set(["RO"]);
  * aparece en los archivos overall, no en stages.
  */
 export function isWinmssFormat(text: string): boolean {
-  return (
-    /Overall\s+(Match|Stage)\s+Results/i.test(text) &&
-    /Printed\s+[a-záéíóúñ]+\s+\d{1,2}/i.test(text)
-  );
+  // Soporta dos formatos:
+  //  - WinMSS clásico: "X -- Overall Match Results", mes en español.
+  //  - ESS (Electronic Scoring System): "X - Results Overall", "Printed:"
+  //    con mes en inglés.
+  const hasHeader =
+    /Overall\s+(Match|Stage)\s+Results/i.test(text) ||
+    /-\s+Results\s+(Overall|Stage\s+\d+)/i.test(text);
+  const hasPrinted = /Printed[:\s]+[A-Za-záéíóúñ]+\s+\d{1,2}/i.test(text);
+  return hasHeader && hasPrinted;
 }
 
 /**
@@ -134,12 +174,30 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
 
   for (const page of pages) {
     const parsed = parsePage(page.text);
-    if (!parsed) continue;
+    if (!parsed) {
+      // Diagnóstico: la página no se mapeó a ninguna división conocida o no
+      // tiene header. Dejamos snippet en logs para investigar.
+      console.warn(
+        `[winmss-pdf] página ${page.num} descartada (sin división reconocida). Texto inicio: ${page.text
+          .slice(0, 300)
+          .replace(/\s+/g, " ")
+          .trim()}`,
+      );
+      continue;
+    }
 
     matchName = matchName || parsed.matchName;
     matchDate = matchDate || parsed.date;
 
     if (parsed.kind === "overall") {
+      if (parsed.entries.length === 0) {
+        console.warn(
+          `[winmss-pdf] página ${page.num} (${parsed.divisionCode}): 0 filas parseadas. Texto: ${page.text
+            .slice(0, 500)
+            .replace(/\s+/g, " ")
+            .trim()}`,
+        );
+      }
       for (const entry of parsed.entries) {
         matchEntries.push({
           ...entry,
@@ -147,6 +205,14 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
         });
       }
     } else {
+      if (parsed.results.length === 0) {
+        console.warn(
+          `[winmss-pdf] página ${page.num} (${parsed.divisionCode}, stage ${parsed.stageNumber}): 0 resultados parseados. Texto: ${page.text
+            .slice(0, 500)
+            .replace(/\s+/g, " ")
+            .trim()}`,
+        );
+      }
       let bucket = stagesByNum.get(parsed.stageNumber);
       if (!bucket) {
         bucket = [];
@@ -227,18 +293,31 @@ interface StagePageResult {
 }
 
 function parsePage(text: string): OverallPageResult | StagePageResult | null {
-  const overallMatch = /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Match\s+Results/i.exec(
-    text,
-  );
+  // Dos formatos soportados:
+  //  - WinMSS clásico: "X -- Overall (Match|Stage) Results"
+  //  - ESS: "X - Results Overall" (overall) y "X - Results Stage N" (stages)
+  const overallMatch =
+    /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Match\s+Results/i.exec(text) ??
+    /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Overall(?!\s+Stage)/i.exec(text);
   const stageHeaderMatch =
-    /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Stage\s+Results/i.exec(text);
+    /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Stage\s+Results/i.exec(text) ??
+    /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Stage\s+\d+/i.exec(text);
 
   if (!overallMatch && !stageHeaderMatch) return null;
 
   const divisionRaw = (overallMatch?.[1] ?? stageHeaderMatch?.[1] ?? "")
     .trim()
+    .replace(/\s+/g, " ")
     .toUpperCase();
-  const divisionCode = DIVISION_NAME_TO_CODE[divisionRaw];
+  // Probamos lookup con el texto tal como vino, y también sin espacios.
+  // Ej.: en algunos PDFs `pdfjs` rompe la palabra "PISTOLA" en dos items
+  // ("P" + "ISTOLA") por kerning, y nuestra reconstrucción posicional los
+  // junta con un espacio. Sacar espacios cubre ese caso sin afectar
+  // divisiones legítimamente multi-palabra (que matchean en el primer
+  // lookup).
+  const divisionCode =
+    DIVISION_NAME_TO_CODE[divisionRaw] ??
+    DIVISION_NAME_TO_CODE[divisionRaw.replace(/\s+/g, "")];
   if (!divisionCode) {
     // División desconocida: ignoramos esta página silenciosamente. El
     // resto del PDF sigue siendo válido.
@@ -297,8 +376,17 @@ function extractMatchName(text: string): string {
         "",
       )
       .replace(/World\s+Classification\s+System(\s+used)?/gi, "")
+      .replace(/ESS\s*-\s*Electronic\s+Scoring\s+System/gi, "")
       .replace(/Page\s+\d+/gi, "")
+      .replace(/\d+\s+of\s+\d+/g, "") // ESS footer "1 of 8"
       .replace(/\d{4}\s+at\s+[\d:]+/g, "")
+      .replace(/\d{4}\s+\d{1,2}:\d{2}(:\d{2})?/g, "") // ESS "2026 21:33:24"
+      // ESS header: "X - Results Overall" o "X - Results Stage N"
+      .replace(/[A-Z][A-Z0-9\s]*?\s+-\s*Results\s+(Overall|Stage\s+\d+)/gi, "")
+      .replace(
+        /Printed:?\s+[A-Za-z]+\s+\d{1,2},?(\s+\d{4})?(\s+[\d:]+)?/gi,
+        "",
+      )
       .replace(/\s+/g, " ")
       .trim();
 
@@ -385,9 +473,32 @@ function matchesRepetition(line: string, prefix: string): boolean {
 }
 
 function extractDate(text: string): string {
-  const m = /Printed\s+([a-záéíóúñ]+)\s+(\d{1,2}),?\s+(\d{4})/i.exec(text);
+  // Prioridad 1: fecha embebida en el título con formato "DD MES YYYY"
+  // (ej. "SEGUNDO SOCIAL PISTOLA 9 MAYO 2026"). Es la fecha real del
+  // certamen — la del "Printed:" puede ser días después (cuando se generó
+  // el PDF) y eso confunde al tirador.
+  //
+  // El orden de los tokens (DD primero) la distingue del formato de
+  // "Printed: May 11, 2026" (MONTH primero), así que la regex no se
+  // confunde aunque ambas líneas estén en el mismo texto.
+  const titleMatch = /\b(\d{1,2})\s+([A-Za-záéíóúñ]+)\s+(\d{4})\b/.exec(text);
+  if (titleMatch) {
+    const day = parseInt(titleMatch[1]!, 10);
+    const name = titleMatch[2]!.toLowerCase();
+    const month = SPANISH_MONTHS[name] ?? ENGLISH_MONTHS[name];
+    if (month && day >= 1 && day <= 31) {
+      return `${titleMatch[3]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  // Fallback: fecha de "Printed:" (formato "MONTH DD, YYYY").
+  //  - WinMSS clásico: "Printed mayo 2, 2026" (sin colon, mes en español)
+  //  - ESS: "Printed: May 11, 2026" (con colon, mes en inglés)
+  const m =
+    /Printed[:\s]+([A-Za-záéíóúñ]+)\s+(\d{1,2}),?\s+(\d{4})/i.exec(text);
   if (!m) return "";
-  const month = SPANISH_MONTHS[m[1]!.toLowerCase()];
+  const name = m[1]!.toLowerCase();
+  const month = SPANISH_MONTHS[name] ?? ENGLISH_MONTHS[name];
   if (!month) return "";
   return `${m[3]}-${String(month).padStart(2, "0")}-${m[2]!.padStart(2, "0")}`;
 }
@@ -404,35 +515,66 @@ function extractStageNumber(text: string): number | null {
 function parseOverallRows(
   text: string,
 ): Array<Omit<ParsedMatchEntry, "divisionCode">> {
-  const ROW_RE = /^\s*(\d+)\s+(\d+,\d+)\s+(\d+,\d+)\s+(\d+)\s+(.+?)\s*$/;
+  // Acepta decimales con coma (WinMSS, es-AR) o punto (ESS, en-US).
+  const ROW_RE = /^\s*(\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+)\s+(.+?)\s*$/;
+  // Filas DQ del formato ESS: no traen columnas de %/points/place — solo
+  // dorsal, nombre y el marker "DQ" al final. Ej: "39 SGUERA, Santino DQ".
+  const DQ_ROW_RE = /^\s*(\d+)\s+(.+?)\s+DQ\s*$/;
   const out: Array<Omit<ParsedMatchEntry, "divisionCode">> = [];
   for (const line of text.split(/\n/)) {
     const m = ROW_RE.exec(line);
-    if (!m) continue;
-    const place = parseInt(m[1]!, 10);
-    const matchPercentage = parseDecimalComma(m[2]!);
-    const matchPoints = parseDecimalComma(m[3]!);
-    const { name, meta } = splitNameFromMeta(m[5]!);
-    if (!name) continue;
-    out.push({
-      shooter: {
-        fullName: name,
-        memberNumber: null,
-        // La columna "Reg" del PDF es la federación regional IPSC del
-        // tirador (ARG, CAN, etc.) — la guardamos como region del shooter.
-        region: meta.reg ?? null,
-      },
-      classification: meta.cls ?? null,
-      powerFactor: null,
-      category: meta.cat ?? null,
-      place,
-      matchPoints,
-      matchPercentage,
-      totalTimeSeconds: null,
-      hits: null, // IPSC scoring es hit factor, no impactos.
-      // Si el tirador terminó con 0 puntos, lo marcamos como DQ.
-      isDq: matchPoints === 0,
-    });
+    if (m) {
+      const place = parseInt(m[1]!, 10);
+      const matchPercentage = parseDecimalComma(m[2]!);
+      const matchPoints = parseDecimalComma(m[3]!);
+      const { name, meta } = splitNameFromMeta(m[5]!);
+      if (!name) continue;
+      out.push({
+        shooter: {
+          fullName: name,
+          memberNumber: null,
+          // La columna "Reg" del PDF es la federación regional IPSC del
+          // tirador (ARG, CAN, etc.) — la guardamos como region del shooter.
+          region: meta.reg ?? null,
+        },
+        classification: meta.cls ?? null,
+        powerFactor: null,
+        category: meta.cat ?? null,
+        place,
+        matchPoints,
+        matchPercentage,
+        totalTimeSeconds: null,
+        hits: null, // IPSC scoring es hit factor, no impactos.
+        // Si el tirador terminó con 0 puntos, lo marcamos como DQ.
+        isDq: matchPoints === 0,
+      });
+      continue;
+    }
+    const dq = DQ_ROW_RE.exec(line);
+    if (dq) {
+      // Filas DQ del formato ESS. No tenemos place/points/% reales — los
+      // dejamos en 0 y la UI los muestra con badge "DQ" porque isDq=true.
+      // El nombre puede o no tener Cat/Reg trailing; reusamos el splitter
+      // de meta para limpiar.
+      const { name, meta } = splitNameFromMeta(dq[2]!);
+      if (!name) continue;
+      out.push({
+        shooter: {
+          fullName: name,
+          memberNumber: null,
+          region: meta.reg ?? null,
+        },
+        classification: meta.cls ?? null,
+        powerFactor: null,
+        category: meta.cat ?? null,
+        place: 0,
+        matchPoints: 0,
+        matchPercentage: 0,
+        totalTimeSeconds: null,
+        hits: null,
+        isDq: true,
+      });
+    }
   }
   return out;
 }
@@ -444,8 +586,9 @@ function parseOverallRows(
 function parseStageRows(
   text: string,
 ): Array<Omit<ParsedStageResult, "divisionCode">> {
+  // Acepta decimales con coma (WinMSS, es-AR) o punto (ESS, en-US).
   const ROW_RE =
-    /^\s*(\d+)\s+(\d+)\s+(\d+,\d+)\s+(\d+,\d+)\s+(\d+,\d+)\s+(\d+,\d+)\s+(\d+)\s+(.+?)\s*$/;
+    /^\s*(\d+)\s+(\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+)\s+(.+?)\s*$/;
   const out: Array<Omit<ParsedStageResult, "divisionCode">> = [];
   for (const line of text.split(/\n/)) {
     const m = ROW_RE.exec(line);
@@ -617,6 +760,35 @@ function reconstructTextByPosition(items: unknown[]): string {
       rows.push([item]);
     }
   }
-  for (const row of rows) row.sort((a, b) => a.x - b.x);
-  return rows.map((row) => row.map((i) => i.str).join(" ")).join("\n");
+  // Ordenamos por X dentro de cada fila y deduplicamos artefactos de
+  // bold-rendering: algunos PDFs simulan texto en negrita dibujando el
+  // mismo glyph 2-4 veces con un offset horizontal chico (<1pt). Sin esta
+  // dedup el header "% Points Competitor..." sale como "% % % % Points
+  // Points Points Points..." y termina contaminando la extracción del
+  // título.
+  //
+  // Estrategia: si dos items consecutivos tienen la MISMA string y la X
+  // difiere en menos de X_DEDUP_TOL, asumimos artefacto. Las columnas
+  // reales en una tabla están separadas por mucho más (5pt+) así que
+  // este threshold no debería pisar contenido legítimo.
+  const X_DEDUP_TOL = 2;
+  const dedupedRows = rows.map((row) => {
+    row.sort((a, b) => a.x - b.x);
+    const out: Item[] = [];
+    for (const item of row) {
+      const last = out[out.length - 1];
+      if (
+        last &&
+        last.str === item.str &&
+        Math.abs(item.x - last.x) <= X_DEDUP_TOL
+      ) {
+        continue;
+      }
+      out.push(item);
+    }
+    return out;
+  });
+  return dedupedRows
+    .map((row) => row.map((i) => i.str).join(" "))
+    .join("\n");
 }
