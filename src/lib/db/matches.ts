@@ -116,7 +116,7 @@ export async function listEntriesByShooters(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, total_time_seconds, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name, scoring_type))",
+      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name, scoring_type))",
     )
     .in("shooter_id", shooterIds)
     .order("matches(date)", { ascending: false });

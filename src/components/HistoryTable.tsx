@@ -107,6 +107,14 @@ export function HistoryTable({
     return list;
   }, [entries, discipline, division, factor, club, sort]);
 
+  // Mostramos columna "Impactos" solo si al menos una fila filtrada la tiene
+  // (Tiro FBI). Calculado sobre `filtered` para que al cambiar el filtro de
+  // disciplina la columna aparezca/desaparezca según haga sentido.
+  const showHits = useMemo(
+    () => filtered.some((e) => e.hits !== null),
+    [filtered],
+  );
+
   return (
     <div>
       <div
@@ -195,6 +203,7 @@ export function HistoryTable({
                 <TH>División</TH>
                 <TH>Factor</TH>
                 <TH className="text-right">Puesto</TH>
+                {showHits && <TH className="text-right">Impactos</TH>}
                 <TH className="text-right">%</TH>
               </TR>
             </THead>
@@ -203,6 +212,9 @@ export function HistoryTable({
                 const clubName = getClubName(e.matches?.region);
                 const clubCode = getClubCode(e.matches?.region);
                 const disc = e.matches?.disciplines;
+                // Fila FBI (o cualquier hits-based): destacamos impactos y
+                // bajamos énfasis del %.
+                const hasHits = e.hits !== null;
                 return (
                   <TR key={e.id}>
                     <TD className="whitespace-nowrap font-mono text-fg-muted">
@@ -242,7 +254,17 @@ export function HistoryTable({
                     <TD className="text-right font-mono">
                       {e.is_dq ? <Badge tone="danger">DQ</Badge> : e.place}
                     </TD>
-                    <TD className="text-right font-mono">
+                    {showHits && (
+                      <TD className="text-right font-mono font-semibold text-fg">
+                        {e.is_dq ? "—" : (e.hits ?? "—")}
+                      </TD>
+                    )}
+                    <TD
+                      className={cn(
+                        "text-right font-mono",
+                        hasHits && "text-fg-muted",
+                      )}
+                    >
                       {e.is_dq ? "—" : formatPercent(e.match_percentage)}
                     </TD>
                   </TR>

@@ -8,9 +8,18 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 /**
  * Bloque de KPIs + chart para el historial del tirador.
  * Se renderiza solo si hay al menos un torneo válido (no DQ).
+ *
+ * Si el tirador tiene matches con impactos (Tiro FBI), aparecen también:
+ *  - KPIs de impactos (promedio / mejor)
+ *  - Gráfica adicional de evolución de impactos
  */
 export function StatsOverview({ stats }: { stats: ShooterStats }) {
   if (stats.scoredMatches === 0) return null;
+
+  // ¿Hay al menos 2 puntos con impactos? Si sí, mostramos KPIs y gráfica
+  // de impactos además de los de %. (≥2 porque la gráfica necesita 2 puntos.)
+  const hitsTimelineCount = stats.timeline.filter((p) => p.hits !== null).length;
+  const hasHits = hitsTimelineCount >= 2;
 
   return (
     <div className="space-y-4">
@@ -68,6 +77,36 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
         />
       </div>
 
+      {/* Fila de KPIs de impactos (Tiro FBI) */}
+      {hasHits && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Promedio impactos"
+            value={
+              stats.avgHits !== null ? stats.avgHits.toFixed(1) : "—"
+            }
+            hint={`sobre ${hitsTimelineCount} torneo${hitsTimelineCount === 1 ? "" : "s"} FBI`}
+          />
+          <KpiCard
+            label="Mejor impactos"
+            value={
+              stats.bestHits ? String(stats.bestHits.value) : "—"
+            }
+            hint={
+              stats.bestHits ? (
+                <Link
+                  href={`/matches/${stats.bestHits.matchId}/me`}
+                  className="hover:text-accent"
+                  title={stats.bestHits.matchName}
+                >
+                  {formatDate(stats.bestHits.date)}
+                </Link>
+              ) : undefined
+            }
+          />
+        </div>
+      )}
+
       {/* Fila 2: KPIs derivados (estado actual + proyección) */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <PercentileCard
@@ -79,19 +118,29 @@ export function StatsOverview({ stats }: { stats: ShooterStats }) {
         <CadenceCard cadence={stats.cadence} />
       </div>
 
-      {/* Chart */}
+      {/* Chart de evolución del Match % */}
       <Card className="px-5 py-4">
         <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-          Evolución
+          Evolución del %
         </p>
         {stats.timeline.length >= 2 ? (
-          <PerformanceChart points={stats.timeline} />
+          <PerformanceChart points={stats.timeline} mode="percentage" />
         ) : (
           <p className="mt-3 text-sm text-fg-subtle">
             Necesitás al menos 2 torneos para ver la evolución.
           </p>
         )}
       </Card>
+
+      {/* Chart de evolución de impactos (Tiro FBI) */}
+      {hasHits && (
+        <Card className="px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
+            Evolución de impactos
+          </p>
+          <PerformanceChart points={stats.timeline} mode="hits" />
+        </Card>
+      )}
 
       {stats.byDiscipline.length > 1 && (
         <Card className="px-5 py-4">

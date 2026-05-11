@@ -13,6 +13,7 @@ function entry(overrides: Partial<EntryInput> = {}): MyEntryRow {
     date: "2026-01-01",
     place: 1,
     matchPercentage: 100,
+    hits: null,
     isDq: false,
     divisionCode: "PR",
     divisionName: "Production",
@@ -26,6 +27,7 @@ function entry(overrides: Partial<EntryInput> = {}): MyEntryRow {
     match_points: 0,
     match_percentage: e.matchPercentage,
     total_time_seconds: null,
+    hits: e.hits,
     is_dq: e.isDq,
     power_factor: null,
     category: null,
@@ -47,6 +49,7 @@ interface EntryInput {
   date: string;
   place: number;
   matchPercentage: number;
+  hits: number | null;
   isDq: boolean;
   divisionCode: string;
   divisionName: string;
@@ -367,5 +370,47 @@ describe("computeShooterStats — timeline", () => {
     ]);
     expect(s.timeline).toHaveLength(2);
     expect(s.timeline[0]?.isDq).toBe(true);
+  });
+});
+
+describe("computeShooterStats — impactos (FBI)", () => {
+  it("null para avgHits/bestHits cuando ningún entry tiene hits", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", hits: null }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", hits: null }),
+    ]);
+    expect(s.avgHits).toBeNull();
+    expect(s.bestHits).toBeNull();
+  });
+
+  it("computa avgHits sobre entries con hits != null", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", hits: 30 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", hits: 38 }),
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", hits: 40 }),
+    ]);
+    expect(s.avgHits).toBeCloseTo(36, 5);
+    expect(s.bestHits?.value).toBe(40);
+    expect(s.bestHits?.matchId).toBe("mc");
+  });
+
+  it("ignora DQs al computar avgHits/bestHits", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", hits: 40, isDq: true }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", hits: 35 }),
+    ]);
+    // DQ aporta 40 hits, pero se excluye → avg = 35.
+    expect(s.avgHits).toBe(35);
+    expect(s.bestHits?.value).toBe(35);
+  });
+
+  it("ignora entries sin hits al promediar (mix de disciplinas)", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", hits: null }), // IPSC
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", hits: 36 }), // FBI
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", hits: 40 }), // FBI
+    ]);
+    expect(s.avgHits).toBe(38);
+    expect(s.bestHits?.value).toBe(40);
   });
 });

@@ -440,6 +440,12 @@ async function findOrCreateShooter(
   supabase: SupabaseClient,
   parsed: ParsedShooter,
 ): Promise<string> {
+  // Usamos `limit(1)` + orden estable en lugar de `maybeSingle()` porque
+  // este último devuelve null silenciosamente cuando hay >1 match —
+  // típicamente porque ya hay shooters duplicados en la DB de imports
+  // anteriores. Si ese null caía a INSERT, generábamos un duplicado más.
+  // Acá, si encontramos al menos uno, lo reusamos (preferimos los que
+  // tienen claim para no romper el linkeo del usuario).
   let query = supabase
     .from("shooters")
     .select("id")
@@ -451,8 +457,11 @@ async function findOrCreateShooter(
     query = query.is("member_number", null);
   }
 
-  const { data: existing } = await query.maybeSingle();
-  if (existing) return existing.id as string;
+  const { data: existing } = await query
+    .order("linked_user_id", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (existing && existing.length > 0) return existing[0]!.id as string;
 
   const { data: created, error } = await supabase
     .from("shooters")

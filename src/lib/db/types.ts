@@ -82,6 +82,8 @@ export interface MyEntryRow {
   match_points: number;
   match_percentage: number;
   total_time_seconds: number | null;
+  /** Impactos (Tiro FBI). NULL en disciplinas no hits-based. */
+  hits: number | null;
   is_dq: boolean;
   power_factor: "Min" | "Maj" | null;
   category: string | null;

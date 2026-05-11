@@ -5,23 +5,39 @@ import { cn, formatDate, formatPercent } from "@/lib/utils";
 import type { MatchTimelinePoint } from "@/lib/stats/shooter-stats";
 
 /**
- * Line chart en SVG puro (sin libs) que muestra la evolución del Match %
- * a lo largo de los torneos. Hover muestra tooltip con detalle.
+ * Line chart en SVG puro (sin libs) que muestra la evolución temporal de
+ * una métrica del tirador a lo largo de los torneos.
  *
- * - Eje X: orden cronológico (los gaps de fecha se "comprimen" para que la
- *   línea sea legible aun cuando hay períodos sin matches).
- * - Eje Y: 0 a max(100, mejor%) con margen.
- * - Los DQ se dibujan como puntos rojos en y=0.
+ * Modos:
+ *  - `"percentage"` (default): grafica `matchPercentage`. Eje Y de 0 a 100+
+ *    con grid en 0/25/50/75/100. DQs en y=0.
+ *  - `"hits"`: grafica `hits` (Tiro FBI). Eje Y de 0 a 40 con grid en
+ *    0/10/20/30/40. Filtra puntos sin hits (otras disciplinas).
+ *
+ * Comportamiento común:
+ *  - Eje X: orden cronológico (los gaps de fecha se "comprimen" para que la
+ *    línea sea legible aun cuando hay períodos sin matches).
+ *  - DQs se dibujan como puntos rojos sobre y=0.
+ *  - Hover muestra tooltip con detalle.
  */
-export function PerformanceChart({
-  points,
-}: {
+
+type Mode = "percentage" | "hits";
+
+interface PerformanceChartProps {
   points: MatchTimelinePoint[];
-}) {
+  mode?: Mode;
+}
+
+export function PerformanceChart({ points, mode = "percentage" }: PerformanceChartProps) {
   const [hover, setHover] = useState<number | null>(null);
   const gradientId = useId();
 
-  if (points.length < 2) return null;
+  // Para "hits", excluimos puntos sin hits (matches de IPSC/Steel cuando el
+  // dashboard es consolidado). Si no quedan al menos 2 puntos, no graficamos.
+  const filteredPoints =
+    mode === "hits" ? points.filter((p) => p.hits !== null) : points;
+
+  if (filteredPoints.length < 2) return null;
 
   const W = 600;
   const H = 180;
@@ -32,26 +48,44 @@ export function PerformanceChart({
   const innerW = W - PAD_L - PAD_R;
   const innerH = H - PAD_T - PAD_B;
 
-  const yMax = Math.max(
-    100,
-    ...points.filter((p) => !p.isDq).map((p) => p.matchPercentage),
-  );
+  // Accessor del valor para cada modo.
+  const valueOf = (p: MatchTimelinePoint): number =>
+    mode === "hits" ? (p.hits ?? 0) : p.matchPercentage;
+
+  const formatValue = (v: number) =>
+    mode === "hits" ? String(Math.round(v)) : formatPercent(v);
+
+  const yMax =
+    mode === "hits"
+      ? 40 // FBI: 8 stages × 5 disparos = 40 impactos máximo.
+      : Math.max(
+          100,
+          ...filteredPoints.filter((p) => !p.isDq).map((p) => p.matchPercentage),
+        );
   const yMin = 0;
 
+  const gridYs =
+    mode === "hits"
+      ? [0, 10, 20, 30, 40]
+      : [0, 25, 50, 75, 100].filter((v) => v <= yMax);
+
   const xFor = (i: number) =>
-    PAD_L + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+    PAD_L +
+    (filteredPoints.length === 1
+      ? innerW / 2
+      : (i / (filteredPoints.length - 1)) * innerW);
   const yFor = (v: number) =>
     PAD_T + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
 
   // Línea solo con los no-DQ (los DQ se muestran como puntos sueltos).
-  const linePoints = points
+  const linePoints = filteredPoints
     .map((p, i) => ({ p, i }))
     .filter(({ p }) => !p.isDq);
 
   const pathD = linePoints
     .map(({ p, i }, idx) => {
       const x = xFor(i);
-      const y = yFor(p.matchPercentage);
+      const y = yFor(valueOf(p));
       return `${idx === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
@@ -60,10 +94,13 @@ export function PerformanceChart({
     ? `${pathD} L${xFor(linePoints[linePoints.length - 1]!.i).toFixed(1)},${yFor(0).toFixed(1)} L${xFor(linePoints[0]!.i).toFixed(1)},${yFor(0).toFixed(1)} Z`
     : "";
 
-  const gridYs = [0, 25, 50, 75, 100].filter((v) => v <= yMax);
-
   // Para los X labels mostramos máximo ~5 puntos para no saturar.
-  const xLabelStep = Math.max(1, Math.ceil(points.length / 5));
+  const xLabelStep = Math.max(1, Math.ceil(filteredPoints.length / 5));
+
+  const ariaLabel =
+    mode === "hits"
+      ? "Evolución de impactos"
+      : "Evolución del match percentage";
 
   return (
     <div className="mt-3">
@@ -71,7 +108,7 @@ export function PerformanceChart({
         viewBox={`0 0 ${W} ${H}`}
         className="h-44 w-full"
         role="img"
-        aria-label="Evolución del match percentage"
+        aria-label={ariaLabel}
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -121,9 +158,9 @@ export function PerformanceChart({
         )}
 
         {/* Puntos */}
-        {points.map((p, i) => {
+        {filteredPoints.map((p, i) => {
           const cx = xFor(i);
-          const cy = p.isDq ? yFor(0) : yFor(p.matchPercentage);
+          const cy = p.isDq ? yFor(0) : yFor(valueOf(p));
           const isHover = hover === i;
           return (
             <g key={p.matchId + i}>
@@ -149,15 +186,15 @@ export function PerformanceChart({
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover(null)}
                 tabIndex={0}
-                aria-label={`${p.matchName}: ${p.isDq ? "DQ" : formatPercent(p.matchPercentage)}`}
+                aria-label={`${p.matchName}: ${p.isDq ? "DQ" : formatValue(valueOf(p))}`}
               />
             </g>
           );
         })}
 
         {/* X labels */}
-        {points.map((p, i) => {
-          if (i % xLabelStep !== 0 && i !== points.length - 1) return null;
+        {filteredPoints.map((p, i) => {
+          if (i % xLabelStep !== 0 && i !== filteredPoints.length - 1) return null;
           return (
             <text
               key={`xl-${i}`}
@@ -173,22 +210,22 @@ export function PerformanceChart({
         })}
       </svg>
 
-      {hover !== null && points[hover] && (
+      {hover !== null && filteredPoints[hover] && (
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs">
-          <span className="font-medium">{points[hover].matchName}</span>
+          <span className="font-medium">{filteredPoints[hover].matchName}</span>
           <span className="text-fg-muted">
-            {formatDate(points[hover].date)}
+            {formatDate(filteredPoints[hover].date)}
           </span>
           <span className="text-fg-muted">
-            {points[hover].divisionCode}
+            {filteredPoints[hover].divisionCode}
           </span>
           <span className="ml-auto font-mono">
-            {points[hover].isDq
+            {filteredPoints[hover].isDq
               ? "DQ"
-              : formatPercent(points[hover].matchPercentage)}
-            {!points[hover].isDq && (
+              : formatValue(valueOf(filteredPoints[hover]))}
+            {!filteredPoints[hover].isDq && (
               <span className="ml-2 text-fg-subtle">
-                puesto #{points[hover].place}
+                puesto #{filteredPoints[hover].place}
               </span>
             )}
           </span>

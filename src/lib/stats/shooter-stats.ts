@@ -21,6 +21,11 @@ export interface MatchTimelinePoint {
    * Null si no se conoce el total.
    */
   percentile: number | null;
+  /**
+   * Impactos del tirador en el match. Sólo poblado para disciplinas hits-based
+   * (Tiro FBI: 0..40). Null en IPSC y Steel.
+   */
+  hits: number | null;
   divisionCode: string;
   divisionName: string;
   disciplineCode: string;
@@ -69,6 +74,13 @@ export interface ShooterStats {
   bestPercentage: MatchHighlight | null;
   /** Tu mejor puesto (numéricamente más bajo). null si no hay. */
   bestPlace: MatchHighlight | null;
+  /**
+   * Promedio de impactos en torneos válidos donde hits != null (Tiro FBI).
+   * Null si no hay matches con hits.
+   */
+  avgHits: number | null;
+  /** Tu mejor cantidad de impactos. Null si no hay matches con hits. */
+  bestHits: MatchHighlight | null;
   /**
    * Percentil promedio dentro de tu división (place/total × 100).
    * Más bajo = mejor (top 10% > top 30%). Null si no hay datos de tamaño.
@@ -138,6 +150,18 @@ export function computeShooterStats(
     ? scored.reduce((best, p) => (p.place < best.place ? p : best))
     : null;
 
+  // Stats de impactos: solo sobre puntos con hits != null (FBI).
+  const withHits = scored.filter(
+    (p): p is MatchTimelinePoint & { hits: number } => p.hits !== null,
+  );
+  const avgHits =
+    withHits.length > 0
+      ? withHits.reduce((a, p) => a + p.hits, 0) / withHits.length
+      : null;
+  const bestHitsPoint = withHits.length
+    ? withHits.reduce((best, p) => (p.hits > best.hits ? p : best))
+    : null;
+
   // Percentiles: solo sobre matches con totalInDivision conocido.
   const withPercentile = scored.filter(
     (p): p is MatchTimelinePoint & { percentile: number } => p.percentile !== null,
@@ -184,6 +208,16 @@ export function computeShooterStats(
           divisionCode: bestPlace.divisionCode,
         }
       : null,
+    avgHits,
+    bestHits: bestHitsPoint
+      ? {
+          matchId: bestHitsPoint.matchId,
+          matchName: bestHitsPoint.matchName,
+          date: bestHitsPoint.date,
+          value: bestHitsPoint.hits,
+          divisionCode: bestHitsPoint.divisionCode,
+        }
+      : null,
     avgPercentile,
     bestPercentile: bestPercentilePoint
       ? {
@@ -227,6 +261,7 @@ function toTimelinePoints(
       place: e.place,
       totalInDivision: total,
       percentile,
+      hits: e.hits,
       divisionCode,
       divisionName: e.divisions?.name ?? "",
       disciplineCode: e.matches.disciplines?.code ?? "",
