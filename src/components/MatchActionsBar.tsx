@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -60,18 +60,108 @@ export function MatchActionsBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    // justify-end recuesta los botones contra el borde derecho del header,
+    // matcheando la posición que naturalmente tienen "Guardar/Cancelar" en
+    // el estado de edición (allá los empuja el Select que ocupa flex-1).
+    // Sin esto, en reposo flotan a la izquierda y se sienten desconectados.
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
         {currentRegion ? "Editar club" : "Asignar club"}
       </Button>
-      <form action={deleteMatch}>
-        <input type="hidden" name="match_id" value={matchId} />
-        {from && <input type="hidden" name="from" value={from} />}
-        <Button type="submit" variant="danger" size="sm">
-          Eliminar
-        </Button>
-      </form>
+      <DeleteButton matchId={matchId} from={from} />
     </div>
+  );
+}
+
+/**
+ * Eliminar match con confirmación inline de dos clicks:
+ *  1. Click → el botón cambia a "¿Confirmar?" con fondo rojo lleno y se
+ *     queda "armado". No se envía nada todavía.
+ *  2. Click otra vez (en el mismo botón) → ahora el form se envía.
+ *
+ * Salvavidas para que el estado armado no quede sentado esperando un
+ * misclick más tarde:
+ *  - Auto-revert a los 4s.
+ *  - Escape también cancela.
+ *
+ * No usamos `window.confirm()` porque es feo y rompe la estética del
+ * resto de la app; no usamos un Dialog modal porque hoy este es el único
+ * punto destructivo y un modal sería sobre-ingeniería.
+ */
+function DeleteButton({
+  matchId,
+  from,
+}: {
+  matchId: string;
+  from?: string;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  useEffect(() => {
+    if (!armed) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setArmed(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [armed]);
+
+  return (
+    <form action={deleteMatch}>
+      <input type="hidden" name="match_id" value={matchId} />
+      {from && <input type="hidden" name="from" value={from} />}
+      <DeleteSubmit armed={armed} onArm={() => setArmed(true)} />
+    </form>
+  );
+}
+
+/**
+ * Botón submit del form de eliminar. Separado porque `useFormStatus` solo
+ * funciona dentro de un `<form>`, y queremos mostrar "Eliminando…" mientras
+ * la action está en flight.
+ */
+function DeleteSubmit({
+  armed,
+  onArm,
+}: {
+  armed: boolean;
+  onArm: () => void;
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      variant="danger"
+      size="sm"
+      // Si NO está armed, interceptamos el click para armar en lugar de
+      // submitear. Si ya está armed (o pending), dejamos pasar.
+      onClick={
+        armed || pending
+          ? undefined
+          : (e) => {
+              e.preventDefault();
+              onArm();
+            }
+      }
+      disabled={pending}
+      aria-busy={pending}
+      // En estado armed pasamos a rojo lleno para que el cambio sea bien
+      // visible — el outline rojo solo no comunica suficiente "ojo, el
+      // próximo click sí borra".
+      className={
+        armed
+          ? "bg-danger text-bg border-danger hover:bg-danger"
+          : undefined
+      }
+    >
+      {pending ? "Eliminando…" : armed ? "¿Confirmar?" : "Eliminar"}
+    </Button>
   );
 }
 
@@ -151,15 +241,21 @@ function ClubForm({
  *  - "Guardar" muestra spinner + texto "Guardando…" y queda disabled
  *  - "Cancelar" también queda disabled, para que el usuario no oculte el form
  *    mid-update y termine confundido sobre si guardó o no
+ *
+ * Usamos `size="md"` (h-10) para que ambos botones matcheen la altura del
+ * Select (también h-10) — el form queda alineado en una sola línea visual.
+ * "Cancelar" va con `variant="secondary"` (borde + bg suave) en lugar de
+ * `ghost`: al lado del Guardar naranja sólido, ghost queda como texto sin
+ * peso visual; secondary lo balancea sin competir.
  */
 function FormButtons({ onCancel }: { onCancel: () => void }) {
   const { pending } = useFormStatus();
   return (
     <div className="flex gap-2">
-      <Button type="submit" size="sm" disabled={pending} aria-busy={pending}>
+      <Button type="submit" disabled={pending} aria-busy={pending}>
         {pending ? (
           <>
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             Guardando…
           </>
         ) : (
@@ -168,8 +264,7 @@ function FormButtons({ onCancel }: { onCancel: () => void }) {
       </Button>
       <Button
         type="button"
-        variant="ghost"
-        size="sm"
+        variant="secondary"
         onClick={onCancel}
         disabled={pending}
       >
