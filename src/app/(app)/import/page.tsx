@@ -54,7 +54,7 @@ export default async function ImportPage({
       </header>
 
       {(params.error || params.ok === "1") && (
-        <DismissOnSubmit key={resultKey(params)}>
+        <DismissOnSubmit key={`alerts:${resultKey(params)}`}>
           {params.error && (
             <Alert tone="danger" title="No se pudo importar" className="mb-6">
               {params.error}

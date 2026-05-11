@@ -21,6 +21,8 @@ export type DisciplineCode = (typeof DISCIPLINE)[keyof typeof DISCIPLINE];
 
 const TIME_BASED: Set<string> = new Set([DISCIPLINE.STEEL, DISCIPLINE.COMBAT]);
 
+const HITS_BASED: Set<string> = new Set([DISCIPLINE.FBI]);
+
 /**
  * True si la disciplina puntúa por tiempo total (Steel Challenge / Combat
  * Solutions). Acepta el code suelto, o el objeto `disciplines` embebido que
@@ -41,4 +43,21 @@ export function isTimeBasedDiscipline(
   if (input.scoring_type === "time_plus") return true;
   if (input.code && TIME_BASED.has(input.code)) return true;
   return false;
+}
+
+/**
+ * True si la disciplina rankea primariamente por cantidad de impactos
+ * (Tiro FBI). En estas disciplinas el campo `hits` de un entry/result es
+ * el criterio primario y el puntaje funciona como desempate.
+ */
+export function isHitsBasedDiscipline(
+  input:
+    | string
+    | { code?: string | null }
+    | null
+    | undefined,
+): boolean {
+  if (input == null) return false;
+  const code = typeof input === "string" ? input : input.code;
+  return !!code && HITS_BASED.has(code);
 }

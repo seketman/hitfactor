@@ -66,6 +66,8 @@ export interface MatchEntry {
   match_points: number;
   match_percentage: number;
   total_time_seconds: number | null;
+  /** Impactos (sólo Tiro FBI: 0..40 — ranking primario). NULL en IPSC/Steel. */
+  hits: number | null;
   is_dq: boolean;
 }
 

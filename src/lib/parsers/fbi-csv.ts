@@ -221,11 +221,16 @@ export function parseFbiCsv(content: string): ParsedMatch {
   }
 
   // Construimos matchEntries (con place + percentage por división).
+  //
+  // Criterio de ranking FBI: **impactos DESC, puntos DESC**. El criterio
+  // primario es la cantidad de disparos acertados (cuántas veces el tirador
+  // dio en el blanco); el puntaje es el desempate. Un tirador con 40
+  // impactos y 180 puntos le gana a otro con 39 impactos y 195 puntos.
   const matchEntries: ParsedMatchEntry[] = [];
   for (const [, group] of byDivision) {
     group.sort((a, b) => {
-      if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-      return b.impactos - a.impactos;
+      if (b.impactos !== a.impactos) return b.impactos - a.impactos;
+      return b.puntos - a.puntos;
     });
     const winnerPuntos = group[0]?.puntos ?? 0;
     group.forEach((e, i) => {

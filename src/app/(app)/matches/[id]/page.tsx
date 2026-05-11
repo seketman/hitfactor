@@ -17,6 +17,7 @@ import {
 } from "@/lib/db/matches";
 import { parseRegion } from "@/lib/clubs";
 import {
+  cn,
   formatDate,
   formatDateTime,
   formatNumber,
@@ -26,6 +27,7 @@ import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { claimShooter } from "@/lib/actions/claim";
 import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
+import { isHitsBasedDiscipline } from "@/lib/disciplines";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -57,6 +59,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const parsedClub = parseRegion(match.region);
   const clubLabel =
     parsedClub.clubName ?? parsedClub.clubCode ?? match.region ?? null;
+  // Tiro FBI rankea por impactos antes que por puntos — agregamos columna
+  // Impactos y bajamos el énfasis visual de Puntos en la tabla.
+  const isHitsBased = isHitsBasedDiscipline(match.disciplines);
 
   // Agrupar por división
   const byDivision = new Map<string, MatchEntryWithRelations[]>();
@@ -130,6 +135,12 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
         </Card>
       )}
 
+      {isHitsBased && (
+        <p className="-mt-4 mb-6 text-xs text-fg-subtle">
+          Ranking por <strong className="text-fg-muted">impactos</strong> (puntos como desempate).
+        </p>
+      )}
+
       {sortedDivisions.map((divCode) => {
         const list = byDivision.get(divCode)!;
         const divName = list[0].divisions?.name ?? divCode;
@@ -146,6 +157,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                     <TH className="w-12">#</TH>
                     <TH>Tirador</TH>
                     <TH>Categoría</TH>
+                    {isHitsBased && (
+                      <TH className="text-right">Impactos</TH>
+                    )}
                     <TH className="text-right">Puntos</TH>
                     <TH className="text-right">%</TH>
                     <TH className="w-28"></TH>
@@ -196,10 +210,25 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                             </span>
                           )}
                         </TD>
-                        <TD className="text-right font-mono">
+                        {isHitsBased && (
+                          <TD className="text-right font-mono font-semibold text-fg">
+                            {e.is_dq ? "—" : (e.hits ?? "—")}
+                          </TD>
+                        )}
+                        <TD
+                          className={cn(
+                            "text-right font-mono",
+                            isHitsBased && "text-fg-muted",
+                          )}
+                        >
                           {e.is_dq ? "—" : formatNumber(e.match_points, 2)}
                         </TD>
-                        <TD className="text-right font-mono">
+                        <TD
+                          className={cn(
+                            "text-right font-mono",
+                            isHitsBased && "text-fg-muted",
+                          )}
+                        >
                           {e.is_dq ? "—" : formatPercent(e.match_percentage)}
                         </TD>
                         <TD>

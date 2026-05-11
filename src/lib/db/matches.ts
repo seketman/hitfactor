@@ -50,7 +50,16 @@ export async function listStagesByMatch(
   return (data as Stage[] | null) ?? [];
 }
 
-/** Match entries con shooter + division embebidos, ordenados por % desc (DQ al final). */
+/**
+ * Match entries con shooter + division embebidos, ordenados por `place ASC`
+ * (DQ al final).
+ *
+ * Ordenamos por `place` y no por `match_percentage` para respetar el ranking
+ * computado por el parser de cada disciplina. En FBI por ejemplo el criterio
+ * primario son los impactos, así que un tirador puede tener place=1 con
+ * menos puntos (y por tanto menor %) que el de place=2 — ordenar por % daría
+ * un ranking inconsistente con el campo place.
+ */
 export async function listEntriesByMatch(
   supabase: SupabaseClient,
   matchId: string,
@@ -58,11 +67,11 @@ export async function listEntriesByMatch(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, is_dq, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
+      "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, hits, is_dq, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
     )
     .eq("match_id", matchId)
     .order("is_dq", { ascending: true })
-    .order("match_percentage", { ascending: false });
+    .order("place", { ascending: true });
   return (data as unknown as MatchEntryWithRelations[] | null) ?? [];
 }
 

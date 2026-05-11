@@ -127,6 +127,34 @@ describe("parseFbiCsv — Social 4", () => {
     }
   });
 
+  it("ordena el ranking por hits DESC, puntos DESC (no por puntos solo)", () => {
+    // Por cada división, dentro de los no-DQ, los entries en orden de place
+    // deben respetar: hits[i] >= hits[i+1], con desempate por puntos DESC.
+    const byDiv = new Map<string, typeof parsed.matchEntries>();
+    for (const e of parsed.matchEntries) {
+      if (e.isDq) continue;
+      const list = byDiv.get(e.divisionCode) ?? [];
+      list.push(e);
+      byDiv.set(e.divisionCode, list);
+    }
+    for (const [, list] of byDiv) {
+      list.sort((a, b) => a.place - b.place);
+      for (let i = 1; i < list.length; i++) {
+        const prev = list[i - 1]!;
+        const curr = list[i]!;
+        const prevH = prev.hits ?? 0;
+        const currH = curr.hits ?? 0;
+        if (prevH === currH) {
+          // Mismo hits → puntos del anterior >= puntos del actual.
+          expect(prev.matchPoints).toBeGreaterThanOrEqual(curr.matchPoints);
+        } else {
+          // Hits distintos → hits del anterior > hits del actual.
+          expect(prevH).toBeGreaterThan(currH);
+        }
+      }
+    }
+  });
+
   it("places por división son contiguos desde 1", () => {
     const byDivision = new Map<string, number[]>();
     for (const e of parsed.matchEntries) {
