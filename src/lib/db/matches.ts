@@ -141,11 +141,11 @@ export async function listMyEntriesInMatch(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, total_time_seconds, is_dq, power_factor, category, classification, divisions(code, name)",
+      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, power_factor, category, classification, divisions(code, name)",
     )
     .eq("match_id", matchId)
     .in("shooter_id", shooterIds)
-    .order("match_percentage", { ascending: false });
+    .order("place", { ascending: true });
 
   return (data ?? []) as unknown as MyMatchSummary["entry"][];
 }
@@ -163,7 +163,7 @@ export async function listStageResultsForEntry(
   const { data } = await supabase
     .from("stage_results")
     .select(
-      "id, points, penalties, time_seconds, hit_factor, stage_points, stage_percentage, place, is_dq, stages!inner(id, stage_number, name, match_id)",
+      "id, points, penalties, time_seconds, hit_factor, stage_points, stage_percentage, place, hits, is_dq, stages!inner(id, stage_number, name, match_id)",
     )
     .eq("match_entry_id", matchEntryId)
     .eq("stages.match_id", matchId);

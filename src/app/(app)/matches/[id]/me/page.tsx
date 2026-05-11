@@ -17,7 +17,7 @@ import {
   listMyFirearms,
 } from "@/lib/db/firearms";
 import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
-import { isTimeBasedDiscipline } from "@/lib/disciplines";
+import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import type { MyMatchSummary } from "@/lib/db/types";
 import { getClubCode, getClubName } from "@/lib/clubs";
 import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
@@ -105,6 +105,7 @@ export default async function PersonalMatchPage({
   const entry = requestedEntry ?? myEntries[0]!;
 
   const isTimeBased = isTimeBasedDiscipline(match.disciplines);
+  const isHitsBased = isHitsBasedDiscipline(match.disciplines);
   const clubCode = getClubCode(match.region);
   const clubName = getClubName(match.region);
 
@@ -154,6 +155,8 @@ export default async function PersonalMatchPage({
 
       {isTimeBased ? (
         <SteelSummaryCard entry={entry} />
+      ) : isHitsBased ? (
+        <FbiSummaryCard entry={entry} />
       ) : (
         <IpscSummaryCard entry={entry} />
       )}
@@ -183,6 +186,8 @@ export default async function PersonalMatchPage({
           </Card>
         ) : isTimeBased ? (
           <SteelStagesTable stageResults={stageResults} />
+        ) : isHitsBased ? (
+          <FbiStagesTable stageResults={stageResults} />
         ) : (
           <IpscStagesTable stageResults={stageResults} />
         )}
@@ -347,6 +352,83 @@ function SteelStagesTable({ stageResults }: { stageResults: MyMatchSummary["stag
                   : "—"}
               </TD>
               <TD className="text-right font-mono">
+                {r.is_dq ? "—" : formatPercent(r.stage_percentage)}
+              </TD>
+            </TR>
+          ))}
+        </TBody>
+      </Table>
+    </Card>
+  );
+}
+
+/**
+ * Resumen FBI: el dato primario es Impactos (criterio de ranking). Puntos y %
+ * quedan más muteados — coherente con el detalle público del match.
+ */
+function FbiSummaryCard({ entry }: { entry: EntrySummary }) {
+  return (
+    <Card className="mb-8">
+      <div className="grid grid-cols-2 gap-6 p-5 sm:grid-cols-5">
+        <Stat label="División">
+          {entry.divisions ? (
+            <span title={entry.divisions.name}>{entry.divisions.name}</span>
+          ) : (
+            "—"
+          )}
+        </Stat>
+        <Stat label="Categoría">{entry.category ?? "General"}</Stat>
+        <Stat label="Puesto">
+          {entry.is_dq ? <Badge tone="danger">DQ</Badge> : entry.place}
+        </Stat>
+        <Stat label="Impactos" mono>
+          {entry.is_dq || entry.hits == null ? "—" : `${entry.hits}/40`}
+        </Stat>
+        <Stat label="Puntos" mono>
+          {entry.is_dq ? "—" : formatNumber(entry.match_points, 0)}
+        </Stat>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Tabla de stages para FBI. Muestra impactos por stage (0..5) destacados,
+ * más puntos y % como datos secundarios. No hay tiempo ni hit factor.
+ */
+function FbiStagesTable({
+  stageResults,
+}: {
+  stageResults: MyMatchSummary["stageResults"];
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <Table>
+        <THead>
+          <TR>
+            <TH>Stage</TH>
+            <TH className="text-right">Puesto</TH>
+            <TH className="text-right">Impactos</TH>
+            <TH className="text-right">Puntos</TH>
+            <TH className="text-right">Stage %</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {stageResults.map((r) => (
+            <TR key={r.id}>
+              <TD>
+                <span className="font-medium">{stageLabel(r)}</span>
+              </TD>
+              <TD className="text-right font-mono">
+                {r.is_dq ? <Badge tone="danger">DQ</Badge> : r.place ?? "—"}
+              </TD>
+              <TD className="text-right font-mono font-semibold text-fg">
+                {r.is_dq || r.hits == null ? "—" : `${r.hits}/5`}
+              </TD>
+              <TD className="text-right font-mono text-fg-muted">
+                {r.is_dq ? "—" : formatNumber(r.stage_points, 0)}
+              </TD>
+              <TD className="text-right font-mono text-fg-muted">
                 {r.is_dq ? "—" : formatPercent(r.stage_percentage)}
               </TD>
             </TR>

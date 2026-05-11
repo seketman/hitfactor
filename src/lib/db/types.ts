@@ -107,6 +107,8 @@ export interface MyStageResultRow {
   stage_points: number;
   stage_percentage: number;
   place: number | null;
+  /** Impactos del stage (Tiro FBI: 0..5). NULL en IPSC/Steel. */
+  hits: number | null;
   is_dq: boolean;
   stages: {
     id: string;
@@ -191,6 +193,8 @@ export interface MyMatchSummary {
     match_points: number;
     match_percentage: number;
     total_time_seconds: number | null;
+    /** Impactos del match (Tiro FBI). NULL en otras disciplinas. */
+    hits: number | null;
     is_dq: boolean;
     power_factor: "Min" | "Maj" | null;
     category: string | null;
