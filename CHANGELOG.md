@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/seketman/hitfactor/compare/v1.0.0...v1.0.1) (2026-05-12)
+
+
+### Documentation
+
+* open-source the project under AGPL-3.0 ([792f974](https://github.com/seketman/hitfactor/commit/792f9746b5dc23ea74a4764f8ee33ebe21480664))
+
 ## [1.0.0](https://github.com/seketman/hitfactor/compare/v0.1.0...v1.0.0) (2026-05-12)
 
 
