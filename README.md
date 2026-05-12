@@ -1,9 +1,13 @@
 # HitFactor
 
+[![CI](https://github.com/seketman/hitfactor/actions/workflows/ci.yml/badge.svg)](https://github.com/seketman/hitfactor/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
+
 App para tiradores deportivos: importás los resultados de tus torneos
 (PractiScore HTML para Tiro Práctico / Steel Challenge, CSV de Google Sheets
-para Tiro FBI), seguís tu evolución match a match con KPIs y gráficos, y
-opcionalmente llevás el registro de las armas usadas y los tiros disparados.
+para Tiro FBI, PDF de WinMSS para IPSC), seguís tu evolución match a match
+con KPIs y gráficos, y opcionalmente llevás el registro de las armas usadas
+y los tiros disparados.
 
 ## Quickstart
 
@@ -99,3 +103,23 @@ tests/                  # vitest + fixtures reales de PractiScore y FBI
 - `firearms` · `match_firearm_log` — privados por usuario, RLS por owner.
 
 Ver [`docs/data-model.md`](./docs/data-model.md) para el detalle.
+
+## Contribuir
+
+Pull Requests bienvenidos. Antes de mandar uno, leé [CONTRIBUTING.md](./CONTRIBUTING.md)
+— tiene el setup local, las convenciones de commit (usamos
+[conventional commits](https://www.conventionalcommits.org) para que
+release-please calcule las versiones automáticamente), y el flujo de PR.
+
+¿Encontraste un bug o tenés una idea?
+[Abrí un issue](https://github.com/seketman/hitfactor/issues/new/choose).
+Para bugs de importación de archivos, **adjuntá el archivo** que falla —
+sin él no podemos reproducir.
+
+## Licencia
+
+[AGPL v3 o posterior](./LICENSE). En resumen: podés usar, modificar y
+redistribuir el código libremente; si lo hostás como servicio público
+(propio o forkeado), tu versión modificada también tiene que estar
+disponible bajo AGPL. Esto preserva que las mejoras de la comunidad
+queden abiertas para la comunidad.

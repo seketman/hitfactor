@@ -1,0 +1,42 @@
+name: Sugerir una feature
+description: Una idea, mejora, o nueva funcionalidad
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Las features se discuten primero acá antes de codear, así
+        evitamos retrabajos. Si la sugerencia es chica (un copy, un
+        ajuste visual) podés saltearte algunas secciones.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué problema resuelve
+      description: |
+        Describí el problema o pain point antes de hablar de la
+        solución. "Cuando importo X, no puedo Y porque Z."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Solución propuesta
+      description: Cómo te imaginás que debería funcionar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas que consideraste
+      description: Otras formas de resolver lo mismo, o por qué descartaste otras.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: |
+        Cualquier cosa que sume: screenshots/mockups, links a apps que lo
+        hacen parecido, casos de uso reales tuyos.

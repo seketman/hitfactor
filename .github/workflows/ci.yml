@@ -1,0 +1,43 @@
+name: CI
+
+# Corre en PRs hacia main y en pushes directos a main. La idea es que la
+# branch protection rule de "main" requiera que este workflow pase antes
+# de poder mergear cualquier PR.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancela runs vieja si entra una nueva al mismo branch/PR — ahorra minutos
+# de CI cuando alguien pushea fixes en rápida sucesión.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
+
+      # Build no es estrictamente necesario para validar correctitud del
+      # código (los tests + tsc ya cubren la mayoría), pero detectarlo en
+      # CI evita que un PR rompa el build de Vercel post-merge.
+      - name: Build
+        run: npm run build

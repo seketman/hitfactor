@@ -1,0 +1,58 @@
+name: Reportar un bug
+description: Algo no funciona como esperabas
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar! Cuanta más info incluyas, más rápido lo
+        resolvemos. Si es un bug de importación de archivo, por favor
+        adjuntá el archivo PDF/HTML/CSV que falla — sin él no podemos
+        reproducir.
+
+  - type: input
+    id: version
+    attributes:
+      label: Versión
+      description: La ves al pie del sidebar de la app (ej. `v1.2.0`).
+      placeholder: v1.0.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      description: |
+        Una lista numerada de qué hiciste, paso a paso. Mientras más
+        específico, mejor.
+      placeholder: |
+        1. Abrí /import
+        2. Subí el PDF adjunto
+        3. Esperé X segundos
+        4. Apareció el error Y
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Qué esperabas que pasara
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Qué pasó en realidad
+      description: Si hay un mensaje de error, copialo tal cual.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto adicional
+      description: |
+        Browser, OS, si pasa en local o producción, capturas, etc. Si es
+        un import, **adjuntá el archivo arrastrándolo a esta caja**.

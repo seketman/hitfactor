@@ -1,0 +1,8 @@
+# CODEOWNERS — auto-asigna reviewers a las PRs según los archivos tocados.
+# Sintaxis: <patrón>  @usuario1 @usuario2 ...
+# https://docs.github.com/en/repositories/managing-your-repositories-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Hoy hay un solo mantenedor; cuando sumemos más, los podemos dividir por
+# área (parsers, importer, UI, etc.).
+
+* @seketman
