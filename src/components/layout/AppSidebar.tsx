@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { listMyDisciplines } from "@/lib/db/shooters";
+import { APP_VERSION } from "@/lib/version";
 import { AppSidebarShell } from "./AppSidebarShell";
 
 interface AppSidebarProps {
@@ -33,6 +34,7 @@ export async function AppSidebar({
       userEmail={userEmail}
       memberSince={memberSince}
       disciplines={disciplines}
+      appVersion={APP_VERSION}
     />
   );
 }

@@ -34,6 +34,8 @@ interface AppSidebarShellProps {
   /** Fecha de creación de la cuenta (ISO YYYY-MM-DD). Tooltip-only. */
   memberSince?: string | null;
   disciplines: DisciplineEntry[];
+  /** Versión de la app (de package.json) — uso interno, render discreto. */
+  appVersion: string;
 }
 
 /**
@@ -51,6 +53,7 @@ export function AppSidebarShell({
   userEmail,
   memberSince,
   disciplines,
+  appVersion,
 }: AppSidebarShellProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -242,6 +245,15 @@ export function AppSidebarShell({
                 >
                   Acerca de & feedback
                 </Link>
+                {/* Versión: uso interno para verificar qué build corre cada
+                 * usuario cuando reportan bugs. Render bien discreto —
+                 * mono, 10px, color subtle, centrado. */}
+                <p
+                  className="mt-1 text-center font-mono text-[10px] tracking-tight text-fg-subtle"
+                  title={`HitFactor v${appVersion}`}
+                >
+                  v{appVersion}
+                </p>
               </div>
             </>
           )}

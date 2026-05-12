@@ -1,0 +1,24 @@
+name: release-please
+
+# Corre en cada push a main. release-please es idempotente: si no hay
+# commits nuevos desde el último release, no hace nada. Si hay commits
+# nuevos abre/actualiza una PR titulada "chore(main): release X.Y.Z" con
+# el bump calculado y el CHANGELOG.md acumulado. Cuando se mergea esa PR,
+# crea el tag git + GitHub Release automáticamente.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
