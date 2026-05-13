@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/seketman/hitfactor/compare/v1.0.2...v1.1.0) (2026-05-13)
+
+
+### Features
+
+* **clubs:** seed federated IPSC Argentina clubs from FATP ([#11](https://github.com/seketman/hitfactor/issues/11)) ([45a1112](https://github.com/seketman/hitfactor/commit/45a111294f3cb015e245e2db355eec9102f48c08))
+
 ## [1.0.2](https://github.com/seketman/hitfactor/compare/v1.0.1...v1.0.2) (2026-05-12)
 
 
