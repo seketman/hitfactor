@@ -163,6 +163,12 @@ export interface Club {
   code: string;
   name: string;
   country: string | null;
+  /**
+   * Zona geográfica FATP (Atlántica, Centro, Cuyo, Litoral, Metropolitana,
+   * Noreste, Noroeste, Patagónica). Nullable: clubes fuera del esquema
+   * FATP (extranjeros, etc.) pueden quedar sin zona.
+   */
+  zone: string | null;
 }
 
 export interface Firearm {
