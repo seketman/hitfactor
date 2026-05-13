@@ -11,7 +11,7 @@ import type { Club } from "./types";
 export async function listClubs(supabase: SupabaseClient): Promise<Club[]> {
   const { data } = await supabase
     .from("clubs")
-    .select("code, name, country")
+    .select("code, name, country, zone")
     .order("name", { ascending: true });
   return (data as Club[] | null) ?? [];
 }
