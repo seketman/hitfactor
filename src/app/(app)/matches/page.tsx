@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { MatchList } from "@/components/MatchList";
 import { requireUser } from "@/lib/supabase/require-user";
 import { listAllMatches } from "@/lib/db/matches";
+import { listClubs } from "@/lib/db/clubs";
 
 /**
  * Listado de todos los matches del sistema. Antes vivía como sección dentro
@@ -19,7 +20,10 @@ export default async function MatchesPage() {
 
   // 200 cubre cómodo el rango de un usuario activo. Si el sistema crece y
   // hace falta paginar, este es el punto a mejorar.
-  const matches = await listAllMatches(supabase, 200);
+  const [matches, clubs] = await Promise.all([
+    listAllMatches(supabase, 200),
+    listClubs(supabase),
+  ]);
 
   return (
     <PageContainer>
@@ -48,7 +52,12 @@ export default async function MatchesPage() {
           </Link>
         </Card>
       ) : (
-        <MatchList matches={matches} userId={user.id} from="/matches" />
+        <MatchList
+          matches={matches}
+          userId={user.id}
+          from="/matches"
+          clubs={clubs}
+        />
       )}
     </PageContainer>
   );

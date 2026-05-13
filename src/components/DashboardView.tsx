@@ -7,6 +7,7 @@ import { StatsOverview } from "@/components/StatsOverview";
 import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
+import { listClubs } from "@/lib/db/clubs";
 import {
   getDivisionSizes,
   listEntriesByShooters,
@@ -39,9 +40,10 @@ export async function DashboardView({
   const userId = user.id;
   const isConsolidated = disciplineCode === null;
 
-  const [profile, myShooters] = await Promise.all([
+  const [profile, myShooters, clubs] = await Promise.all([
     getProfile(supabase, userId),
     listMyShooters(supabase, userId),
+    listClubs(supabase),
   ]);
 
   const allEntries = await listEntriesByShooters(
@@ -98,6 +100,7 @@ export async function DashboardView({
           <Section title={`Tu historial (${myEntries.length})`}>
             <HistoryTable
               entries={myEntries}
+              clubs={clubs}
               showDisciplineFilter={isConsolidated}
             />
           </Section>

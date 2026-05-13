@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/Badge";
 import { Select } from "@/components/ui/Select";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { cn, formatDate, formatPercent } from "@/lib/utils";
-import { getClubCode, getClubName } from "@/lib/clubs";
-import type { MyEntryRow } from "@/lib/db/types";
+import { buildClubLookup, getClubCode, getClubName } from "@/lib/clubs";
+import type { Club, MyEntryRow } from "@/lib/db/types";
 
 type SortKey = "date_desc" | "date_asc" | "pct_desc" | "pct_asc" | "place_asc";
 
@@ -28,6 +28,11 @@ const POWER_FACTOR_LABELS: Record<string, string> = {
 interface HistoryTableProps {
   entries: MyEntryRow[];
   /**
+   * Catálogo de clubes para resolver `match.region` → nombre completo.
+   * El caller (DashboardView) hace `listClubs()` y lo pasa.
+   */
+  clubs: ReadonlyArray<Pick<Club, "code" | "name">>;
+  /**
    * Si false, esconde el filtro de disciplina (se asume que el caller ya
    * filtró por disciplina vía URL — ej. /dashboard/[discipline]).
    * Default: true (vista consolidada).
@@ -37,8 +42,10 @@ interface HistoryTableProps {
 
 export function HistoryTable({
   entries,
+  clubs,
   showDisciplineFilter = true,
 }: HistoryTableProps) {
+  const clubLookup = useMemo(() => buildClubLookup(clubs), [clubs]);
   const [discipline, setDiscipline] = useState<string>("all");
   const [division, setDivision] = useState<string>("all");
   const [factor, setFactor] = useState<string>("all");
@@ -67,11 +74,11 @@ export function HistoryTable({
     const set = new Map<string, string>();
     for (const e of entries) {
       const code = getClubCode(e.matches?.region);
-      const name = getClubName(e.matches?.region);
+      const name = getClubName(e.matches?.region, clubLookup);
       if (code && name) set.set(code, name);
     }
     return Array.from(set.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [entries]);
+  }, [entries, clubLookup]);
 
   const filtered = useMemo(() => {
     let list = entries.slice();
@@ -209,7 +216,7 @@ export function HistoryTable({
             </THead>
             <TBody>
               {filtered.map((e) => {
-                const clubName = getClubName(e.matches?.region);
+                const clubName = getClubName(e.matches?.region, clubLookup);
                 const clubCode = getClubCode(e.matches?.region);
                 const disc = e.matches?.disciplines;
                 // Fila FBI (o cualquier hits-based): destacamos impactos y

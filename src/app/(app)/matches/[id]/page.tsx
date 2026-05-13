@@ -15,7 +15,7 @@ import {
   listEntriesByMatch,
   listStagesByMatch,
 } from "@/lib/db/matches";
-import { parseRegion } from "@/lib/clubs";
+import { buildClubLookup, getClubName, parseRegion } from "@/lib/clubs";
 import {
   cn,
   formatDate,
@@ -58,8 +58,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const myShooterIds = new Set(myShooters.map((s) => s.id));
   const isImporter = match.imported_by_user_id === userId;
   const parsedClub = parseRegion(match.region);
+  const clubLookup = buildClubLookup(clubs);
   const clubLabel =
-    parsedClub.clubName ?? parsedClub.clubCode ?? match.region ?? null;
+    getClubName(match.region, clubLookup) ?? match.region ?? null;
   // Tiro FBI rankea por impactos antes que por puntos — agregamos columna
   // Impactos y bajamos el énfasis visual de Puntos en la tabla.
   const isHitsBased = isHitsBasedDiscipline(match.disciplines);
