@@ -25,6 +25,29 @@ export async function listAllMatches(
   return (data as unknown as MatchWithDiscipline[] | null) ?? [];
 }
 
+/**
+ * Versión paginada para `/matches`. Pide un rango (offset/limit) y trae el
+ * count total para que la UI pueda calcular "Página X de Y". `count: "exact"`
+ * es barato acá porque `matches` es una tabla chica — si en el futuro crece
+ * a decenas de miles, conviene bajar a `"planned"` o `"estimated"`.
+ */
+export async function listMatchesPage(
+  supabase: SupabaseClient,
+  { page, size }: { page: number; size: number },
+): Promise<{ matches: MatchWithDiscipline[]; total: number }> {
+  const from = (page - 1) * size;
+  const to = from + size - 1;
+  const { data, count } = await supabase
+    .from("matches")
+    .select(MATCH_BASE_SELECT, { count: "exact" })
+    .order("date", { ascending: false })
+    .range(from, to);
+  return {
+    matches: (data as unknown as MatchWithDiscipline[] | null) ?? [],
+    total: count ?? 0,
+  };
+}
+
 /** Match con su disciplina embebida. */
 export async function getMatchById(
   supabase: SupabaseClient,
