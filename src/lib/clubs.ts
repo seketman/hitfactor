@@ -1,15 +1,13 @@
+import type { Club } from "./db/types";
+
 /**
- * Mapping de códigos de club (PractiScore region) a nombre completo.
- * Los reportes vienen como `ARG-TFALP` o `TFALP-ARG`. parseRegion() detecta
- * el código del club independientemente del orden.
+ * Helpers para interpretar `matches.region` y traducirlo a nombre de club.
+ *
+ * Diseño: la fuente de verdad de nombres es la tabla `clubs` (DB). Estos
+ * helpers son puros — el caller fetchea `listClubs()` y pasa el resultado
+ * como `ClubLookup`. Antes había un diccionario hardcoded acá, pero quedaba
+ * desincronizado de la DB cada vez que sumábamos clubes federados.
  */
-const CLUB_NAMES: Record<string, string> = {
-  TFALP: "Tiro Federal Argentino de La Plata",
-  TFLZ: "Tiro Federal de Lomas de Zamora",
-  TFABA: "Tiro Federal Argentino Buenos Aires",
-  TFBA: "Tiro Federal Buenos Aires",
-  ATyGQ: "Asociación Tiradores y Gimnasia Quilmes",
-};
 
 const COUNTRY_CODES = new Set(["ARG"]);
 
@@ -20,8 +18,6 @@ export interface ParsedRegion {
   country: string | null;
   /** Código del club detectado, ej "TFALP". */
   clubCode: string | null;
-  /** Nombre completo del club si está mapeado, sino el código. */
-  clubName: string | null;
 }
 
 /**
@@ -35,43 +31,58 @@ export interface ParsedRegion {
  */
 export function parseRegion(region: string | null | undefined): ParsedRegion {
   if (!region) {
-    return { raw: null, country: null, clubCode: null, clubName: null };
+    return { raw: null, country: null, clubCode: null };
   }
 
   const parts = region.split("-").map((s) => s.trim()).filter(Boolean);
 
   if (parts.length === 0) {
-    return { raw: region, country: null, clubCode: null, clubName: null };
+    return { raw: region, country: null, clubCode: null };
   }
 
   if (parts.length === 1) {
     const code = parts[0];
+    const isCountry = COUNTRY_CODES.has(code);
     return {
       raw: region,
-      country: COUNTRY_CODES.has(code) ? code : null,
-      clubCode: COUNTRY_CODES.has(code) ? null : code,
-      clubName: CLUB_NAMES[code] ?? (COUNTRY_CODES.has(code) ? null : code),
+      country: isCountry ? code : null,
+      clubCode: isCountry ? null : code,
     };
   }
 
   // 2+ partes: la que sea código de país es el country, la otra es el club.
-  const countryPart = parts.find((p) => COUNTRY_CODES.has(p)) ?? null;
-  const clubPart = parts.find((p) => !COUNTRY_CODES.has(p)) ?? null;
+  const country = parts.find((p) => COUNTRY_CODES.has(p)) ?? null;
+  const clubCode = parts.find((p) => !COUNTRY_CODES.has(p)) ?? null;
 
-  return {
-    raw: region,
-    country: countryPart,
-    clubCode: clubPart,
-    clubName: clubPart ? CLUB_NAMES[clubPart] ?? clubPart : null,
-  };
-}
-
-/** Helper directo para mostrar el nombre del club. */
-export function getClubName(region: string | null | undefined): string | null {
-  return parseRegion(region).clubName;
+  return { raw: region, country, clubCode };
 }
 
 /** Helper directo para mostrar el código del club. */
 export function getClubCode(region: string | null | undefined): string | null {
   return parseRegion(region).clubCode;
+}
+
+/** Mapa `code → name` para resolver nombres de club sin reconsultar la DB. */
+export type ClubLookup = ReadonlyMap<string, string>;
+
+/** Construye un `ClubLookup` desde el resultado de `listClubs()`. */
+export function buildClubLookup(
+  clubs: ReadonlyArray<Pick<Club, "code" | "name">>,
+): ClubLookup {
+  return new Map(clubs.map((c) => [c.code, c.name]));
+}
+
+/**
+ * Devuelve el nombre completo del club a partir del `region`, usando el
+ * catálogo provisto. Si el code no está en el catálogo (ej. región custom,
+ * club extranjero), cae al code crudo — coherente con cómo se mostraban
+ * antes los clubes desconocidos en la UI.
+ */
+export function getClubName(
+  region: string | null | undefined,
+  clubs: ClubLookup,
+): string | null {
+  const code = getClubCode(region);
+  if (!code) return null;
+  return clubs.get(code) ?? code;
 }

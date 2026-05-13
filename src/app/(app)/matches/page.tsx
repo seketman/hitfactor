@@ -3,8 +3,12 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MatchList } from "@/components/MatchList";
+import { Pagination } from "@/components/Pagination";
 import { requireUser } from "@/lib/supabase/require-user";
-import { listAllMatches } from "@/lib/db/matches";
+import { listMatchesPage } from "@/lib/db/matches";
+import { listClubs } from "@/lib/db/clubs";
+import { getUiPrefs } from "@/lib/db/profiles";
+import { saveMatchesPageSize } from "./actions";
 
 /**
  * Listado de todos los matches del sistema. Antes vivía como sección dentro
@@ -13,13 +17,50 @@ import { listAllMatches } from "@/lib/db/matches";
  *
  * El botón "Importar match" reemplaza al item "Importar" del sidebar — ahora
  * es la acción principal de esta página.
+ *
+ * Paginación server-side via `?page` y `?size`. Los tamaños permitidos son
+ * fijos (PAGE_SIZES) para que un `size` arbitrario en la URL no nos haga
+ * pedirle 10_000 filas a la DB.
  */
-export default async function MatchesPage() {
+
+const PAGE_SIZES = [10, 20, 50, 100] as const;
+const DEFAULT_PAGE_SIZE = 20;
+
+interface PageProps {
+  searchParams: Promise<{ page?: string; size?: string }>;
+}
+
+export default async function MatchesPage({ searchParams }: PageProps) {
+  const { page: pageParam, size: sizeParam } = await searchParams;
+
   const { supabase, user } = await requireUser();
 
-  // 200 cubre cómodo el rango de un usuario activo. Si el sistema crece y
-  // hace falta paginar, este es el punto a mejorar.
-  const matches = await listAllMatches(supabase, 200);
+  // Si la URL trae `?size=N` y es válido, gana — eso permite compartir un
+  // link con un tamaño puntual sin pisar la preferencia. Si no, usamos lo
+  // que el usuario guardó en su perfil. Si nunca guardó nada, default 20.
+  const uiPrefs = await getUiPrefs(supabase, user.id);
+  const parsedUrlSize = Number(sizeParam);
+  const urlSizeValid =
+    sizeParam != null &&
+    (PAGE_SIZES as ReadonlyArray<number>).includes(parsedUrlSize);
+  const savedSize = uiPrefs.matchesPageSize;
+  const savedSizeValid =
+    savedSize != null && (PAGE_SIZES as ReadonlyArray<number>).includes(savedSize);
+  const size = urlSizeValid
+    ? parsedUrlSize
+    : savedSizeValid
+      ? savedSize
+      : DEFAULT_PAGE_SIZE;
+
+  const parsedPage = Math.floor(Number(pageParam));
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+
+  const [{ matches, total }, clubs] = await Promise.all([
+    listMatchesPage(supabase, { page, size }),
+    listClubs(supabase),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(total / size));
 
   return (
     <PageContainer>
@@ -27,9 +68,9 @@ export default async function MatchesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Matches</h1>
           <p className="mt-1 text-sm text-fg-muted">
-            {matches.length === 0
+            {total === 0
               ? "Todavía no se importó ningún match."
-              : `${matches.length} torneo${matches.length === 1 ? "" : "s"} cargado${matches.length === 1 ? "" : "s"} en HitFactor`}
+              : `${total} torneo${total === 1 ? "" : "s"} cargado${total === 1 ? "" : "s"} en HitFactor`}
           </p>
         </div>
         <Link href="/import">
@@ -37,7 +78,7 @@ export default async function MatchesPage() {
         </Link>
       </header>
 
-      {matches.length === 0 ? (
+      {total === 0 ? (
         <Card className="p-10 text-center">
           <p className="text-fg-muted">
             Sé el primero en importar uno desde tu planilla de PractiScore o el
@@ -48,7 +89,24 @@ export default async function MatchesPage() {
           </Link>
         </Card>
       ) : (
-        <MatchList matches={matches} userId={user.id} from="/matches" />
+        <>
+          <MatchList
+            matches={matches}
+            userId={user.id}
+            from="/matches"
+            clubs={clubs}
+          />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            size={size}
+            sizes={PAGE_SIZES}
+            basePath="/matches"
+            itemLabel={{ one: "torneo", many: "torneos" }}
+            onSizeChange={saveMatchesPageSize}
+          />
+        </>
       )}
     </PageContainer>
   );

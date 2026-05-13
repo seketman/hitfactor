@@ -7,6 +7,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/Table";
 import { FirearmSelector } from "@/components/FirearmSelector";
 import { requireUser } from "@/lib/supabase/require-user";
 import { listMyShooters } from "@/lib/db/shooters";
+import { listClubs } from "@/lib/db/clubs";
 import {
   getMatchById,
   listMyEntriesInMatch,
@@ -19,7 +20,7 @@ import {
 import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import type { MyMatchSummary } from "@/lib/db/types";
-import { getClubCode, getClubName } from "@/lib/clubs";
+import { buildClubLookup, getClubCode, getClubName } from "@/lib/clubs";
 import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
 
 const POWER_FACTOR_LABELS: Record<string, string> = {
@@ -42,9 +43,10 @@ export default async function PersonalMatchPage({
   const { supabase, user } = await requireUser();
   const userId = user.id;
 
-  const [match, myShooters] = await Promise.all([
+  const [match, myShooters, clubs] = await Promise.all([
     getMatchById(supabase, id),
     listMyShooters(supabase, userId),
+    listClubs(supabase),
   ]);
 
   if (!match) {
@@ -106,8 +108,9 @@ export default async function PersonalMatchPage({
 
   const isTimeBased = isTimeBasedDiscipline(match.disciplines);
   const isHitsBased = isHitsBasedDiscipline(match.disciplines);
+  const clubLookup = buildClubLookup(clubs);
   const clubCode = getClubCode(match.region);
-  const clubName = getClubName(match.region);
+  const clubName = getClubName(match.region, clubLookup);
 
   const [myFirearms, currentFirearmLog, stageResults] = await Promise.all([
     listMyFirearms(supabase, userId),

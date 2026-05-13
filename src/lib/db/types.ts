@@ -10,6 +10,17 @@ export interface Profile {
   member_number: string | null;
 }
 
+/**
+ * Preferencias de UI persistidas en `profiles.ui_prefs` (jsonb).
+ * Forma libre — agregamos campos sin migration. Las keys que no entiende
+ * el cliente se ignoran. Todos los campos son opcionales: si el usuario
+ * nunca tocó la preferencia, no aparece y el cliente cae al default.
+ */
+export interface UiPrefs {
+  /** Items por página en el listado `/matches`. */
+  matchesPageSize?: number;
+}
+
 export interface Discipline {
   id: number;
   code: string;

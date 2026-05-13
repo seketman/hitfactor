@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { parseRegion } from "@/lib/clubs";
+import { buildClubLookup, getClubName } from "@/lib/clubs";
 import { formatDate } from "@/lib/utils";
+import type { Club } from "@/lib/db/types";
 
 export interface MatchListItem {
   id: string;
@@ -22,6 +23,11 @@ interface MatchListProps {
    * "← Volver". Ej: "/matches" o "/dashboard/ipsc".
    */
   from: string;
+  /**
+   * Catálogo de clubes para resolver `region` → nombre completo. La page
+   * que renderiza esta lista hace `listClubs()` y lo pasa.
+   */
+  clubs: ReadonlyArray<Pick<Club, "code" | "name">>;
 }
 
 /**
@@ -33,14 +39,14 @@ interface MatchListProps {
  *  - `/matches` (grilla principal de todos los matches)
  *  - `/dashboard` (deprecated — se sacó la sección, queda por compat si vuelve)
  */
-export function MatchList({ matches, userId, from }: MatchListProps) {
+export function MatchList({ matches, userId, from, clubs }: MatchListProps) {
+  const clubLookup = buildClubLookup(clubs);
   return (
     <Card>
       <ul className="divide-y divide-border">
         {matches.map((m) => {
           const isMine = m.imported_by_user_id === userId;
-          const club = parseRegion(m.region);
-          const clubLabel = club.clubName ?? club.clubCode ?? m.region;
+          const clubLabel = getClubName(m.region, clubLookup) ?? m.region;
           return (
             <li key={m.id}>
               <Link
