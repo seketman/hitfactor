@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/seketman/hitfactor/compare/v1.1.0...v1.2.0) (2026-05-13)
+
+
+### Features
+
+* **matches:** paginate list + persist user page-size pref ([#13](https://github.com/seketman/hitfactor/issues/13)) ([2f80f21](https://github.com/seketman/hitfactor/commit/2f80f21cf74c11df6b0827aec4cda68c758c9581))
+
 ## [1.1.0](https://github.com/seketman/hitfactor/compare/v1.0.2...v1.1.0) (2026-05-13)
 
 
