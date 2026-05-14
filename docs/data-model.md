@@ -131,10 +131,8 @@ Todas en [`supabase/migrations/`](../supabase/migrations/), aplicar en orden:
 
 | # | Archivo | Qué hace |
 |---|---|---|
-| 0001 | `0001_initial_schema.sql` | Schema inicial: profiles, disciplines, divisions IPSC, shooters, matches, stages, match_entries, stage_results, match_reports + RLS |
-| 0002 | `0002_steel_challenge.sql` | Agrega `total_time_seconds` a `match_entries` + divisiones Steel Challenge |
-| 0003 | `0003_steel_source_type.sql` | Suma `practiscore_steel_html` al CHECK de `matches.source_type` |
-| 0004 | `0004_fbi.sql` | Divisiones FBI + suma `fbi_csv` al CHECK de `source_type` |
-| 0005 | `0005_matches_nulls_not_distinct.sql` | Recrea el UNIQUE de matches con `NULLS NOT DISTINCT` (fix de duplicados FBI con region NULL) |
-| 0006 | `0006_profiles_readable_by_authenticated.sql` | Abre el SELECT de `profiles` a todos los autenticados (para el "Importado por X") |
-| 0007 | `0007_firearms.sql` | Tablas `firearms` + `match_firearm_log` con RLS por ownership |
+| 0001 | `0001_initial_schema.sql` | Schema completo: profiles, disciplines, divisions (IPSC + Steel + FBI), shooters, matches, stages, match_entries, stage_results, match_reports, firearms, audit_log, feedback, clubs y RLS |
+| 0002 | `0002_my_discipline_counts.sql` | RPC `my_discipline_counts(p_user_id)` — agrega en Postgres el conteo de participaciones por disciplina del usuario (lo consume el sidebar) |
+
+Las migraciones incrementales originales (0002–0020) se consolidaron en
+`0001_initial_schema.sql` — ver el commit de consolidación del schema.

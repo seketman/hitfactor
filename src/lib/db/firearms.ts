@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type {
   Firearm,
   FirearmUsageStats,
@@ -11,7 +11,7 @@ import type {
  */
 
 export async function listMyFirearms(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<Firearm[]> {
   const { data } = await supabase
@@ -23,7 +23,7 @@ export async function listMyFirearms(
 }
 
 export async function getFirearmById(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   firearmId: string,
 ): Promise<Firearm | null> {
   const { data } = await supabase
@@ -35,7 +35,7 @@ export async function getFirearmById(
 }
 
 export async function getMatchFirearmLog(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   matchEntryId: string,
 ): Promise<MatchFirearmLog | null> {
   const { data } = await supabase
@@ -54,17 +54,11 @@ export async function getMatchFirearmLog(
  * último uso.
  */
 export async function listFirearmUsageStats(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<FirearmUsageStats[]> {
   const firearms = await listMyFirearms(supabase, userId);
   if (firearms.length === 0) return [];
-
-  type LogRow = {
-    firearm_id: string;
-    rounds_fired: number;
-    match_entries: { matches: { date: string } | null } | null;
-  };
 
   const { data } = await supabase
     .from("match_firearm_log")
@@ -74,7 +68,7 @@ export async function listFirearmUsageStats(
       firearms.map((f) => f.id),
     );
 
-  const logs = (data as unknown as LogRow[] | null) ?? [];
+  const logs = data ?? [];
 
   const byFirearm = new Map<
     string,
@@ -110,7 +104,7 @@ export async function listFirearmUsageStats(
  * Más recientes primero.
  */
 export async function listFirearmHistory(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   firearmId: string,
 ): Promise<
   Array<{
@@ -122,20 +116,6 @@ export async function listFirearmHistory(
     roundsFired: number;
   }>
 > {
-  type Row = {
-    match_entry_id: string;
-    rounds_fired: number;
-    match_entries: {
-      id: string;
-      matches: {
-        id: string;
-        name: string;
-        date: string;
-        disciplines: { name: string } | null;
-      } | null;
-    } | null;
-  };
-
   const { data } = await supabase
     .from("match_firearm_log")
     .select(
@@ -143,7 +123,7 @@ export async function listFirearmHistory(
     )
     .eq("firearm_id", firearmId);
 
-  const rows = (data as unknown as Row[] | null) ?? [];
+  const rows = data ?? [];
 
   return rows
     .filter((r) => r.match_entries?.matches)

@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type {
   ParsedMatch,
   ParsedMatchEntry,
@@ -35,7 +35,7 @@ export class ImportError extends Error {
  * El RLS valida que `imported_by_user_id = auth.uid()`.
  */
 export async function importParsedMatch(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsed: ParsedMatch,
   importerUserId: string,
   filename: string,
@@ -110,7 +110,7 @@ interface DisciplineRef {
 // ---------------------------------------------------------------------------
 
 async function importMatchOverall(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsed: ParsedMatch,
   discipline: DisciplineRef,
   divisionByCode: Map<string, number>,
@@ -243,7 +243,7 @@ async function importMatchOverall(
 // ---------------------------------------------------------------------------
 
 async function importStages(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsed: ParsedMatch,
   discipline: DisciplineRef,
   divisionByCode: Map<string, number>,
@@ -338,7 +338,7 @@ async function importStages(
  * actualizados — no distinguimos).
  */
 async function upsertMatchEntries(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsed: ParsedMatch,
   matchId: string,
   divisionByCode: Map<string, number>,
@@ -375,7 +375,7 @@ async function upsertMatchEntries(
 // ---------------------------------------------------------------------------
 
 async function attachStagesToMatch(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsed: ParsedMatch,
   matchId: string,
   divisionByCode: Map<string, number>,
@@ -528,7 +528,7 @@ function shooterCacheKey(s: ParsedShooter): string {
  * por el caller sin más round-trips.
  */
 async function resolveShootersBulk(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsedShooters: ParsedShooter[],
 ): Promise<Map<string, string>> {
   const cache = new Map<string, string>();
@@ -602,7 +602,7 @@ async function resolveShootersBulk(
 }
 
 async function findOrCreateShooter(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsed: ParsedShooter,
 ): Promise<string> {
   // Usamos `limit(1)` + orden estable en lugar de `maybeSingle()` porque
@@ -731,7 +731,7 @@ interface MatchLookupRow {
  * Exportada para testing del algoritmo de prefijo.
  */
 async function resolveMatchForStage(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   parsed: ParsedMatch,
   disciplineId: number,
 ): Promise<MatchLookupRow | null> {
@@ -804,7 +804,7 @@ export function findBestPrefixMatch<T extends { name: string }>(
  * los más nuevos son ramas erróneas a limpiar.
  */
 async function findUserMatch(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   disciplineId: number,
   name: string,
   date: string,
@@ -824,7 +824,7 @@ async function findUserMatch(
 }
 
 async function listSameDayMatchNames(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   disciplineId: number,
   date: string,
 ): Promise<string> {

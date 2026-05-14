@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type { AuditLogRow } from "./types";
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -12,7 +12,7 @@ const DEFAULT_PAGE_SIZE = 50;
  * total para que la UI pueda mostrar "Página X de Y".
  */
 export async function listAuditLog(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
   page: number = 1,
   pageSize: number = DEFAULT_PAGE_SIZE,

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "./server";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "./types";
 
 /**
  * Server-side: garantiza que hay un usuario autenticado y devuelve el cliente
@@ -13,7 +14,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
  * igual sirva el 307 al cliente. Este helper hace explícito el fallback.
  */
 export async function requireUser(): Promise<{
-  supabase: SupabaseClient;
+  supabase: TypedSupabaseClient;
   user: User;
 }> {
   const supabase = await createClient();

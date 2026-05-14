@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type { FeedbackRow, FeedbackType } from "./types";
 
 /**
@@ -20,7 +20,7 @@ interface CreateFeedbackInput {
  * `redirectWithError` — no tiramos excepciones acá.
  */
 export async function createFeedback(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
   input: CreateFeedbackInput,
 ): Promise<{ error: string | null }> {
@@ -39,7 +39,7 @@ export async function createFeedback(
  * para que el usuario vea el estado de lo que reportó.
  */
 export async function listMyFeedback(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
   limit: number = 20,
 ): Promise<FeedbackRow[]> {

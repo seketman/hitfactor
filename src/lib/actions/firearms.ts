@@ -58,7 +58,7 @@ export async function createFirearm(formData: FormData) {
   await logAction(supabase, user.id, {
     action: AUDIT_ACTION.FIREARM_CREATE,
     entityType: "firearm",
-    entityId: (created as { id?: string } | null)?.id,
+    entityId: created?.id,
     metadata: {
       name: payload.name,
       brand: payload.brand,
@@ -135,22 +135,15 @@ export async function deleteFirearm(formData: FormData) {
   }
 
   if (snapshot) {
-    type Snap = {
-      name: string;
-      brand: string | null;
-      model: string | null;
-      caliber: string | null;
-    };
-    const s = snapshot as unknown as Snap;
     await logAction(supabase, user.id, {
       action: AUDIT_ACTION.FIREARM_DELETE,
       entityType: "firearm",
       entityId: id,
       metadata: {
-        name: s.name,
-        brand: s.brand,
-        model: s.model,
-        caliber: s.caliber,
+        name: snapshot.name,
+        brand: snapshot.brand,
+        model: snapshot.model,
+        caliber: snapshot.caliber,
       },
     });
   }
@@ -177,12 +170,6 @@ export async function setMatchFirearm(formData: FormData) {
 
   // Snapshot del log actual + nombres de match/firearm para el audit log.
   // Hacemos las queries en paralelo, son chicas.
-  type LogSnap = {
-    firearm_id: string;
-    rounds_fired: number;
-    firearms: { name: string } | null;
-  } | null;
-
   const [logRes, matchNameRes] = await Promise.all([
     supabase
       .from("match_firearm_log")
@@ -197,8 +184,8 @@ export async function setMatchFirearm(formData: FormData) {
           .maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
-  const logBefore = logRes.data as unknown as LogSnap;
-  const matchName = (matchNameRes.data as { name?: string } | null)?.name;
+  const logBefore = logRes.data;
+  const matchName = matchNameRes.data?.name;
 
   if (!firearmId) {
     // Limpiar el log para este match_entry
@@ -269,7 +256,7 @@ export async function setMatchFirearm(formData: FormData) {
           : null,
         after: {
           firearm_id: firearmId,
-          firearm_name: (firearmRow as { name?: string } | null)?.name,
+          firearm_name: firearmRow?.name,
           rounds_fired: rounds,
         },
       },

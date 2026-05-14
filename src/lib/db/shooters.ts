@@ -1,42 +1,30 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type { Shooter } from "./types";
 
 /**
- * Disciplinas en las que el usuario tiene al menos una participación.
- * Se usa para construir el menú lateral con solo las disciplinas relevantes.
+ * Disciplinas en las que el usuario tiene al menos una participación, con el
+ * conteo de participaciones en cada una. Se usa para construir el menú lateral
+ * con solo las disciplinas relevantes.
+ *
+ * Corre en cada page load (vive en `AppSidebar`), así que la agregación se
+ * hace en la DB vía el RPC `my_discipline_counts` — antes esto se traía
+ * TODAS las match_entries del usuario y contaba en JS. El RPC ya resuelve las
+ * identidades del usuario internamente y devuelve a lo sumo 4 filas.
  */
 export async function listMyDisciplines(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<Array<{ code: string; name: string; count: number }>> {
-  // Obtener mis shooters (puede haber varias identidades).
-  const shooters = await listMyShooters(supabase, userId);
-  if (shooters.length === 0) return [];
+  const { data } = await supabase.rpc("my_discipline_counts", {
+    p_user_id: userId,
+  });
 
-  type Row = {
-    matches: { disciplines: { code: string; name: string } | null } | null;
-  };
-
-  const { data } = await supabase
-    .from("match_entries")
-    .select("matches(disciplines(code, name))")
-    .in(
-      "shooter_id",
-      shooters.map((s) => s.id),
-    );
-
-  const counts = new Map<string, { code: string; name: string; count: number }>();
-  for (const row of (data as unknown as Row[] | null) ?? []) {
-    const d = row.matches?.disciplines;
-    if (!d?.code) continue;
-    const existing = counts.get(d.code);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      counts.set(d.code, { code: d.code, name: d.name, count: 1 });
-    }
-  }
-  return Array.from(counts.values()).sort((a, b) => b.count - a.count);
+  return (data ?? []).map((r) => ({
+    code: r.code,
+    name: r.name,
+    // count viene de un count(*)::bigint — PostgREST lo serializa como number.
+    count: Number(r.count),
+  }));
 }
 
 /**
@@ -48,7 +36,7 @@ export async function listMyDisciplines(
  * Se usa para gatear features (ej: feedback) detrás de un mínimo de actividad.
  */
 export async function countMyMatchEntries(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<number> {
   const shooters = await listMyShooters(supabase, userId);
@@ -72,7 +60,7 @@ export async function countMyMatchEntries(
  * todas las pantallas que muestran "lo mío" deben agregar a través de la lista.
  */
 export async function listMyShooters(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<Shooter[]> {
   const { data } = await supabase

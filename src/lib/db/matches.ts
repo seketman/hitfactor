@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type {
   MatchEntryWithRelations,
   MatchWithDiscipline,
@@ -12,19 +12,6 @@ import type {
 const MATCH_BASE_SELECT =
   "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(code, name, scoring_type)";
 
-/** Todos los matches visibles, más recientes primero. */
-export async function listAllMatches(
-  supabase: SupabaseClient,
-  limit = 20,
-): Promise<MatchWithDiscipline[]> {
-  const { data } = await supabase
-    .from("matches")
-    .select(MATCH_BASE_SELECT)
-    .order("date", { ascending: false })
-    .limit(limit);
-  return (data as unknown as MatchWithDiscipline[] | null) ?? [];
-}
-
 /**
  * Versión paginada para `/matches`. Pide un rango (offset/limit) y trae el
  * count total para que la UI pueda calcular "Página X de Y". `count: "exact"`
@@ -32,7 +19,7 @@ export async function listAllMatches(
  * a decenas de miles, conviene bajar a `"planned"` o `"estimated"`.
  */
 export async function listMatchesPage(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   { page, size }: { page: number; size: number },
 ): Promise<{ matches: MatchWithDiscipline[]; total: number }> {
   const from = (page - 1) * size;
@@ -43,14 +30,14 @@ export async function listMatchesPage(
     .order("date", { ascending: false })
     .range(from, to);
   return {
-    matches: (data as unknown as MatchWithDiscipline[] | null) ?? [],
+    matches: data ?? [],
     total: count ?? 0,
   };
 }
 
 /** Match con su disciplina embebida. */
 export async function getMatchById(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   matchId: string,
 ): Promise<MatchWithDiscipline | null> {
   const { data } = await supabase
@@ -58,12 +45,12 @@ export async function getMatchById(
     .select(MATCH_BASE_SELECT)
     .eq("id", matchId)
     .maybeSingle();
-  return (data as unknown as MatchWithDiscipline | null) ?? null;
+  return data ?? null;
 }
 
 /** Stages de un match, ordenados por número. */
 export async function listStagesByMatch(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   matchId: string,
 ): Promise<Stage[]> {
   const { data } = await supabase
@@ -85,18 +72,20 @@ export async function listStagesByMatch(
  * un ranking inconsistente con el campo place.
  */
 export async function listEntriesByMatch(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   matchId: string,
 ): Promise<MatchEntryWithRelations[]> {
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, hits, is_dq, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
+      "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, total_time_seconds, hits, is_dq, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
     )
     .eq("match_id", matchId)
     .order("is_dq", { ascending: true })
     .order("place", { ascending: true });
-  return (data as unknown as MatchEntryWithRelations[] | null) ?? [];
+  // `power_factor` es `text` en la DB; el parser de import garantiza que solo
+  // sea "Min" | "Maj" | null, así que estrechamos el tipo acá.
+  return (data ?? []) as MatchEntryWithRelations[];
 }
 
 /**
@@ -107,19 +96,18 @@ export async function listEntriesByMatch(
  * Devuelve un Map con clave `${matchId}|${divisionCode}` → count.
  */
 export async function getDivisionSizes(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   matchIds: string[],
 ): Promise<Map<string, number>> {
   if (matchIds.length === 0) return new Map();
 
-  type Row = { match_id: string; divisions: { code: string } | null };
   const { data } = await supabase
     .from("match_entries")
     .select("match_id, divisions(code)")
     .in("match_id", matchIds);
 
   const counts = new Map<string, number>();
-  for (const row of (data as unknown as Row[] | null) ?? []) {
+  for (const row of data ?? []) {
     if (!row.divisions) continue;
     const key = `${row.match_id}|${row.divisions.code}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
@@ -133,7 +121,7 @@ export async function getDivisionSizes(
  * identidades linkeadas (una por disciplina/torneo).
  */
 export async function listEntriesByShooters(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   shooterIds: string[],
 ): Promise<MyEntryRow[]> {
   if (shooterIds.length === 0) return [];
@@ -144,7 +132,8 @@ export async function listEntriesByShooters(
     )
     .in("shooter_id", shooterIds)
     .order("matches(date)", { ascending: false });
-  return (data as unknown as MyEntryRow[] | null) ?? [];
+  // `power_factor` es `text` en la DB; el parser garantiza "Min" | "Maj" | null.
+  return (data ?? []) as MyEntryRow[];
 }
 
 /**
@@ -156,7 +145,7 @@ export async function listEntriesByShooters(
  * linkeadas; igual filtramos por todas en una sola query.
  */
 export async function listMyEntriesInMatch(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   matchId: string,
   shooterIds: string[],
 ): Promise<MyMatchSummary["entry"][]> {
@@ -171,7 +160,8 @@ export async function listMyEntriesInMatch(
     .in("shooter_id", shooterIds)
     .order("place", { ascending: true });
 
-  return (data ?? []) as unknown as MyMatchSummary["entry"][];
+  // `power_factor` es `text` en la DB; el parser garantiza "Min" | "Maj" | null.
+  return (data ?? []) as MyMatchSummary["entry"][];
 }
 
 /**
@@ -180,7 +170,7 @@ export async function listMyEntriesInMatch(
  * y evitar leer stages que no son del match actual.
  */
 export async function listStageResultsForEntry(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   matchEntryId: string,
   matchId: string,
 ): Promise<MyStageResultRow[]> {
@@ -192,7 +182,7 @@ export async function listStageResultsForEntry(
     .eq("match_entry_id", matchEntryId)
     .eq("stages.match_id", matchId);
 
-  const results = (data as unknown as MyStageResultRow[] | null) ?? [];
+  const results = data ?? [];
   results.sort((a, b) => {
     const an = a.stages?.stage_number ?? Number.MAX_SAFE_INTEGER;
     const bn = b.stages?.stage_number ?? Number.MAX_SAFE_INTEGER;
@@ -209,7 +199,7 @@ export async function listStageResultsForEntry(
  * Para filtrar por disciplina: filtrar `entryIds` antes de llamar.
  */
 export async function listMyStageResultsForEntries(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   entryIds: string[],
 ): Promise<MyStageRow[]> {
   if (entryIds.length === 0) return [];

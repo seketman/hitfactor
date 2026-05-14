@@ -1,6 +1,11 @@
 /**
- * Tipos de DB compartidos. Hasta que generemos types con `supabase gen types`,
- * los definimos manualmente acá. Solo lo que necesitan las páginas.
+ * Tipos de dominio compartidos por las páginas y componentes.
+ *
+ * No son los tipos crudos de la DB — esos se generan con `npm run db:types`
+ * en `../supabase/database.types.ts` y los usa el cliente Supabase tipado
+ * (`TypedSupabaseClient`). Acá vivimos los tipos "de app": shapes de selects
+ * con joins embebidos y narrowings que la DB no expresa (ej. `power_factor`
+ * es `text` en la DB pero el parser garantiza `"Min" | "Maj" | null`).
  */
 
 export interface Profile {

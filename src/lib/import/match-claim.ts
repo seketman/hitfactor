@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 
 /**
  * Auto-detección de claim al importar y filtrado de "Soy yo" en la vista
@@ -80,6 +80,39 @@ function hasUsefulAliases(aliases: ClaimAliases): boolean {
 }
 
 /**
+ * Comparación estricta de un shooter contra los aliases: ¿matchea por número
+ * de socio (coincidencia exacta) o por nombre (`areNamesSimilar`)? Devuelve la
+ * razón, o `null` si no matchea.
+ *
+ * Es el primitivo único compartido por `isClaimCandidate` (filtro de la vista
+ * pública) y `findClaimCandidates` (auto-detección post-import) — antes cada
+ * uno tenía su propia copia de esta lógica y podían divergir.
+ *
+ * OJO: esto NO incluye el comportamiento de bootstrap de `isClaimCandidate`
+ * (aliases pobres → matchea todo). Eso es deliberado y vive solo en
+ * `isClaimCandidate`: la vista pública quiere mostrar "Soy yo" en todos los
+ * shooters para habilitar el primer claim, pero la auto-detección post-import
+ * prefiere no sugerir nada antes que sugerir 200 candidatos.
+ */
+function claimMatchReason(
+  shooter: ShooterLike,
+  aliases: ClaimAliases,
+): "member_number" | "name" | null {
+  if (
+    shooter.member_number != null &&
+    aliases.memberNumbers.has(shooter.member_number.trim())
+  ) {
+    return "member_number";
+  }
+  if (
+    aliases.names.some((alias) => areNamesSimilar(alias, shooter.full_name))
+  ) {
+    return "name";
+  }
+  return null;
+}
+
+/**
  * True si un shooter dado tiene similitud razonable con los aliases del
  * usuario actual. Pensado para filtrar el botón "Soy yo" en la vista pública
  * del match.
@@ -92,17 +125,7 @@ export function isClaimCandidate(
   aliases: ClaimAliases,
 ): boolean {
   if (!hasUsefulAliases(aliases)) return true;
-
-  if (
-    shooter.member_number != null &&
-    aliases.memberNumbers.has(shooter.member_number.trim())
-  ) {
-    return true;
-  }
-
-  return aliases.names.some((alias) =>
-    areNamesSimilar(alias, shooter.full_name),
-  );
+  return claimMatchReason(shooter, aliases) !== null;
 }
 
 /**
@@ -116,39 +139,15 @@ export function isClaimCandidate(
  *    al menos 2 tokens distintos para evitar falsos positivos por apellidos comunes.
  */
 export async function findClaimCandidates(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
   matchId: string,
 ): Promise<ClaimCandidate[]> {
-  const [profileRes, linkedRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("display_name, full_name, member_number")
-      .eq("id", userId)
-      .maybeSingle(),
-    supabase
-      .from("shooters")
-      .select("full_name, member_number")
-      .eq("linked_user_id", userId),
-  ]);
-
-  const profile = profileRes.data as ProfileLike | null;
-  const linkedShooters = (linkedRes.data ?? []) as ShooterLike[];
-  const aliases = buildClaimAliases(profile, linkedShooters);
+  const aliases = await getMyClaimAliases(supabase, userId);
 
   if (aliases.names.length === 0 && aliases.memberNumbers.size === 0) {
     return [];
   }
-
-  type EntryRow = {
-    divisions: { code: string } | null;
-    shooters: {
-      id: string;
-      full_name: string;
-      member_number: string | null;
-      linked_user_id: string | null;
-    } | null;
-  };
 
   const { data } = await supabase
     .from("match_entries")
@@ -157,7 +156,7 @@ export async function findClaimCandidates(
     )
     .eq("match_id", matchId);
 
-  const entries = (data as unknown as EntryRow[] | null) ?? [];
+  const entries = data ?? [];
 
   const candidates: ClaimCandidate[] = [];
   const seen = new Set<string>();
@@ -168,24 +167,17 @@ export async function findClaimCandidates(
     if (shooter.linked_user_id) continue; // ya claimado (por este usuario o por otro)
     if (seen.has(shooter.id)) continue;
 
-    const memberMatch =
-      shooter.member_number !== null &&
-      aliases.memberNumbers.has(shooter.member_number.trim());
+    const reason = claimMatchReason(shooter, aliases);
+    if (reason === null) continue;
 
-    const nameMatch = aliases.names.some((alias) =>
-      areNamesSimilar(alias, shooter.full_name),
-    );
-
-    if (memberMatch || nameMatch) {
-      seen.add(shooter.id);
-      candidates.push({
-        shooterId: shooter.id,
-        fullName: shooter.full_name,
-        memberNumber: shooter.member_number,
-        divisionCode: e.divisions?.code ?? null,
-        reason: memberMatch ? "member_number" : "name",
-      });
-    }
+    seen.add(shooter.id);
+    candidates.push({
+      shooterId: shooter.id,
+      fullName: shooter.full_name,
+      memberNumber: shooter.member_number,
+      divisionCode: e.divisions?.code ?? null,
+      reason,
+    });
   }
 
   return candidates;
@@ -196,7 +188,7 @@ export async function findClaimCandidates(
  * Lo usa la vista pública del match para filtrar el botón "Soy yo".
  */
 export async function getMyClaimAliases(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<ClaimAliases> {
   const [profileRes, linkedRes] = await Promise.all([
@@ -211,10 +203,7 @@ export async function getMyClaimAliases(
       .eq("linked_user_id", userId),
   ]);
 
-  return buildClaimAliases(
-    profileRes.data as ProfileLike | null,
-    (linkedRes.data ?? []) as ShooterLike[],
-  );
+  return buildClaimAliases(profileRes.data, linkedRes.data ?? []);
 }
 
 // ---------------------------------------------------------------------------

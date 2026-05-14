@@ -15,7 +15,7 @@ y los tiros disparados.
 npm install
 cp .env.example .env.local           # completar con credenciales de Supabase
 # aplicar TODAS las migraciones de supabase/migrations/ en el SQL Editor,
-# en orden numérico (0001 → 0007).
+# en orden numérico (0001 → 0002).
 npm run dev                          # http://localhost:3000
 ```
 
@@ -88,7 +88,7 @@ src/
 │   └── utils.ts        # cn, formatters
 └── proxy.ts            # refresh de sesión por request
 
-supabase/migrations/    # SQL del schema (numeradas 0001…0007)
+supabase/migrations/    # SQL del schema (numeradas 0001…0002)
 docs/                   # documentación funcional
 tests/                  # vitest + fixtures reales de PractiScore y FBI
 ```
