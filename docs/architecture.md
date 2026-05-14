@@ -88,8 +88,11 @@ Las páginas hijas no tienen que repetir esa lógica.
 Todas las queries a Supabase viven acá, no embebidas en las páginas.
 
 - Las páginas son **componentes de presentación** que llaman funciones de `db/`.
-- Los tipos de los rows están centralizados en `db/types.ts`.
-- Cuando generemos types con `supabase gen types`, ese archivo se reemplaza.
+- Los tipos crudos de la DB se generan con `npm run db:types` en
+  `lib/supabase/database.types.ts`; el cliente Supabase está tipado contra
+  ellos (`TypedSupabaseClient`).
+- `db/types.ts` mantiene los tipos **de dominio**: shapes de selects con
+  joins embebidos y narrowings que la DB no expresa.
 
 ### 3. Parsers separados del importer
 
