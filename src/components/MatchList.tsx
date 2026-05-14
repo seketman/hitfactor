@@ -33,11 +33,8 @@ interface MatchListProps {
 /**
  * Lista de matches en formato de filas. Cada fila linkea al detalle del match
  * preservando el origen via `?from=` para que el "← Volver" del detalle vuelva
- * acá.
- *
- * Reutilizable desde:
- *  - `/matches` (grilla principal de todos los matches)
- *  - `/dashboard` (deprecated — se sacó la sección, queda por compat si vuelve)
+ * acá. Hoy se usa solo desde `/matches`; el prop `from` queda genérico por si
+ * vuelve a renderizarse desde otra ruta.
  */
 export function MatchList({ matches, userId, from, clubs }: MatchListProps) {
   const clubLookup = buildClubLookup(clubs);

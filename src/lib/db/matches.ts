@@ -12,19 +12,6 @@ import type {
 const MATCH_BASE_SELECT =
   "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(code, name, scoring_type)";
 
-/** Todos los matches visibles, más recientes primero. */
-export async function listAllMatches(
-  supabase: SupabaseClient,
-  limit = 20,
-): Promise<MatchWithDiscipline[]> {
-  const { data } = await supabase
-    .from("matches")
-    .select(MATCH_BASE_SELECT)
-    .order("date", { ascending: false })
-    .limit(limit);
-  return (data as unknown as MatchWithDiscipline[] | null) ?? [];
-}
-
 /**
  * Versión paginada para `/matches`. Pide un rango (offset/limit) y trae el
  * count total para que la UI pueda calcular "Página X de Y". `count: "exact"`

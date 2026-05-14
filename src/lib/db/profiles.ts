@@ -1,17 +1,27 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Profile, UiPrefs } from "./types";
 
-export async function getProfile(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<Profile | null> {
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, display_name, full_name, member_number")
-    .eq("id", userId)
-    .maybeSingle();
-  return (data as Profile | null) ?? null;
-}
+/**
+ * Perfil de un usuario. Envuelto en `cache()` (React): el layout lo pide para
+ * el usuario logueado y varias páginas lo vuelven a pedir (ej. el detalle del
+ * match, para el "importado por X") — dentro de un request las llamadas con el
+ * mismo `(supabase, userId)` comparten una sola consulta. Depende de que el
+ * cliente `supabase` sea estable por request, ver `createClient`.
+ */
+export const getProfile = cache(
+  async (
+    supabase: SupabaseClient,
+    userId: string,
+  ): Promise<Profile | null> => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, display_name, full_name, member_number")
+      .eq("id", userId)
+      .maybeSingle();
+    return (data as Profile | null) ?? null;
+  },
+);
 
 /**
  * Lee las UI prefs del usuario. Si el row no existe (caso raro, solo en
