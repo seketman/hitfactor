@@ -33,23 +33,16 @@ export async function deleteMatch(formData: FormData) {
   }
 
   if (matchSnapshot) {
-    type Snapshot = {
-      name: string;
-      date: string;
-      region: string | null;
-      disciplines: { code: string; name: string } | null;
-    };
-    const snap = matchSnapshot as unknown as Snapshot;
     await logAction(supabase, user.id, {
       action: AUDIT_ACTION.MATCH_DELETE,
       entityType: "match",
       entityId: matchId,
       metadata: {
-        match_name: snap.name,
-        match_date: snap.date,
-        region: snap.region,
-        discipline_code: snap.disciplines?.code,
-        discipline_name: snap.disciplines?.name,
+        match_name: matchSnapshot.name,
+        match_date: matchSnapshot.date,
+        region: matchSnapshot.region,
+        discipline_code: matchSnapshot.disciplines?.code,
+        discipline_name: matchSnapshot.disciplines?.name,
       },
     });
   }
@@ -108,14 +101,13 @@ export async function updateMatchClub(formData: FormData) {
   }
 
   if (matchBefore) {
-    const snap = matchBefore as unknown as { name: string; region: string | null };
     await logAction(supabase, user.id, {
       action: AUDIT_ACTION.MATCH_UPDATE_CLUB,
       entityType: "match",
       entityId: matchId,
       metadata: {
-        match_name: snap.name,
-        before: { region: snap.region },
+        match_name: matchBefore.name,
+        before: { region: matchBefore.region },
         after: { region },
       },
     });

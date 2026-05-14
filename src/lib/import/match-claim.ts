@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 
 /**
  * Auto-detección de claim al importar y filtrado de "Soy yo" en la vista
@@ -139,7 +139,7 @@ export function isClaimCandidate(
  *    al menos 2 tokens distintos para evitar falsos positivos por apellidos comunes.
  */
 export async function findClaimCandidates(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
   matchId: string,
 ): Promise<ClaimCandidate[]> {
@@ -149,16 +149,6 @@ export async function findClaimCandidates(
     return [];
   }
 
-  type EntryRow = {
-    divisions: { code: string } | null;
-    shooters: {
-      id: string;
-      full_name: string;
-      member_number: string | null;
-      linked_user_id: string | null;
-    } | null;
-  };
-
   const { data } = await supabase
     .from("match_entries")
     .select(
@@ -166,7 +156,7 @@ export async function findClaimCandidates(
     )
     .eq("match_id", matchId);
 
-  const entries = (data as unknown as EntryRow[] | null) ?? [];
+  const entries = data ?? [];
 
   const candidates: ClaimCandidate[] = [];
   const seen = new Set<string>();
@@ -198,7 +188,7 @@ export async function findClaimCandidates(
  * Lo usa la vista pública del match para filtrar el botón "Soy yo".
  */
 export async function getMyClaimAliases(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<ClaimAliases> {
   const [profileRes, linkedRes] = await Promise.all([
@@ -213,10 +203,7 @@ export async function getMyClaimAliases(
       .eq("linked_user_id", userId),
   ]);
 
-  return buildClaimAliases(
-    profileRes.data as ProfileLike | null,
-    (linkedRes.data ?? []) as ShooterLike[],
-  );
+  return buildClaimAliases(profileRes.data, linkedRes.data ?? []);
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
+import type { Json } from "../supabase/database.types";
 
 /**
  * Códigos canónicos de acciones registrables en `audit_log`.
@@ -30,7 +31,7 @@ interface LogActionInput {
   /** Id de la entidad afectada — UUID o id stringificado. */
   entityId?: string;
   /** Datos adicionales para reconstruir el contexto (snapshots before/after, nombres, etc.). */
-  metadata?: Record<string, unknown>;
+  metadata?: Json;
 }
 
 /**
@@ -45,7 +46,7 @@ interface LogActionInput {
  * exige `auth.uid() = user_id`.
  */
 export async function logAction(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
   input: LogActionInput,
 ): Promise<void> {

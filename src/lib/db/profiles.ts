@@ -1,5 +1,5 @@
 import { cache } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type { Profile, UiPrefs } from "./types";
 
 /**
@@ -11,7 +11,7 @@ import type { Profile, UiPrefs } from "./types";
  */
 export const getProfile = cache(
   async (
-    supabase: SupabaseClient,
+    supabase: TypedSupabaseClient,
     userId: string,
   ): Promise<Profile | null> => {
     const { data } = await supabase
@@ -29,7 +29,7 @@ export const getProfile = cache(
  * para las keys que faltan.
  */
 export async function getUiPrefs(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<UiPrefs> {
   const { data } = await supabase
@@ -48,7 +48,7 @@ export async function getUiPrefs(
  * RPC y complica la API para una columna que se actualiza rara vez.
  */
 export async function updateUiPrefs(
-  supabase: SupabaseClient,
+  supabase: TypedSupabaseClient,
   userId: string,
   patch: Partial<UiPrefs>,
 ): Promise<void> {

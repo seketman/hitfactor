@@ -32,13 +32,8 @@ Aplicar **todas** las migraciones en Supabase, en orden numérico:
 
 | # | Archivo | Qué hace |
 |---|---|---|
-| 0001 | [`0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) | Schema inicial (profiles, disciplines, divisions IPSC, shooters, matches, stages, match_entries, stage_results, match_reports, RLS) |
-| 0002 | [`0002_steel_challenge.sql`](../supabase/migrations/0002_steel_challenge.sql) | Soporte Steel Challenge (`total_time_seconds` + divisiones) |
-| 0003 | [`0003_steel_source_type.sql`](../supabase/migrations/0003_steel_source_type.sql) | `practiscore_steel_html` en CHECK de source_type |
-| 0004 | [`0004_fbi.sql`](../supabase/migrations/0004_fbi.sql) | Divisiones Tiro FBI + `fbi_csv` en CHECK |
-| 0005 | [`0005_matches_nulls_not_distinct.sql`](../supabase/migrations/0005_matches_nulls_not_distinct.sql) | UNIQUE de matches resistente a region NULL |
-| 0006 | [`0006_profiles_readable_by_authenticated.sql`](../supabase/migrations/0006_profiles_readable_by_authenticated.sql) | SELECT de profiles abierto a autenticados |
-| 0007 | [`0007_firearms.sql`](../supabase/migrations/0007_firearms.sql) | Catálogo de armas y log de uso por match |
+| 0001 | [`0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) | Schema completo: profiles, disciplines, divisions (IPSC + Steel + FBI), shooters, matches, stages, match_entries, stage_results, match_reports, firearms, audit_log, feedback, clubs y RLS |
+| 0002 | [`0002_my_discipline_counts.sql`](../supabase/migrations/0002_my_discipline_counts.sql) | RPC `my_discipline_counts(p_user_id)` — agrega en Postgres el conteo de participaciones por disciplina del usuario (lo consume el sidebar) |
 
 Para desarrollo se recomienda **deshabilitar la confirmación por email** en
 Supabase → *Authentication → Sign In / Providers → Email* — así podés crear
@@ -51,7 +46,12 @@ npm run dev          # dev server (localhost:3000)
 npm run build        # build de producción
 npm test             # corre tests una vez
 npm run test:watch   # tests en watch mode
+npm run db:types     # regenera src/lib/supabase/database.types.ts desde la DB
 ```
+
+`db:types` necesita un `SUPABASE_ACCESS_TOKEN` en el entorno (o `supabase
+login` previo). Correlo después de aplicar una migración que cambie el
+schema, así el cliente Supabase tipado queda sincronizado.
 
 ## Estructura del proyecto
 
@@ -63,4 +63,4 @@ Ver [`architecture.md`](./architecture.md).
 npm test && npx tsc --noEmit && npm run build
 ```
 
-Los tres tienen que pasar. Hoy: 130 tests verdes, typecheck limpio.
+Los tres tienen que pasar. Hoy: 243 tests verdes, typecheck limpio.

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { TypedSupabaseClient } from "../supabase/types";
 import type { Club } from "./types";
 
 /**
@@ -13,7 +13,7 @@ import type { Club } from "./types";
  * `supabase` sea estable por request — lo es, ver `createClient`.
  */
 export const listClubs = cache(
-  async (supabase: SupabaseClient): Promise<Club[]> => {
+  async (supabase: TypedSupabaseClient): Promise<Club[]> => {
     const { data } = await supabase
       .from("clubs")
       .select("code, name, country, zone")
