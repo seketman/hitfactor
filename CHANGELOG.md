@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/seketman/hitfactor/compare/v1.2.0...v1.2.1) (2026-05-14)
+
+
+### Performance Improvements
+
+* architecture quick wins — caching, single-RPC sidebar, typed Supabase client ([#16](https://github.com/seketman/hitfactor/issues/16)) ([c556b7f](https://github.com/seketman/hitfactor/commit/c556b7f594e7e9feb78542457e9a0af4c5a1a059))
+
 ## [1.2.0](https://github.com/seketman/hitfactor/compare/v1.1.0...v1.2.0) (2026-05-13)
 
 
