@@ -24,6 +24,14 @@ export interface Profile {
 export interface UiPrefs {
   /** Items por página en el listado `/matches`. */
   matchesPageSize?: number;
+  /**
+   * Si true, ocultamos las sugerencias de "Soy yo" del listado de matches.
+   * Sirve para usuarios que ya entendieron el modelo y prefieren la vista
+   * limpia, o que no quieren claimar ninguno de los candidatos sugeridos.
+   * Una vez que el usuario claima cualquier shooter, las sugerencias dejan
+   * de mostrarse igual (el gate primario es `myShooters.length === 0`).
+   */
+  claimSuggestionsDismissed?: boolean;
 }
 
 export interface Discipline {

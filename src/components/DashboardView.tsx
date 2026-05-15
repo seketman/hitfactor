@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -45,6 +46,16 @@ export async function DashboardView({
     listMyShooters(supabase, userId),
     listClubs(supabase),
   ]);
+
+  // Onboarding: si nunca claimó ninguna identidad, el dashboard no tiene
+  // nada para mostrarle (todos los KPIs/historial dependen de tener al
+  // menos un shooter linkeado). Lo redirigimos a `/matches`, donde la card
+  // de sugerencias le presenta candidatos detectados por similitud. Solo
+  // aplica al dashboard consolidado — en `/dashboard/[discipline]` el
+  // usuario navega con intención y aceptamos mostrar el empty state.
+  if (isConsolidated && myShooters.length === 0) {
+    redirect("/matches");
+  }
 
   const allEntries = await listEntriesByShooters(
     supabase,

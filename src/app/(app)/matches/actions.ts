@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/require-user";
 import { updateUiPrefs } from "@/lib/db/profiles";
 
@@ -25,4 +26,19 @@ export async function saveMatchesPageSize(size: number): Promise<void> {
   if (!Number.isFinite(size) || !ALLOWED_SIZES.includes(size)) return;
   const { supabase, user } = await requireUser();
   await updateUiPrefs(supabase, user.id, { matchesPageSize: size });
+}
+
+/**
+ * Oculta para siempre las sugerencias de "Soy yo" en `/matches`. Pensada
+ * para usuarios que vieron la card pero ninguno de los candidatos es
+ * realmente ellos (o que ya entendieron el flujo y quieren la vista limpia).
+ *
+ * No es destructiva: si el usuario claima cualquier shooter más adelante,
+ * las sugerencias se ocultan igual por el gate primario (`myShooters > 0`),
+ * así que este flag solo importa mientras el usuario tiene 0 claims.
+ */
+export async function dismissClaimSuggestions(): Promise<void> {
+  const { supabase, user } = await requireUser();
+  await updateUiPrefs(supabase, user.id, { claimSuggestionsDismissed: true });
+  revalidatePath("/matches");
 }

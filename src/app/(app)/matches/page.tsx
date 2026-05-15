@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MatchList } from "@/components/MatchList";
 import { Pagination } from "@/components/Pagination";
+import { ClaimSuggestions } from "@/components/ClaimSuggestions";
 import { requireUser } from "@/lib/supabase/require-user";
 import { listMatchesPage } from "@/lib/db/matches";
 import { listClubs } from "@/lib/db/clubs";
+import { listMyShooters } from "@/lib/db/shooters";
+import { findClaimSuggestions } from "@/lib/db/claim-suggestions";
 import { getUiPrefs } from "@/lib/db/profiles";
 import { saveMatchesPageSize } from "./actions";
 
@@ -55,10 +58,21 @@ export default async function MatchesPage({ searchParams }: PageProps) {
   const parsedPage = Math.floor(Number(pageParam));
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
-  const [{ matches, total }, clubs] = await Promise.all([
+  const [{ matches, total }, clubs, myShooters] = await Promise.all([
     listMatchesPage(supabase, { page, size }),
     listClubs(supabase),
+    listMyShooters(supabase, user.id),
   ]);
+
+  // Sugerencias de onboarding: solo si el usuario nunca claimó nada Y no
+  // dismisseó la card. La query es relativamente liviana (filtra shooters
+  // huérfanos en la DB, escanea entries por fecha), pero la evitamos en el
+  // caso común (usuario con claims) para no pagar el round-trip.
+  const showSuggestions =
+    myShooters.length === 0 && !uiPrefs.claimSuggestionsDismissed;
+  const suggestions = showSuggestions
+    ? await findClaimSuggestions(supabase, user.id)
+    : [];
 
   const totalPages = Math.max(1, Math.ceil(total / size));
 
@@ -90,6 +104,9 @@ export default async function MatchesPage({ searchParams }: PageProps) {
         </Card>
       ) : (
         <>
+          {suggestions.length > 0 && (
+            <ClaimSuggestions suggestions={suggestions} />
+          )}
           <MatchList
             matches={matches}
             userId={user.id}
