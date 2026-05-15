@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/seketman/hitfactor/compare/v1.2.1...v1.3.0) (2026-05-15)
+
+
+### Features
+
+* **onboarding:** surface claim candidates on /matches for first-time users ([#18](https://github.com/seketman/hitfactor/issues/18)) ([cdd7e0c](https://github.com/seketman/hitfactor/commit/cdd7e0cb44adbe3b035bd6ef73ae81fee3c6101c))
+
 ## [1.2.1](https://github.com/seketman/hitfactor/compare/v1.2.0...v1.2.1) (2026-05-14)
 
 
