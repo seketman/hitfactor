@@ -74,7 +74,7 @@ export function buildClaimAliases(
  * Una vez linkeado un shooter con nombre completo (≥2 tokens), los aliases
  * pasan a ser útiles y el filtro arranca.
  */
-function hasUsefulAliases(aliases: ClaimAliases): boolean {
+export function hasUsefulAliases(aliases: ClaimAliases): boolean {
   if (aliases.memberNumbers.size > 0) return true;
   return aliases.names.some((name) => nameTokens(name).size >= 2);
 }
