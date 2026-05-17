@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/seketman/hitfactor/compare/v1.3.1...v1.3.2) (2026-05-17)
+
+
+### Bug Fixes
+
+* **winmss-pdf:** prefer first title candidate by position, not length ([#22](https://github.com/seketman/hitfactor/issues/22)) ([2fad4ae](https://github.com/seketman/hitfactor/commit/2fad4aef2e86dc039e522a30783fbe25524d7f01))
+
 ## [1.3.1](https://github.com/seketman/hitfactor/compare/v1.3.0...v1.3.1) (2026-05-17)
 
 
