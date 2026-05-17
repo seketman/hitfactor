@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/seketman/hitfactor/compare/v1.3.0...v1.3.1) (2026-05-17)
+
+
+### Bug Fixes
+
+* **auth:** handle email confirm via token_hash so new session overwrites old ([#20](https://github.com/seketman/hitfactor/issues/20)) ([752375c](https://github.com/seketman/hitfactor/commit/752375c4825b24238acce2e3c7f1480a2a964865))
+
 ## [1.3.0](https://github.com/seketman/hitfactor/compare/v1.2.1...v1.3.0) (2026-05-15)
 
 
