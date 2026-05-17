@@ -308,6 +308,57 @@ Page 1 of 1`;
   });
 });
 
+describe("parseWinmssText — título corto pierde contra distractores largos", () => {
+  // Bug reproducido con el match "SOCIAL DOMINGO" (TFABA, 17/05/26):
+  // título de 14 chars. En el PDF de stages la página 1 tiene "SOCIAL
+  // DOMINGO" seguido de "Stage 1 -- LA UNO" (17 chars), y en la última
+  // página la fila DQ "21 Production Optics Echeverria, Guillermo Ramon"
+  // (~48 chars). Con la heurística vieja "el más largo gana", el extractor
+  // elegía cualquiera de esos en vez del título real, y el resolver de
+  // stages no encontraba el match en DB.
+  //
+  // Fix: la posición es la señal — el título siempre aparece arriba de la
+  // página, antes de cualquier "Stage N" o tabla de DQs.
+  // El orden de líneas refleja la salida real de unpdf: el header de
+  // división va PRIMERO (arriba del PDF), después el título, después
+  // "Printed". El "Stage 1 -- LA UNO" sin "Etapa" no entra en el strip
+  // pattern existente y queda como candidato más largo (17 chars vs
+  // "SOCIAL DOMINGO" 14).
+  const socialDomingoStagePage = `PCC OPTIC -- Overall Stage Results
+SOCIAL DOMINGO
+Printed May 17, 2026 at 13:41
+Stage 1 -- LA UNO
+PTS TIME FACTOR POINTS PERCENT # Name
+HIT STAGE STAGE COMPETITOR
+1 37 4.79 7.7244 45.0000 100.00 44 Ortiz, Facundo Maximil
+2 26 5.13 5.0682 29.5258 65.61 57 Salomone, Juan Pablo
+Page 1`;
+
+  // La página DQ del WinMSS clásico: la fila "21 Production Optics
+  // Echeverria, Guillermo Ramon" (~48 chars) no la filtra el regex
+  // `^\s*\d+\s+\d` (después de "21 " viene "P", no dígito), y antes
+  // ganaba como candidato más largo contra "SOCIAL DOMINGO".
+  const socialDomingoDqPage = `SOCIAL DOMINGO
+Printed May 17, 2026 at 13:41
+Disqualified Shooters
+No. Division Name
+21 Production Optics Echeverria, Guillermo Ramon
+1 Disqualifications
+Page 1 of 1`;
+
+  it("elige el título corto sobre 'Stage N -- NOMBRE' más largo", () => {
+    const parsed = parseWinmssText(pages(socialDomingoStagePage));
+    expect(parsed.name).toBe("SOCIAL DOMINGO");
+  });
+
+  it("el título sobrevive aun cuando la página DQ trae filas muy largas", () => {
+    const parsed = parseWinmssText(
+      pages(socialDomingoStagePage, socialDomingoDqPage),
+    );
+    expect(parsed.name).toBe("SOCIAL DOMINGO");
+  });
+});
+
 describe("parseWinmssText — formato ESS by-Stage", () => {
   // Tercer formato: PDFs de stages generados por ESS. Diferencias clave:
   //  - Header: "X - Results by Stage" (no "Stage Results" ni "Stage N")
