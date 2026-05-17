@@ -414,10 +414,19 @@ function parsePage(
 }
 
 /**
- * Saca el título del match de la página. WinMSS suele ponerlo en una
- * línea junto con "Printed mayo X, YYYY" — primero stripeamos cualquier
- * marker (Printed, headers de columnas, etc.), después dedup si quedó
- * el título duplicado, y nos quedamos con la primera línea que sobra.
+ * Saca el título del match de la página. WinMSS lo pone arriba — junto al
+ * header de división, junto al "Printed" o en una línea propia entre los
+ * dos. Stripeamos los markers conocidos (headers de columnas, "Printed",
+ * footers, headers de stage) y nos quedamos con la PRIMERA línea que
+ * sobra.
+ *
+ * Antes la heurística era "la línea más larga gana" — fallaba con torneos
+ * de título corto como "SOCIAL DOMINGO" (14 chars), porque cualquier
+ * "Stage N -- LA NOMBRE" (17+ chars) o una fila de DQ del tipo
+ * "21 Production Optics Apellido, Nombre" (~48 chars) la sobrepasaba en
+ * longitud. La posición es una señal más fuerte: en TODOS los formatos
+ * que vemos (WinMSS clásico, ESS, DQ page) el título aparece arriba —
+ * los distractores son siempre líneas posteriores (stages, tablas, DQs).
  */
 function extractMatchName(text: string): string {
   const lines = text
@@ -491,11 +500,9 @@ function extractMatchName(text: string): string {
   }
 
   if (candidates.length === 0) return "";
-  // El título es la línea con más sustancia — los fragmentos sueltos suelen
-  // ser cortos ("Page", residuos de stripping). Empata con el primero que
-  // llegó al máximo, así que en archivos overall normales sigue ganando la
-  // primera ocurrencia del título.
-  return candidates.reduce((a, b) => (b.length > a.length ? b : a));
+  // Primera línea que pasa todos los filtros — el título siempre arranca
+  // arriba de la página, antes de cualquier "Stage N" o tabla de DQs.
+  return candidates[0];
 }
 
 // Nombres de columna que aparecen en las tablas de WinMSS (overall + stages).
