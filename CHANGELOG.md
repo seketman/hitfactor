@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.3](https://github.com/seketman/hitfactor/compare/v1.3.2...v1.3.3) (2026-05-18)
+
+
+### Bug Fixes
+
+* **auth:** clearer signup + unconfirmed-email messages ([#25](https://github.com/seketman/hitfactor/issues/25)) ([cd8e207](https://github.com/seketman/hitfactor/commit/cd8e2078d07ee6d9352439b88e4205d64cdb73d3))
+* **copy:** replace tech jargon with plain language across the app ([#24](https://github.com/seketman/hitfactor/issues/24)) ([6339624](https://github.com/seketman/hitfactor/commit/6339624e4a6f61d32589df30955dd47bc6f00d56))
+
 ## [1.3.2](https://github.com/seketman/hitfactor/compare/v1.3.1...v1.3.2) (2026-05-17)
 
 
