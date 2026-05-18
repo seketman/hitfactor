@@ -37,9 +37,14 @@ export function ClaimSuggestions({ suggestions }: ClaimSuggestionsProps) {
               ¿Sos vos en alguno de estos matches?
             </h2>
             <p className="mt-1 text-sm text-fg-muted">
-              Detectamos {suggestions.length === 1 ? "un" : suggestions.length}{" "}
-              tirador{suggestions.length === 1 ? "" : "es"} con nombre parecido
-              al tuyo. Linkear te habilita ver tu performance en el dashboard.
+              Encontramos{" "}
+              {suggestions.length === 1
+                ? "un tirador"
+                : `${suggestions.length} tiradores`}{" "}
+              con nombre parecido al tuyo. Si sos vos, hacé click en{" "}
+              <span className="font-medium text-fg">&ldquo;Soy yo&rdquo;</span>{" "}
+              para asociar esa participación a tu cuenta y empezar a ver tus
+              resultados.
             </p>
           </div>
         </div>

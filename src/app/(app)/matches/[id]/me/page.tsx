@@ -64,9 +64,9 @@ export default async function PersonalMatchPage({
     return (
       <PageContainer>
         <BackToDashboard />
-        <Alert tone="warning" title="Necesitás linkear tu identidad de tirador">
+        <Alert tone="warning" title="Asociá una participación a tu cuenta">
           Para ver tu detalle del match, primero buscá tu nombre en el ranking
-          público y dale a “Soy yo”.{" "}
+          público y hacé click en “Soy yo”.{" "}
           <Link href={`/matches/${id}`} className="underline hover:text-fg">
             Ir al ranking del match
           </Link>
@@ -174,7 +174,7 @@ export default async function PersonalMatchPage({
 
       <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
-          Tu performance por stage
+          Tus resultados por stage
         </h2>
 
         {stageResults.length === 0 ? (
@@ -491,7 +491,7 @@ function BackToDashboard() {
       href="/dashboard"
       className="mb-4 inline-block text-sm text-fg-muted hover:text-accent"
     >
-      ← Volver al dashboard
+      ← Volver a mis estadísticas
     </Link>
   );
 }

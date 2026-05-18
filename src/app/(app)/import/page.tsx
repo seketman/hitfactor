@@ -98,8 +98,13 @@ export default async function ImportPage({
               ¿Sos alguno de estos tiradores?
             </h2>
             <p className="mt-1 text-sm text-fg-muted">
-              Detectamos {candidates.length === 1 ? "una coincidencia" : `${candidates.length} coincidencias`}
-              {" "}entre los participantes y tu perfil. Linkealos para ver tu performance.
+              Encontramos{" "}
+              {candidates.length === 1
+                ? "una coincidencia"
+                : `${candidates.length} coincidencias`}{" "}
+              entre los participantes y tu perfil. Si sos vos, hacé click en{" "}
+              <span className="font-medium text-fg">&ldquo;Soy yo&rdquo;</span>{" "}
+              para asociar esa participación a tu cuenta y ver tus resultados.
             </p>
           </div>
           <ul className="divide-y divide-border border-t border-border">
