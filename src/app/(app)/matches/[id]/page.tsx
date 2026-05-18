@@ -256,7 +256,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                           {!canClaim &&
                             shooter?.linked_user_id &&
                             !isMine && (
-                              <span className="text-xs text-fg-subtle">linkeado</span>
+                              <span className="text-xs text-fg-subtle">
+                                ya asociado
+                              </span>
                             )}
                         </TD>
                       </TR>

@@ -99,7 +99,7 @@ describe("describeAuditEntry", () => {
         metadata: { shooter_full_name: "Demarziani Diego" },
       }),
     );
-    expect(desc.summary).toContain("Desvinculaste");
+    expect(desc.summary).toContain("Quitaste la asociación");
     expect(desc.summary).toContain("Demarziani Diego");
   });
 

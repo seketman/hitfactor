@@ -44,7 +44,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
           </p>
           <p className="mt-2 text-xs text-fg-subtle">
             Cualquier acción que hagas (importar un match, asignar un arma,
-            linkear un shooter, etc.) va a aparecer acá.
+            asociar una participación a tu cuenta, etc.) va a aparecer acá.
           </p>
         </Card>
       ) : (

@@ -96,7 +96,7 @@ export async function DashboardView({
 
       {myEntries.length > 0 ? (
         <>
-          <Section title="Tu performance">
+          <Section title="Tus resultados">
             <StatsOverview
               stats={computeShooterStats(myEntries, {
                 divisionSizes,
@@ -133,10 +133,10 @@ function EmptyState({ hasIdentities }: { hasIdentities: boolean }) {
     <Card className="p-10 text-center">
       {hasIdentities ? (
         <>
-          <p className="font-medium">Tus stats van a aparecer acá</p>
+          <p className="font-medium">Tus estadísticas van a aparecer acá</p>
           <p className="mt-2 text-sm text-fg-muted">
             En cuanto se importe un match en el que hayas participado, vas a
-            ver tu performance, KPIs e historial.
+            ver tus resultados, estadísticas e historial.
           </p>
           <Link href="/matches" className="mt-4 inline-block">
             <Button size="sm">Ver matches</Button>
@@ -144,10 +144,10 @@ function EmptyState({ hasIdentities }: { hasIdentities: boolean }) {
         </>
       ) : (
         <>
-          <p className="font-medium">Linkeá tu identidad de tirador</p>
+          <p className="font-medium">Asociá una participación a tu cuenta</p>
           <p className="mt-2 text-sm text-fg-muted">
-            Buscá tu nombre en el ranking de algún match y dale a "Soy yo"
-            para empezar a ver tus estadísticas acá.
+            Buscá tu nombre en el ranking de algún match y hacé click en
+            “Soy yo” para empezar a ver tus estadísticas acá.
           </p>
           <Link href="/matches" className="mt-4 inline-block">
             <Button size="sm">Ver matches</Button>
@@ -162,18 +162,18 @@ function renderConsolidatedSubtitle(
   myShooters: Awaited<ReturnType<typeof listMyShooters>>,
 ) {
   if (myShooters.length === 0) {
-    return "Aún no linkeaste tu identidad. Buscá tu nombre en algún match para hacerlo.";
+    return "Todavía no asociaste ninguna participación a tu cuenta. Buscá tu nombre en algún match para hacerlo.";
   }
   if (myShooters.length === 1) {
     return (
       <>
-        Linkeado como <span className="text-fg">{myShooters[0]!.full_name}</span>
+        Asociado con <span className="text-fg">{myShooters[0]!.full_name}</span>
       </>
     );
   }
   return (
     <>
-      Linkeado como{" "}
+      Asociado con{" "}
       <span
         className="text-fg"
         title={myShooters.map((s) => s.full_name).join(" · ")}

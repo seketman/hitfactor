@@ -72,10 +72,10 @@ export function describeAuditEntry(row: AuditLogRow): AuditDescription {
     }
 
     case "shooter.claim": {
-      const name = s(m.shooter_full_name) ?? "un shooter";
+      const name = s(m.shooter_full_name) ?? "un tirador";
       const matchName = s(m.match_name);
       return {
-        summary: `Linkeaste el shooter "${name}"`,
+        summary: `Asociaste a tu cuenta el tirador "${name}"`,
         detail: matchName ? `desde "${matchName}"` : undefined,
         link: s(m.match_id)
           ? { href: `/matches/${m.match_id}`, label: "Ver match" }
@@ -85,7 +85,7 @@ export function describeAuditEntry(row: AuditLogRow): AuditDescription {
 
     case "shooter.unclaim":
       return {
-        summary: `Desvinculaste el shooter "${s(m.shooter_full_name) ?? "?"}"`,
+        summary: `Quitaste la asociación del tirador "${s(m.shooter_full_name) ?? "?"}"`,
       };
 
     case "firearm.create": {

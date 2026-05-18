@@ -62,7 +62,10 @@ export async function claimShooter(formData: FormData) {
     .is("linked_user_id", null);
 
   if (error) {
-    redirectWithError(errorTarget, "No se pudo linkear el tirador: " + error.message);
+    redirectWithError(
+      errorTarget,
+      "No se pudo asociar el tirador a tu cuenta: " + error.message,
+    );
   }
 
   // Si vino con match_id resolvemos también el nombre del match para que
