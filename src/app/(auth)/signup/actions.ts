@@ -32,7 +32,15 @@ export async function signup(formData: FormData) {
     redirectWithError("/signup", error.message);
   }
 
-  // Si el proyecto requiere confirmación de email, no habrá session aún.
-  // Igual mostramos un mensaje de éxito.
-  redirect("/login?info=Cuenta%20creada.%20Inici%C3%A1%20sesi%C3%B3n.");
+  // Supabase está configurado con "Confirm email" obligatorio (ver Dashboard
+  // → Auth → Email). El signup NO devuelve sesión, el user tiene que abrir
+  // el mail de confirmación PRIMERO. El mensaje viejo "Cuenta creada.
+  // Iniciá sesión." inducía a probar login antes de confirmar y caer en
+  // "Email not confirmed". Incluimos el email destino para que el usuario
+  // sepa qué casilla revisar (importa especialmente con `+alias`).
+  const info =
+    `Cuenta creada. Te enviamos un email a ${email} con un link de ` +
+    `confirmación. Hacé click ahí y volvé a ingresar. Si no lo ves, ` +
+    `revisá tu carpeta de spam.`;
+  redirect(`/login?info=${encodeURIComponent(info)}`);
 }
