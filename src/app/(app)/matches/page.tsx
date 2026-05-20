@@ -86,6 +86,13 @@ export default async function MatchesPage({ searchParams }: PageProps) {
               ? "Todavía no se importó ningún match."
               : `${total} torneo${total === 1 ? "" : "s"} cargado${total === 1 ? "" : "s"} en HitFactor`}
           </p>
+          {total > 0 && (
+            <p className="mt-1 max-w-prose text-sm text-fg-subtle">
+              Los importa la comunidad y quedan disponibles para todos. Buscá
+              uno en el que hayas participado y marcate con “Soy yo” — no hace
+              falta volver a subirlo.
+            </p>
+          )}
         </div>
         <Link href="/import">
           <Button>Importar match</Button>
@@ -94,9 +101,10 @@ export default async function MatchesPage({ searchParams }: PageProps) {
 
       {total === 0 ? (
         <Card className="p-10 text-center">
-          <p className="text-fg-muted">
+          <p className="mx-auto max-w-prose text-fg-muted">
             Sé el primero en importar uno desde tu planilla de PractiScore o el
-            CSV de Tiro FBI.
+            CSV de Tiro FBI. Va a quedar disponible para todos los tiradores que
+            participaron, no solo para vos.
           </p>
           <Link href="/import" className="mt-4 inline-block">
             <Button size="sm">Importar el primero</Button>
