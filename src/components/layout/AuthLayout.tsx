@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import Link from "next/link";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 interface AuthLayoutProps {
@@ -13,10 +14,10 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
     <main className="flex min-h-screen items-center justify-center bg-bg px-4 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-accent" aria-hidden />
             <span className="font-semibold tracking-tight">HitFactor</span>
-          </div>
+          </Link>
           <ThemeToggle />
         </div>
 

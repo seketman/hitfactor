@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Users } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -52,6 +53,20 @@ export default async function ImportPage({
           ipsc.org.ar (overall y stages por separado).
         </p>
       </header>
+
+      <div className="mb-6 flex items-start gap-3 rounded-md border border-border bg-surface-2 px-4 py-3">
+        <Users className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+        <p className="text-sm text-fg-muted">
+          Lo que importás queda disponible para{" "}
+          <span className="font-medium text-fg">todos los tiradores</span> del
+          torneo, no solo para vos. Si el match ya lo cargó otra persona, no
+          hace falta volver a subirlo:{" "}
+          <Link href="/matches" className="text-accent hover:underline">
+            buscalo en Matches
+          </Link>{" "}
+          y marcate con &ldquo;Soy yo&rdquo;.
+        </p>
+      </div>
 
       {(params.error || params.ok === "1") && (
         <DismissOnSubmit key={`alerts:${resultKey(params)}`}>
