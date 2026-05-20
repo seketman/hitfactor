@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/seketman/hitfactor/compare/v1.3.3...v1.4.0) (2026-05-20)
+
+
+### Features
+
+* **landing:** add public landing page + highlight shared match library ([#31](https://github.com/seketman/hitfactor/issues/31)) ([6fd29ab](https://github.com/seketman/hitfactor/commit/6fd29abb6d143c224fcbebd27dbfe7e3071333b0))
+
+
+### Bug Fixes
+
+* **db:** resolve Supabase Security Advisor warnings ([#29](https://github.com/seketman/hitfactor/issues/29)) ([73af27b](https://github.com/seketman/hitfactor/commit/73af27b49706ffa6d384026f51ab158a993951e8))
+
 ## [1.3.3](https://github.com/seketman/hitfactor/compare/v1.3.2...v1.3.3) (2026-05-18)
 
 
