@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { useFormStatus } from "react-dom";
-import { Loader2 } from "lucide-react";
+import { useActionState, useState } from "react";
+import Link from "next/link";
+import { CalendarClock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Alert } from "@/components/ui/Alert";
+import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
-import { importHtml } from "./actions";
+import { importHtml, type ImportFormState } from "./actions";
+
+const INITIAL_STATE: ImportFormState = { status: "idle" };
 
 interface ImportFormProps {
   /** True si en esta vista ya estamos mostrando el resultado de un import previo. */
@@ -14,31 +18,55 @@ interface ImportFormProps {
 }
 
 /**
- * Form de importación con feedback visual claro:
- *  - Mientras el server action está corriendo, el fieldset entero queda deshabilitado.
- *  - El botón cambia de "Importar" a "Importando..." con spinner.
- *  - Después de un import exitoso, el label pasa a "Importar otro archivo".
+ * Form de importación.
  *
- * El input file nativo está oculto: usamos un botón + nombre de archivo
- * propios para mantener la UI 100% en español (el "Choose File" /
- * "No file chosen" del browser depende del locale del sistema y no se
- * puede traducir vía atributo).
+ * Flujo normal (HTML / CSV / PDF WinMSS): un solo submit — el server action
+ * parsea, importa y redirige con el resultado.
  *
- * El reseteo del input file se hace por el `key` que pasa la página (que cambia
- * en cada nuevo resultado).
+ * Flujo de los rankings PDF de la FAT: como ese formato no trae la fecha
+ * del torneo, el server action devuelve estado `needsDate` y el form pasa
+ * a un segundo paso donde el usuario completa la fecha (y puede corregir el
+ * nombre) antes de confirmar. Se maneja con `useActionState`: el
+ * `ParsedMatch` ya parseado viaja en el estado, así no hay que volver a
+ * subir ni a parsear el archivo.
  */
 export function ImportForm({ hasPreviousResult }: ImportFormProps) {
+  const [state, formAction, pending] = useActionState(
+    importHtml,
+    INITIAL_STATE,
+  );
+
   return (
     <Card className="p-6">
-      <form action={importHtml}>
-        <FormBody hasPreviousResult={!!hasPreviousResult} />
+      <form action={formAction}>
+        {state.status === "needsDate" ? (
+          <NeedsDateBody state={state} pending={pending} />
+        ) : (
+          <UploadBody
+            hasPreviousResult={!!hasPreviousResult}
+            pending={pending}
+          />
+        )}
       </form>
     </Card>
   );
 }
 
-function FormBody({ hasPreviousResult }: { hasPreviousResult: boolean }) {
-  const { pending } = useFormStatus();
+/**
+ * Paso 1: elegir el archivo a importar.
+ *
+ * El input file nativo está oculto: usamos un botón + nombre de archivo
+ * propios para mantener la UI 100% en español (el "Choose File" /
+ * "No file chosen" del browser depende del locale del sistema y no se
+ * puede traducir vía atributo).
+ */
+function UploadBody({
+  hasPreviousResult,
+  pending,
+}: {
+  hasPreviousResult: boolean;
+  pending: boolean;
+}) {
   const [filename, setFilename] = useState<string | null>(null);
 
   const buttonLabel = pending
@@ -110,6 +138,90 @@ function FormBody({ hasPreviousResult }: { hasPreviousResult: boolean }) {
           No cierres la pestaña hasta que termine.
         </p>
       )}
+    </fieldset>
+  );
+}
+
+/**
+ * Paso 2: completar la fecha de un ranking PDF de la FAT.
+ *
+ * El archivo ya se parseó OK; el `ParsedMatch` viaja en el estado del form.
+ * Solo falta la fecha del torneo (ese formato no la incluye) y, opcional,
+ * un ajuste del nombre — que se deriva del nombre del archivo.
+ */
+function NeedsDateBody({
+  state,
+  pending,
+}: {
+  state: Extract<ImportFormState, { status: "needsDate" }>;
+  pending: boolean;
+}) {
+  return (
+    <fieldset disabled={pending} className="space-y-5 disabled:opacity-60">
+      <div className="flex items-start gap-3 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
+        <CalendarClock
+          className="mt-0.5 h-4 w-4 shrink-0 text-accent"
+          aria-hidden
+        />
+        <div className="text-sm text-fg-muted">
+          <p className="font-medium text-fg">Falta la fecha del torneo</p>
+          <p className="mt-0.5">
+            Los rankings oficiales de la FAT no incluyen la fecha. Leímos{" "}
+            <strong className="text-fg">
+              {state.entriesCount} resultado{state.entriesCount === 1 ? "" : "s"}
+            </strong>{" "}
+            de {state.disciplineLabel}
+            {state.divisions.length > 0 && ` (${state.divisions.join(" / ")})`}.
+            Completá los datos para terminar la importación.
+          </p>
+        </div>
+      </div>
+
+      {state.error && (
+        <Alert tone="danger" title="No se pudo importar">
+          {state.error}
+        </Alert>
+      )}
+
+      <Input
+        label="Nombre del torneo"
+        name="name"
+        type="text"
+        defaultValue={state.parsed.name}
+        required
+      />
+
+      <Input
+        label="Fecha del torneo"
+        name="date"
+        type="date"
+        required
+        hint="No figura en el archivo de la FAT — indicá la fecha en que se corrió el match."
+      />
+
+      <div className="flex gap-3">
+        <Button type="submit" className="flex-1" aria-busy={pending}>
+          {pending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              Importando...
+            </>
+          ) : (
+            "Confirmar e importar"
+          )}
+        </Button>
+        <Link
+          href="/import"
+          className={cn(
+            "inline-flex h-10 shrink-0 items-center justify-center rounded-md px-4 text-sm font-medium",
+            "border border-border bg-surface-2 text-fg-muted transition-colors",
+            "hover:border-border-strong hover:bg-surface hover:text-fg",
+            pending && "pointer-events-none opacity-50",
+          )}
+        >
+          Cancelar
+        </Link>
+      </div>
     </fieldset>
   );
 }
