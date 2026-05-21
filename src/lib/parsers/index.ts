@@ -5,7 +5,9 @@ import {
   parseSteelChallengeHtml,
 } from "./steel-challenge";
 import { isFbiCsvFormat, parseFbiCsv } from "./fbi-csv";
-import { parseWinmssPdf } from "./winmss-pdf";
+import { extractPdfPages } from "./pdf-extract";
+import { isWinmssFormat, parseWinmssText } from "./winmss-pdf";
+import { isFatPdfFormat, parseFatText } from "./fat-pdf";
 
 /**
  * Punto de entrada único para parsear cualquier reporte soportado en
@@ -30,14 +32,35 @@ export function parseHtml(html: string): ParsedMatch {
 }
 
 /**
- * Parsea un PDF (binario) y devuelve un ParsedMatch. Hoy solo soportamos
- * PDFs WinMSS de ipsc.org.ar. Async porque carga `pdf-parse` dinámicamente.
+ * Parsea un PDF (binario) y devuelve un ParsedMatch. Soportamos dos
+ * formatos de PDF: los WinMSS de ipsc.org.ar y los rankings oficiales de
+ * la FAT. Extraemos el texto una vez y elegimos el parser según el
+ * contenido; el `filename` lo necesita el parser de la FAT (de ahí saca
+ * la disciplina y el nombre del torneo).
+ *
+ * Async porque carga `unpdf` dinámicamente.
  */
-export async function parsePdf(data: Uint8Array): Promise<ParsedMatch> {
-  return parseWinmssPdf(data);
+export async function parsePdf(
+  data: Uint8Array,
+  filename: string,
+): Promise<ParsedMatch> {
+  const pages = await extractPdfPages(data);
+  const fullText = pages.map((p) => p.text).join("\n");
+
+  if (isWinmssFormat(fullText)) {
+    return parseWinmssText(pages);
+  }
+  if (isFatPdfFormat(fullText)) {
+    return parseFatText(fullText, filename);
+  }
+  throw new Error(
+    "No reconocemos el formato de este PDF. Soportamos los PDFs WinMSS de " +
+      "ipsc.org.ar y los rankings oficiales en PDF de la FAT.",
+  );
 }
 
 export { parsePractiscoreHtml } from "./practiscore";
 export { parseSteelChallengeHtml, isSteelChallengeFormat } from "./steel-challenge";
 export { parseFbiCsv, isFbiCsvFormat } from "./fbi-csv";
-export { parseWinmssPdf, isWinmssFormat } from "./winmss-pdf";
+export { parseWinmssText, isWinmssFormat } from "./winmss-pdf";
+export { parseFatText, isFatPdfFormat } from "./fat-pdf";

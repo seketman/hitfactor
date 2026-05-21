@@ -49,8 +49,9 @@ export default async function ImportPage({
         <h1 className="text-2xl font-semibold tracking-tight">Importar resultados</h1>
         <p className="mt-1 text-sm text-fg-muted">
           Subí un archivo HTML de PractiScore (IPSC / Steel Challenge), un CSV
-          exportado de Google Sheets para Tiro FBI, o un PDF WinMSS de
-          ipsc.org.ar (overall y stages por separado).
+          exportado de Google Sheets para Tiro FBI, un PDF WinMSS de
+          ipsc.org.ar (overall y stages por separado) o un PDF de ranking
+          oficial de la FAT.
         </p>
       </header>
 
@@ -199,6 +200,14 @@ export default async function ImportPage({
             (crea el match) y después el "stages" para completar los detalles
             por etapa. La fecha del torneo se toma de la fecha de impresión
             del archivo.
+          </p>
+          <p>
+            <strong className="text-fg">PDF de ranking de la FAT</strong>: el
+            PDF de &ldquo;Ranking Oficial&rdquo; con los resultados generales
+            del match (sin stages). La disciplina se toma del nombre del
+            archivo (ej.: <code>resultados-apertura-fbi.pdf</code>). Como ese
+            formato no incluye la fecha del torneo, te la vamos a pedir antes
+            de terminar la importación.
           </p>
         </div>
       </details>

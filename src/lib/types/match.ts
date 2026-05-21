@@ -17,7 +17,8 @@ export type ParsedMatchSource =
   | "practiscore_steel_html"
   | "practiscore_pdf"
   | "winmss_pdf"
-  | "fbi_csv";
+  | "fbi_csv"
+  | "fat_pdf";
 
 /**
  * Identidad de un tirador tal como aparece en un reporte.
