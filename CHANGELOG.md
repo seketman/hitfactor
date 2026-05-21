@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/seketman/hitfactor/compare/v1.4.0...v1.5.0) (2026-05-21)
+
+
+### Features
+
+* **import:** support importing FAT ranking PDFs ([#32](https://github.com/seketman/hitfactor/issues/32)) ([1f9892a](https://github.com/seketman/hitfactor/commit/1f9892a84a14a8df2bc26ddd7cc6ce7d6a126989))
+
 ## [1.4.0](https://github.com/seketman/hitfactor/compare/v1.3.3...v1.4.0) (2026-05-20)
 
 
