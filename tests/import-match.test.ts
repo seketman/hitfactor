@@ -26,6 +26,7 @@ function buildSupabase(): FakeSupabase {
     { id: 14, discipline_id: 1, code: "PCCO", name: "PCC Optics" },
     { id: 15, discipline_id: 1, code: "S", name: "Standard" },
     { id: 16, discipline_id: 1, code: "SM", name: "Standard Manual" },
+    { id: 17, discipline_id: 1, code: "PIS", name: "Pistola" },
   ]);
   return fake;
 }
@@ -100,7 +101,7 @@ describe("importParsedMatch — Match overall", () => {
       (e) => e.shooter_id === "preexisting-shooter",
     );
     expect(diegoEntry).toBeDefined();
-    expect(diegoEntry!.division_id).toBe(11); // Production
+    expect(diegoEntry!.division_id).toBe(17); // Pistola (sección "Pistola" del fixture)
   });
 
   it("respeta DQs y los marca con is_dq=true", async () => {
@@ -211,9 +212,10 @@ describe("importParsedMatch — Match overall", () => {
   });
 
   it("falla con UNKNOWN_DIVISION si aparece una división no registrada", async () => {
-    // Quitar la división Production
+    // Quitar la división Pistola (el fixture tiene una sección "Pistola"
+    // que el parser mapea a PIS).
     fake.tables.divisions.rows = fake.tables.divisions.rows.filter(
-      (d) => d.code !== "P",
+      (d) => d.code !== "PIS",
     );
     const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-match.html"));
 

@@ -37,10 +37,54 @@ interface SectionMeta {
   kind: "match" | "stage";
   /** Texto del header tras "Match Results - " o "Stage Results - " */
   title: string;
+  /**
+   * Código de división derivado del título de la sección (ej. "Pistola" →
+   * "PIS"). Null para secciones "Combined" o para títulos que no matchean
+   * el mapa — en esos casos cada fila usa su columna `Div` como antes.
+   */
+  divisionCode: string | null;
 }
 
 const TITLE_DATE_RE = /-\s*(\d{4}-\d{2}-\d{2})\s*$/;
 const STAGE_NUMBER_RE = /Stage\s+(\d+)/i;
+
+/**
+ * Mapa de título de sección IPSC (tal como aparece tras "Match Results - "
+ * o "Stage Results - ", normalizado a MAYÚSCULAS sin espacios sobrantes)
+ * al `code` de la tabla `divisions`.
+ *
+ * Usamos esto en lugar de la columna `Div` de cada fila porque PractiScore
+ * le deja al organizador definir los códigos cortos en la config del match
+ * — y no son estables entre matches. Vimos archivos con `C` para Classic,
+ * `P` para Pcc y `P` para Pistola en el mismo torneo; el título de la
+ * sección sí es texto humano fijo y mapea bien a las divisiones de la DB.
+ */
+const DIVISION_CODE_BY_TITLE: Record<string, string> = {
+  OPEN: "O",
+  PRODUCTION: "P",
+  "PRODUCTION OPTICS": "PO",
+  STANDARD: "S",
+  "STANDARD MANUAL": "SM",
+  "CARRY OPTICS": "CO",
+  REVOLVER: "R",
+  CLASSIC: "CL",
+  MODIFIED: "MS",
+  "MODIFIED SHOTGUN": "MS",
+  PCC: "PCC",
+  "PCC OPTIC": "PCCO",
+  "PCC OPTICS": "PCCO",
+  PISTOLA: "PIS",
+};
+
+function divisionCodeFromTitle(title: string): string | null {
+  const norm = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  return DIVISION_CODE_BY_TITLE[norm] ?? null;
+}
 
 export function parsePractiscoreHtml(html: string): ParsedMatch {
   const root = parse(html);
@@ -81,7 +125,11 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
     for (const section of sections) {
       if (section.meta.kind !== "stage") continue;
       for (const row of section.rows) {
-        const result = parseStageRow(section.headers, row);
+        const result = parseStageRow(
+          section.headers,
+          row,
+          section.meta.divisionCode,
+        );
         if (result) allResults.push(result);
       }
     }
@@ -94,7 +142,11 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
     for (const section of sections) {
       if (section.meta.kind !== "match") continue;
       for (const row of section.rows) {
-        const entry = parseMatchRow(section.headers, row);
+        const entry = parseMatchRow(
+          section.headers,
+          row,
+          section.meta.divisionCode,
+        );
         if (entry) matchEntries.push(entry);
       }
     }
@@ -126,13 +178,23 @@ export function parsePractiscoreHtml(html: string): ParsedMatch {
 
 function classifyHead(titleText: string): SectionMeta | null {
   const stageMatch = /^Stage\s+Results\s*-\s*(.+)$/i.exec(titleText);
-  if (stageMatch) return { kind: "stage", title: stageMatch[1].trim() };
+  if (stageMatch) {
+    const title = stageMatch[1].trim();
+    return { kind: "stage", title, divisionCode: divisionCodeFromTitle(title) };
+  }
   const matchMatch = /^Match\s+Results\s*-\s*(.+)$/i.exec(titleText);
-  if (matchMatch) return { kind: "match", title: matchMatch[1].trim() };
+  if (matchMatch) {
+    const title = matchMatch[1].trim();
+    return { kind: "match", title, divisionCode: divisionCodeFromTitle(title) };
+  }
   return null;
 }
 
-function parseMatchRow(headers: string[], row: string[]): ParsedMatchEntry | null {
+function parseMatchRow(
+  headers: string[],
+  row: string[],
+  sectionDivisionCode: string | null,
+): ParsedMatchEntry | null {
   // Headers esperados: Place, Name, No., Class, Div, PF, Category, Match Pts, Match %, Region
   const get = (key: string) => columnValue(headers, row, key);
   const placeRaw = get("Place");
@@ -147,7 +209,11 @@ function parseMatchRow(headers: string[], row: string[]): ParsedMatchEntry | nul
       memberNumber: nullIfEmpty(get("No.")),
       region: nullIfEmpty(get("Region")),
     },
-    divisionCode: get("Div") ?? "",
+    // Preferimos el code derivado del título de la sección (estable) sobre
+    // la columna `Div` de la fila (configurable por el organizador en
+    // PractiScore). Para secciones "Combined" sectionDivisionCode es null
+    // y caemos a la columna `Div`, que es la única fuente disponible ahí.
+    divisionCode: sectionDivisionCode ?? get("Div") ?? "",
     classification: nullIfEmpty(get("Class")),
     powerFactor: parsePowerFactor(get("PF")),
     category: nullIfEmpty(get("Category")),
@@ -160,7 +226,11 @@ function parseMatchRow(headers: string[], row: string[]): ParsedMatchEntry | nul
   };
 }
 
-function parseStageRow(headers: string[], row: string[]): ParsedStageResult | null {
+function parseStageRow(
+  headers: string[],
+  row: string[],
+  sectionDivisionCode: string | null,
+): ParsedStageResult | null {
   // Headers esperados: Place, Name, No., Class, Div, PF, Points, Pen, Time, Hit Factor, Stage Pts, Stage %
   const get = (key: string) => columnValue(headers, row, key);
   const nameRaw = get("Name");
@@ -175,7 +245,8 @@ function parseStageRow(headers: string[], row: string[]): ParsedStageResult | nu
       memberNumber: nullIfEmpty(get("No.")),
       region: null, // Stage results de PractiScore no incluyen Region
     },
-    divisionCode: get("Div") ?? "",
+    // Mismo razonamiento que en `parseMatchRow`: section header > row Div.
+    divisionCode: sectionDivisionCode ?? get("Div") ?? "",
     classification: nullIfEmpty(get("Class")),
     powerFactor: parsePowerFactor(get("PF")),
     points: parseFloatOrNull(get("Points")),

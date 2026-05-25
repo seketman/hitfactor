@@ -69,12 +69,16 @@ describe("parsePractiscoreHtml — Match results by division", () => {
     expect(result.matchEntries.length).toBeGreaterThan(15);
   });
 
-  it("Diego Demarziani appears in division P with place 4", () => {
+  it("Diego Demarziani appears in division PIS with place 4", () => {
+    // El header de la sección es "Match Results - Pistola" → división PIS.
+    // PractiScore en este archivo deja `Div=P` en la fila, pero confiamos
+    // en el título de la sección porque la columna `Div` es configurable
+    // por el organizador y no es estable.
     const diego = result.matchEntries.find((e) =>
       e.shooter.fullName.toLowerCase().includes("demarziani"),
     );
     expect(diego).toBeDefined();
-    expect(diego?.divisionCode).toBe("P");
+    expect(diego?.divisionCode).toBe("PIS");
     expect(diego?.place).toBe(4);
     expect(diego?.matchPercentage).toBeCloseTo(73.7623, 3);
     expect(diego?.matchPoints).toBeCloseTo(255.2206, 3);
@@ -107,7 +111,7 @@ describe("parsePractiscoreHtml — Stage results", () => {
   it("contains results from all divisions in the stage", () => {
     const stage = result.stages[0];
     const divisions = new Set(stage.results.map((r) => r.divisionCode));
-    // Open(O), PCC, P, S, SM
+    // Secciones: Open(O), PCC, Pistola(PIS), Standard(S), Standard Manual(SM)
     expect(divisions.size).toBeGreaterThanOrEqual(4);
   });
 
@@ -117,7 +121,7 @@ describe("parsePractiscoreHtml — Stage results", () => {
       r.shooter.fullName.toLowerCase().includes("demarziani"),
     );
     expect(diego).toBeDefined();
-    expect(diego?.divisionCode).toBe("P");
+    expect(diego?.divisionCode).toBe("PIS");
     expect(diego?.hitFactor).toBeGreaterThan(0);
     expect(diego?.timeSeconds).toBeGreaterThan(0);
     expect(diego?.stagePercentage).toBeGreaterThan(0);
@@ -154,5 +158,53 @@ describe("parsePractiscoreHtml — Ranking by-division", () => {
     expect(divisions.has("PCCO")).toBe(true);
     expect(divisions.has("P")).toBe(true);
     expect(divisions.has("PO")).toBe(true);
+  });
+});
+
+describe("parsePractiscoreHtml — section header overrides row Div code", () => {
+  // Regresión: PractiScore deja que el organizador defina los códigos
+  // cortos de división en la config del match, así que la columna `Div`
+  // de las filas no es estable. Vimos archivos con `C` para Classic y `P`
+  // tanto para Pcc como para Pistola dentro del mismo torneo. El parser
+  // debe derivar la división del título de la sección, que sí es texto
+  // humano fijo, y caer al `Div` de la fila solo cuando la sección es
+  // "Combined" (un solo bloque con todas las divisiones mezcladas).
+  const html = `<!DOCTYPE html><html><head>
+<title>Test - 2026-05-24</title>
+</head><body>
+<h3>Test - 2026-05-24</h3>
+<table>
+<tr><td class="division_head" colspan="6"><b>Match Results - Classic</b></td></tr>
+<tr><th>Place</th><th>Name</th><th>No.</th><th>Class</th><th>Div</th><th>PF</th><th>Category</th><th>Match Pts</th><th>Match %</th><th>Region</th></tr>
+<tr><td>1</td><td>Foo, Alpha</td><td>1</td><td>U</td><td>C</td><td>Maj</td><td></td><td>100.0</td><td>100.0%</td><td></td></tr>
+<tr><td class="division_head" colspan="6"><b>Match Results - Pcc</b></td></tr>
+<tr><th>Place</th><th>Name</th><th>No.</th><th>Class</th><th>Div</th><th>PF</th><th>Category</th><th>Match Pts</th><th>Match %</th><th>Region</th></tr>
+<tr><td>1</td><td>Foo, Bravo</td><td>2</td><td>U</td><td>P</td><td>Maj</td><td></td><td>100.0</td><td>100.0%</td><td></td></tr>
+<tr><td class="division_head" colspan="6"><b>Match Results - Pistola</b></td></tr>
+<tr><th>Place</th><th>Name</th><th>No.</th><th>Class</th><th>Div</th><th>PF</th><th>Category</th><th>Match Pts</th><th>Match %</th><th>Region</th></tr>
+<tr><td>1</td><td>Foo, Charlie</td><td>3</td><td>U</td><td>P</td><td>Maj</td><td></td><td>100.0</td><td>100.0%</td><td></td></tr>
+<tr><td class="division_head" colspan="6"><b>Match Results - Open</b></td></tr>
+<tr><th>Place</th><th>Name</th><th>No.</th><th>Class</th><th>Div</th><th>PF</th><th>Category</th><th>Match Pts</th><th>Match %</th><th>Region</th></tr>
+<tr><td>1</td><td>Foo, Delta</td><td>4</td><td>U</td><td>O</td><td>Maj</td><td></td><td>100.0</td><td>100.0%</td><td></td></tr>
+</table>
+</body></html>`;
+  const result = parsePractiscoreHtml(html);
+  const byName = (name: string) =>
+    result.matchEntries.find((e) => e.shooter.fullName === name);
+
+  it("mapea 'Classic' a 'CL' aunque la fila diga Div=C", () => {
+    expect(byName("Foo, Alpha")?.divisionCode).toBe("CL");
+  });
+
+  it("mapea 'Pcc' a 'PCC' aunque la fila diga Div=P", () => {
+    expect(byName("Foo, Bravo")?.divisionCode).toBe("PCC");
+  });
+
+  it("mapea 'Pistola' a 'PIS' aunque la fila diga Div=P", () => {
+    expect(byName("Foo, Charlie")?.divisionCode).toBe("PIS");
+  });
+
+  it("respeta el Div de la fila cuando coincide con el header", () => {
+    expect(byName("Foo, Delta")?.divisionCode).toBe("O");
   });
 });
