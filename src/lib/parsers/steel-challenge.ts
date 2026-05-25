@@ -16,6 +16,7 @@ import {
   parseIntOr,
   parsePercentage,
   stripDqPrefix,
+  stripNameSuffixes,
 } from "./shared";
 
 /**
@@ -154,7 +155,8 @@ function parseEntryRow(
   const nameRaw = get("Name");
   if (!placeRaw || !nameRaw) return null;
 
-  const { fullName, isDq } = stripDqPrefix(nameRaw);
+  const { fullName: rawName, isDq } = stripDqPrefix(nameRaw);
+  const fullName = stripNameSuffixes(rawName);
   const totalTime = parseFloatOrNull(get("Time"));
 
   return {

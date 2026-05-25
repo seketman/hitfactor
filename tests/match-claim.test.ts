@@ -94,6 +94,44 @@ describe("areNamesSimilar", () => {
       areNamesSimilar("Martin Ferraro", "FERRARO, Martin Miguel"),
     ).toBe(true);
   });
+
+  // Tolerancia a typos de 1 caracter (Levenshtein ≤ 1) en un solo token,
+  // siempre que el resto matchee exacto. Cubre los typos típicos de carga
+  // manual del torneo.
+  it("tolera 1 caracter de diferencia en el apellido (Demarciani vs Demarziani)", () => {
+    expect(
+      areNamesSimilar("Diego Demarziani", "Demarciani, Diego"),
+    ).toBe(true);
+  });
+
+  it("tolera 1 caracter insertado (Stoker vs Stocker)", () => {
+    expect(
+      areNamesSimilar("STOCKER, Oscar Alfredo", "Stoker Oscar"),
+    ).toBe(true);
+  });
+
+  it("no fuzzy-matchea tokens cortos (< 4 caracteres)", () => {
+    // "Ana" vs "Ane": 1 caracter de diferencia pero el token es muy corto;
+    // sin el guard el matcher dispararía falsos positivos con nombres
+    // comunes de 3 letras.
+    expect(areNamesSimilar("Ana Lopez", "Ane Lopez")).toBe(false);
+  });
+
+  it("no permite 2 tokens con typos en la misma comparación", () => {
+    // Si dos tokens difieren a la vez, probablemente sean dos personas
+    // distintas. Solo toleramos UN typo por comparación.
+    expect(
+      areNamesSimilar("Dieg Demarciani", "Diego Demarziani"),
+    ).toBe(false);
+  });
+
+  it("sigue rechazando nombres con apellido totalmente distinto", () => {
+    // Garantía de regresión: el aflojamiento por typos no debe convertir
+    // el matcher en algo permisivo en general.
+    expect(
+      areNamesSimilar("Diego Demarziani", "Diego Lopez"),
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractClubFromTitle,
   pickMostCommon,
+  stripNameSuffixes,
 } from "@/lib/parsers/shared";
 
 describe("extractClubFromTitle", () => {
@@ -58,5 +59,79 @@ describe("pickMostCommon", () => {
   it("en caso de empate devuelve el primero que llegó al máximo", () => {
     // "A" y "B" tienen 2 cada uno; A llegó primero a 2.
     expect(pickMostCommon(["A", "A", "B", "B"])).toBe("A");
+  });
+});
+
+describe("stripNameSuffixes", () => {
+  // Pasada A — paréntesis terminales.
+  it("saca un paréntesis terminal tipeado por el organizador", () => {
+    expect(stripNameSuffixes("Chong, Gonzalo (Cursaste)")).toBe(
+      "Chong, Gonzalo",
+    );
+  });
+
+  it("saca múltiples paréntesis terminales encadenados", () => {
+    expect(stripNameSuffixes("Foo, Bar (Cursando) (Senior)")).toBe("Foo, Bar");
+  });
+
+  it("no toca paréntesis en el medio del nombre", () => {
+    expect(stripNameSuffixes("Foo (Bar) Baz")).toBe("Foo (Bar) Baz");
+  });
+
+  // Pasada B — tokens conocidos al final.
+  it("saca región IPSC pegada al final del nombre", () => {
+    expect(stripNameSuffixes("CIPOLLETTI, Pablo ARG")).toBe("CIPOLLETTI, Pablo");
+  });
+
+  it("saca región + token desconocido + región (caso ARG ESC)", () => {
+    // Caso real: WinMSS reconstruye "Region|Marker" como dos tokens. La
+    // pasada B itera de derecha a izquierda: saca ESC, luego saca ARG.
+    expect(stripNameSuffixes("CIRIONI, Germán ARG ESC")).toBe(
+      "CIRIONI, Germán",
+    );
+  });
+
+  it("saca un código de división trailing", () => {
+    expect(stripNameSuffixes("ALZATTO, Luciano PCC")).toBe("ALZATTO, Luciano");
+  });
+
+  it("combina pasada A + B en un mismo nombre", () => {
+    expect(stripNameSuffixes("Foo, Bar (Cursaste) ARG")).toBe("Foo, Bar");
+  });
+
+  it("respeta tokens desconocidos (no agresivo con apellidos cortos)", () => {
+    // "Lopez" no está en el set conocido — no lo toca.
+    expect(stripNameSuffixes("Diego Lopez")).toBe("Diego Lopez");
+    // Letras sueltas no se sacan por más que coincidan con un code DB.
+    expect(stripNameSuffixes("García P")).toBe("García P");
+  });
+
+  it("es idempotente sobre un nombre ya limpio", () => {
+    expect(stripNameSuffixes("Demarziani, Diego")).toBe("Demarziani, Diego");
+  });
+
+  it("normaliza acentos al chequear el token (REVÓLVER -> REVOLVER)", () => {
+    expect(stripNameSuffixes("Pérez, José REVÓLVER")).toBe("Pérez, José");
+  });
+
+  it("saca rol Oficial de Campo (OC) al final del nombre", () => {
+    expect(stripNameSuffixes("SUAREZ, Rodrigo Daniel ARG OC")).toBe(
+      "SUAREZ, Rodrigo Daniel",
+    );
+  });
+
+  it("saca categorías IPSC multi-letra Super Senior (SS) y Grand Senior (GS)", () => {
+    expect(stripNameSuffixes("TONDINI, Claudio Oscar SS ARG OC")).toBe(
+      "TONDINI, Claudio Oscar",
+    );
+    expect(stripNameSuffixes("ZARATE, Jose GS ARG OC")).toBe("ZARATE, Jose");
+  });
+
+  it("NO saca categorías de una sola letra (riesgo de inicial del nombre)", () => {
+    // "S" puede ser Senior o una inicial del segundo nombre. Lo dejamos
+    // para no introducir falsos positivos.
+    expect(stripNameSuffixes("TEJERINA, Eduardo Martin S ARG OC")).toBe(
+      "TEJERINA, Eduardo Martin S",
+    );
   });
 });

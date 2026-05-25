@@ -64,15 +64,22 @@ export default async function MatchesPage({ searchParams }: PageProps) {
     listMyShooters(supabase, user.id),
   ]);
 
-  // Sugerencias de onboarding: solo si el usuario nunca claimó nada Y no
-  // dismisseó la card. La query es relativamente liviana (filtra shooters
-  // huérfanos en la DB, escanea entries por fecha), pero la evitamos en el
-  // caso común (usuario con claims) para no pagar el round-trip.
-  const showSuggestions =
-    myShooters.length === 0 && !uiPrefs.claimSuggestionsDismissed;
+  // Sugerencias de claim. Las mostramos en dos escenarios:
+  //  - Onboarding: el usuario todavía no claimó nada — "Soy yo" arriba del
+  //    listado para que el primer claim sea un click.
+  //  - Identidades adicionales: el usuario ya tiene shooters linkeados pero
+  //    `findClaimSuggestions` encontró otras filas con nombre/socio parecido
+  //    (típico: el mismo tirador tipeado distinto en distintos torneos).
+  //
+  // En ambos casos respetamos el flag `claimSuggestionsDismissed` para no
+  // ser invasivos. Como contrapartida: si dismisseaste en algún momento,
+  // las futuras sugerencias no aparecen automáticamente — refinable más
+  // adelante (dismiss por shooter o con expiración).
+  const showSuggestions = !uiPrefs.claimSuggestionsDismissed;
   const suggestions = showSuggestions
     ? await findClaimSuggestions(supabase, user.id)
     : [];
+  const hasExistingClaims = myShooters.length > 0;
 
   const totalPages = Math.max(1, Math.ceil(total / size));
 
@@ -113,7 +120,10 @@ export default async function MatchesPage({ searchParams }: PageProps) {
       ) : (
         <>
           {suggestions.length > 0 && (
-            <ClaimSuggestions suggestions={suggestions} />
+            <ClaimSuggestions
+              suggestions={suggestions}
+              hasExistingClaims={hasExistingClaims}
+            />
           )}
           <MatchList
             matches={matches}

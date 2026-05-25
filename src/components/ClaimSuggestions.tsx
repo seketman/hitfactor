@@ -9,24 +9,41 @@ import type { ClaimSuggestion } from "@/lib/db/claim-suggestions";
 
 interface ClaimSuggestionsProps {
   suggestions: ClaimSuggestion[];
+  /**
+   * Si `true`, el usuario ya tiene shooters linkeados — el card pasa de
+   * "onboarding" (primer claim) a "identidades adicionales" (más variantes
+   * del mismo tirador tipeadas distinto en otros torneos). Cambia el copy
+   * pero no el comportamiento.
+   */
+  hasExistingClaims?: boolean;
 }
 
 /**
- * Card de onboarding que aparece arriba del listado de matches cuando el
- * usuario todavía no claimó ninguna identidad. Le presenta los shooters
- * huérfanos que más se parecen al perfil — para que el primer "Soy yo" sea
- * un click, no una expedición.
+ * Card que aparece arriba del listado de matches presentando shooters
+ * huérfanos cuyos nombres se parecen a los del usuario.
+ *
+ * Dos modos:
+ *  - Onboarding (sin claims previos): "Soy yo" para empezar a ver stats.
+ *  - Identidades adicionales (con claims previos): variantes tipeadas
+ *    distinto del mismo tirador en otros torneos — claimalas para que
+ *    sumen a tus stats existentes.
  *
  * Cada fila usa `claimShooter` con `redirect_to=/matches` para que después
- * del claim caigamos en esta misma página: el gate primario (myShooters > 0)
- * ya hace que la card desaparezca y se vea la grilla normal con stats.
+ * del claim caigamos en esta misma página: como la lista se recalcula,
+ * los shooters ya claimados desaparecen y, si quedan más sugerencias,
+ * el card se mantiene.
  *
  * "Ocultar sugerencias" es la válvula de escape para los casos en que
- * ninguno de los candidatos es realmente el usuario (típico: nombre común
- * + matches importados por otros que no son tuyos).
+ * ninguno de los candidatos es realmente el usuario.
  */
-export function ClaimSuggestions({ suggestions }: ClaimSuggestionsProps) {
+export function ClaimSuggestions({
+  suggestions,
+  hasExistingClaims = false,
+}: ClaimSuggestionsProps) {
   if (suggestions.length === 0) return null;
+
+  const tiradores =
+    suggestions.length === 1 ? "un tirador" : `${suggestions.length} tiradores`;
 
   return (
     <Card className="mb-6 border-accent/40 bg-accent-soft/40">
@@ -34,17 +51,32 @@ export function ClaimSuggestions({ suggestions }: ClaimSuggestionsProps) {
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-fg">
-              ¿Sos vos en alguno de estos matches?
+              {hasExistingClaims
+                ? "¿Encontramos más identidades tuyas?"
+                : "¿Sos vos en alguno de estos matches?"}
             </h2>
             <p className="mt-1 text-sm text-fg-muted">
-              Encontramos{" "}
-              {suggestions.length === 1
-                ? "un tirador"
-                : `${suggestions.length} tiradores`}{" "}
-              con nombre parecido al tuyo. Si sos vos, hacé click en{" "}
-              <span className="font-medium text-fg">&ldquo;Soy yo&rdquo;</span>{" "}
-              para asociar esa participación a tu cuenta y empezar a ver tus
-              resultados.
+              {hasExistingClaims ? (
+                <>
+                  Detectamos {tiradores} con nombre parecido a tus identidades
+                  ya linkeadas — probablemente sea el mismo tirador tipeado
+                  distinto en otro torneo. Hacé click en{" "}
+                  <span className="font-medium text-fg">
+                    &ldquo;Soy yo&rdquo;
+                  </span>{" "}
+                  para sumar esas participaciones a tus stats.
+                </>
+              ) : (
+                <>
+                  Encontramos {tiradores} con nombre parecido al tuyo. Si sos
+                  vos, hacé click en{" "}
+                  <span className="font-medium text-fg">
+                    &ldquo;Soy yo&rdquo;
+                  </span>{" "}
+                  para asociar esa participación a tu cuenta y empezar a ver
+                  tus resultados.
+                </>
+              )}
             </p>
           </div>
         </div>

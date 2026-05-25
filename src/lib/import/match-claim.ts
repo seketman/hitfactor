@@ -230,9 +230,17 @@ export function nameTokens(s: string): Set<string> {
 
 /**
  * True si los dos nombres parecen referirse al mismo tirador.
- * Requiere que el set más chico esté contenido en el más grande,
- * y que tenga al menos 2 tokens (nombre + apellido) — evita
- * que un apellido común genere falsos positivos.
+ *
+ * Reglas:
+ *  - El set más chico debe estar contenido en el más grande.
+ *  - Al menos 2 tokens en el set chico (nombre + apellido) — evita
+ *    que un apellido común genere falsos positivos.
+ *  - Se tolera UN token con diferencia de Levenshtein ≤ 1 (un caracter
+ *    de inserción, borrado o sustitución) si ambos tokens involucrados
+ *    tienen ≥ `FUZZY_MIN_LEN` caracteres. Cubre typos del apellido como
+ *    "Demarciani" vs "Demarziani" o "Stoker" vs "Stocker" — frecuentes
+ *    cuando la carga del torneo se hace a mano. Los demás tokens deben
+ *    matchear exacto.
  */
 export function areNamesSimilar(a: string, b: string): boolean {
   const ta = nameTokens(a);
@@ -240,8 +248,49 @@ export function areNamesSimilar(a: string, b: string): boolean {
   if (ta.size === 0 || tb.size === 0) return false;
   const [smaller, larger] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
   if (smaller.size < 2) return false;
+  let fuzzyUsed = false;
   for (const t of smaller) {
-    if (!larger.has(t)) return false;
+    if (larger.has(t)) continue;
+    // Token no idéntico: chequeamos si hay uno en larger que difiera
+    // por ≤ 1 caracter. Solo permitimos UNA tolerancia por comparación
+    // y exigimos largo mínimo en ambos tokens para descartar pares
+    // tipo "Ali" vs "Ale" donde 1 caracter de diferencia es la mitad
+    // del token.
+    if (fuzzyUsed) return false;
+    if (t.length < FUZZY_MIN_LEN) return false;
+    const found = [...larger].some(
+      (other) => other.length >= FUZZY_MIN_LEN && levenshtein(t, other) <= 1,
+    );
+    if (!found) return false;
+    fuzzyUsed = true;
   }
   return true;
+}
+
+/** Largo mínimo de token para habilitar el match fuzzy. */
+const FUZZY_MIN_LEN = 4;
+
+/**
+ * Distancia de edición de Levenshtein. Para nuestros usos (tokens cortos)
+ * el costo es despreciable; mantenemos la implementación simple en lugar
+ * de optimizarla con early-exit.
+ */
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  let prev = new Array<number>(n + 1);
+  let curr = new Array<number>(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j]! + 1, prev[j - 1]! + cost);
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n]!;
 }
