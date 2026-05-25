@@ -225,6 +225,152 @@ describe("importParsedMatch — Match overall", () => {
   });
 });
 
+describe("importParsedMatch — Dedup de shooters por member_number", () => {
+  // Cuando dos imports traen al mismo tirador con el mismo número de socio
+  // pero el apellido tipeado distinto ("STOCKER, Oscar Alfredo" en uno,
+  // "Stoker Oscar" en otro), el match por member_number los unifica en un
+  // solo shooter — sin esto, cada variante de tipeo crea fila nueva y
+  // fragmenta la historia del tirador.
+  let fake: FakeSupabase;
+  beforeEach(() => {
+    fake = buildSupabase();
+    // Shooter ya existente en la DB: full_name "Apellido Original" con
+    // número de socio 793. Simula una importación anterior.
+    fake.seed("shooters", [
+      {
+        id: "existing-shooter",
+        full_name: "Apellido Original",
+        member_number: "793",
+        linked_user_id: null,
+        created_at: "2026-01-01",
+      },
+    ]);
+  });
+
+  it("reusa el shooter existente cuando el member_number coincide, aunque el nombre venga distinto", async () => {
+    const parsed = {
+      discipline: "ipsc" as const,
+      source: "practiscore_match_html" as const,
+      name: "Match Test",
+      date: "2026-05-01",
+      region: null,
+      generatedBy: null,
+      matchEntries: [
+        {
+          shooter: {
+            fullName: "Tipo Distinto, Oscar", // nombre completamente distinto
+            memberNumber: "793", // pero MISMO número
+            region: null,
+          },
+          divisionCode: "P",
+          classification: null,
+          powerFactor: "Maj" as const,
+          category: null,
+          place: 1,
+          matchPoints: 100,
+          matchPercentage: 100,
+          totalTimeSeconds: null,
+          hits: null,
+          isDq: false,
+        },
+      ],
+      stages: [],
+    };
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "f.html");
+
+    // No se creó un shooter nuevo: el match_entry apunta al existente.
+    const shooters = fake.tables.shooters.rows;
+    expect(shooters).toHaveLength(1);
+    expect(shooters[0]!.id).toBe("existing-shooter");
+
+    const entries = fake.tables.match_entries.rows;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.shooter_id).toBe("existing-shooter");
+  });
+
+  it("crea un shooter nuevo cuando el member_number no existe todavía", async () => {
+    const parsed = {
+      discipline: "ipsc" as const,
+      source: "practiscore_match_html" as const,
+      name: "Match Test",
+      date: "2026-05-01",
+      region: null,
+      generatedBy: null,
+      matchEntries: [
+        {
+          shooter: {
+            fullName: "Nuevo Tirador",
+            memberNumber: "999", // número que no existe en la DB
+            region: null,
+          },
+          divisionCode: "P",
+          classification: null,
+          powerFactor: "Maj" as const,
+          category: null,
+          place: 1,
+          matchPoints: 100,
+          matchPercentage: 100,
+          totalTimeSeconds: null,
+          hits: null,
+          isDq: false,
+        },
+      ],
+      stages: [],
+    };
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "f.html");
+
+    // Se creó el nuevo (existing + nuevo).
+    expect(fake.tables.shooters.rows).toHaveLength(2);
+    const created = fake.tables.shooters.rows.find(
+      (s) => s.member_number === "999",
+    );
+    expect(created).toBeDefined();
+    expect(created!.full_name).toBe("Nuevo Tirador");
+  });
+
+  it("sin member_number, sigue el path por nombre (no merge inseguro por homónimo)", async () => {
+    const parsed = {
+      discipline: "ipsc" as const,
+      source: "practiscore_match_html" as const,
+      name: "Match Test",
+      date: "2026-05-01",
+      region: null,
+      generatedBy: null,
+      matchEntries: [
+        {
+          shooter: {
+            fullName: "Apellido Original", // mismo nombre que el existing
+            memberNumber: null, // sin número
+            region: null,
+          },
+          divisionCode: "P",
+          classification: null,
+          powerFactor: "Maj" as const,
+          category: null,
+          place: 1,
+          matchPoints: 100,
+          matchPercentage: 100,
+          totalTimeSeconds: null,
+          hits: null,
+          isDq: false,
+        },
+      ],
+      stages: [],
+    };
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "f.html");
+
+    // Sin número en el parsed no podemos saber si el "Apellido Original"
+    // de la DB (que tiene número 793) es la misma persona — preferimos
+    // crear uno nuevo (sin número) antes que mergear dos identidades por
+    // homónimo. El path por nombre dedupea solo si AMBOS coinciden en
+    // (name + memberNumber).
+    expect(fake.tables.shooters.rows).toHaveLength(2);
+  });
+});
+
 describe("importParsedMatch — Stage results", () => {
   let fake: FakeSupabase;
   beforeEach(async () => {

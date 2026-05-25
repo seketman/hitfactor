@@ -29,8 +29,10 @@ export interface ClaimSuggestion {
 
 /**
  * Encuentra candidatos a "Soy yo" para el usuario en cuestión, cruzados
- * con sus match_entries más recientes. Diseñado para el onboarding:
- * mostrar "te encontramos en estos matches" arriba del listado.
+ * con sus match_entries más recientes. Sirve tanto para el onboarding
+ * ("te encontramos en estos matches" antes del primer claim) como para
+ * el flujo de identidades adicionales — un usuario que ya claimó un
+ * shooter puede tener otras variantes tipeadas distinto en otros torneos.
  *
  * Reglas:
  *  - Solo shooters con `linked_user_id IS NULL` (no claimados).
@@ -44,7 +46,7 @@ export interface ClaimSuggestion {
  *  - Orden: por fecha del match descendente (el más reciente arriba).
  *
  * El `limit` default de 5 es bajo a propósito: si mostramos más, el
- * onboarding pierde foco. Si ninguno de los 5 es el usuario, "Ocultar
+ * card pierde foco. Si ninguno de los N es el usuario, "Ocultar
  * sugerencias" cubre el escape.
  */
 export async function findClaimSuggestions(
@@ -61,13 +63,19 @@ export async function findClaimSuggestions(
   // de la DB los shooters claimados. Traemos match + disciplina + división en
   // un solo round-trip, ordenados por fecha del match desc para que al
   // recorrer en JS encontremos primero el entry más reciente de cada shooter.
+  //
+  // Cap defensivo de filas: el filtro real lo hace `isClaimCandidate` en JS
+  // (incluye Levenshtein, no se puede en SQL sin pg_trgm), pero limitamos a
+  // 1000 entries por las dudas — los más recientes alcanzan de sobra para
+  // poblar el `limit` final.
   const { data } = await supabase
     .from("match_entries")
     .select(
       "place, shooters!inner(id, full_name, member_number, linked_user_id), divisions(code, name), matches!inner(id, name, date, disciplines(name))",
     )
     .is("shooters.linked_user_id", null)
-    .order("date", { foreignTable: "matches", ascending: false });
+    .order("date", { foreignTable: "matches", ascending: false })
+    .limit(1000);
 
   if (!data) return [];
 
