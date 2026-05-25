@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/seketman/hitfactor/compare/v1.5.0...v1.5.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* **import:** derive PractiScore division from section header ([#35](https://github.com/seketman/hitfactor/issues/35)) ([e2cdf5e](https://github.com/seketman/hitfactor/commit/e2cdf5e876b69b427703d51ccfe26a2b388d91c4))
+
 ## [1.5.0](https://github.com/seketman/hitfactor/compare/v1.4.0...v1.5.0) (2026-05-21)
 
 
