@@ -40,6 +40,81 @@ export function stripDqPrefix(name: string): { fullName: string; isDq: boolean }
   return { fullName: name.trim(), isDq: false };
 }
 
+/**
+ * Saca postfijos "ruido" del nombre tipeado para que dos variantes del mismo
+ * tirador (con/sin paréntesis de cursante, con/sin tokens de región/división
+ * pegados al final) generen la misma identidad en el importer y no
+ * fragmenten la historia del tirador.
+ *
+ * Dos pasadas que se alternan hasta converger:
+ *  A. Paréntesis terminales — mientras matchee `... (xxx)$`. Cubre
+ *     etiquetas tipeadas por el organizador como "(Cursante)",
+ *     "(Cursaste)", "(Cursando)". Cero riesgo de falso positivo: los
+ *     nombres legales no llevan paréntesis al final.
+ *  B. Tokens "no-nombre" al final — mientras el último token (normalizado
+ *     a MAYÚSCULAS sin acentos) esté en `TRAILING_NOISE_TOKENS`. Cubre
+ *     los casos donde el PDF de WinMSS o un HTML reconstruye en la misma
+ *     celda la columna Region/ICS/División y el parser tradicional no la
+ *     separó. Riesgo bajo pero no nulo — el set está acotado a tokens
+ *     cortos en mayúsculas que es raro que formen parte de un nombre
+ *     real (no incluimos letras sueltas precisamente por eso).
+ *
+ * El loop externo es necesario para casos como "Foo (Cursaste) ARG":
+ * la primera vuelta solo B aplica (paréntesis no está al final); después
+ * de que cae `ARG`, el paréntesis sí queda al final y la segunda vuelta
+ * de A lo levanta.
+ */
+export function stripNameSuffixes(name: string): string {
+  let result = name;
+  while (true) {
+    const before = result;
+
+    // Pasada A: paréntesis terminales.
+    while (true) {
+      const stripped = result.replace(/\s*\([^)]*\)\s*$/, "");
+      if (stripped === result) break;
+      result = stripped.trimEnd();
+    }
+
+    // Pasada B: tokens conocidos al final.
+    while (true) {
+      const match = /^(.+?)\s+(\S+)$/.exec(result);
+      if (!match) break;
+      const trailing = match[2]!
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+      if (!TRAILING_NOISE_TOKENS.has(trailing)) break;
+      result = match[1]!.trimEnd();
+    }
+
+    if (result === before) break;
+  }
+  return result;
+}
+
+/**
+ * Tokens que aparecen al final del nombre cuando una columna del reporte
+ * (Region/ICS/División/Disciplina) se concatenó al `Name`. Acotado a
+ * tokens de ≥2 caracteres — letras sueltas son demasiado ambiguas.
+ *
+ * Cuando agregues uno nuevo, tené en cuenta el riesgo de que sea un
+ * apellido real corto.
+ */
+const TRAILING_NOISE_TOKENS = new Set<string>([
+  // Regiones IPSC habituales en planillas argentinas.
+  "ARG", "CAN", "USA", "URU", "CHI", "BRA", "PAR", "BOL",
+  // Roles ICS.
+  "RO", "ICS",
+  // Marcadores de discipline/segmento que vimos colarse.
+  "ESC", "1TH",
+  // Códigos de división IPSC / Steel / FBI que a veces se cuelan en el
+  // nombre cuando una columna del reporte queda mal alineada.
+  "OPEN", "PRODUCTION", "STANDARD", "CLASSIC", "REVOLVER",
+  "PCC", "PCCO", "REV", "PIS", "MINI",
+  "SM", "PO", "CO", "MS", "CL",
+]);
+
 /** Parsea "85.3%" o "85.3" → 85.3. Vacío/inválido → 0. */
 export function parsePercentage(value: string | undefined): number {
   if (!value) return 0;

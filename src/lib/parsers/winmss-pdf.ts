@@ -5,7 +5,7 @@ import type {
   ParsedStage,
   ParsedStageResult,
 } from "../types/match";
-import { extractClubFromTitle } from "./shared";
+import { extractClubFromTitle, stripNameSuffixes } from "./shared";
 
 /**
  * Parser para PDFs WinMSS (formato usado por ipsc.org.ar para archivos
@@ -842,7 +842,7 @@ function parseDqPageRows(text: string): ParsedMatchEntry[] {
     }
     if (!divisionCode || !apellido) continue;
 
-    const fullName = `${apellido}${afterComma}`.trim();
+    const fullName = stripNameSuffixes(`${apellido}${afterComma}`.trim());
     out.push({
       shooter: { fullName, memberNumber: null, region: null },
       divisionCode,
@@ -905,6 +905,9 @@ function splitNameFromMeta(rest: string): { name: string; meta: ParsedMeta } {
     else if (KNOWN_CLASSIFICATIONS.has(t)) meta.cls = t;
     else if (KNOWN_ICS.has(t)) meta.ics = t;
   }
-  const name = tokens.slice(0, i).join(" ").trim();
+  // `stripNameSuffixes` corre como red de seguridad: si quedó algún token
+  // que la cosecha por sets conocidos no atajó (ej. "ESC" pegado al final
+  // y "ARG" antes que se le escapó), lo limpia acá.
+  const name = stripNameSuffixes(tokens.slice(0, i).join(" ").trim());
   return { name, meta };
 }

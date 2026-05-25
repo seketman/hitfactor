@@ -4,6 +4,7 @@ import {
   type DisciplineCode,
 } from "../disciplines";
 import type { ParsedMatch, ParsedMatchEntry } from "../types/match";
+import { stripNameSuffixes } from "./shared";
 
 /**
  * Parser para los PDFs de "RANKING OFICIAL" que publica la FAT (Federación
@@ -220,7 +221,7 @@ export function parseFatText(text: string, filename: string): ParsedMatch {
     for (const row of section.rows) {
       matchEntries.push({
         shooter: {
-          fullName: row.name,
+          fullName: stripNameSuffixes(row.name),
           memberNumber: null,
           region: null,
         },

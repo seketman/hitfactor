@@ -19,6 +19,7 @@ import {
   parseIntOr,
   parsePercentage,
   stripDqPrefix,
+  stripNameSuffixes,
 } from "./shared";
 
 /**
@@ -201,7 +202,8 @@ function parseMatchRow(
   const nameRaw = get("Name");
   if (!placeRaw || !nameRaw) return null;
 
-  const { fullName, isDq } = stripDqPrefix(nameRaw);
+  const { fullName: rawName, isDq } = stripDqPrefix(nameRaw);
+  const fullName = stripNameSuffixes(rawName);
 
   return {
     shooter: {
@@ -236,7 +238,8 @@ function parseStageRow(
   const nameRaw = get("Name");
   if (!nameRaw) return null;
 
-  const { fullName, isDq } = stripDqPrefix(nameRaw);
+  const { fullName: rawName, isDq } = stripDqPrefix(nameRaw);
+  const fullName = stripNameSuffixes(rawName);
 
   // En filas DQ casi todos los campos vienen vacíos; tomamos lo que haya.
   return {

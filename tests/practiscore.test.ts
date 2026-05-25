@@ -31,7 +31,10 @@ describe("parsePractiscoreHtml — Combined match results", () => {
   it("first place is ALZATTO with 100%", () => {
     const first = result.matchEntries[0];
     expect(first.place).toBe(1);
-    expect(first.shooter.fullName).toBe("ALZATTO, Luciano PCC");
+    // El fixture trae "ALZATTO, Luciano PCC" — el código de división `PCC`
+    // pegado al apellido es ruido del export, no parte del nombre real.
+    // El parser lo descarta vía `stripNameSuffixes`.
+    expect(first.shooter.fullName).toBe("ALZATTO, Luciano");
     expect(first.divisionCode).toBe("PCCO");
     expect(first.matchPercentage).toBe(100);
   });

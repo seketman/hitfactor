@@ -11,6 +11,7 @@ import {
   nullIfEmpty,
   parseIntOrNull,
   pickMostCommon,
+  stripNameSuffixes,
 } from "./shared";
 
 /**
@@ -168,7 +169,7 @@ export function parseFbiCsv(content: string): ParsedMatch {
     const impactos = parseIntOrNull(cells[idxImpactos]);
     if (puntos === null) continue;
 
-    const fullName = (cells[idxTirador] ?? "").trim();
+    const fullName = stripNameSuffixes((cells[idxTirador] ?? "").trim());
     if (!fullName) continue;
 
     // Capturamos los puntos por stage para esta fila — los acompañamos al
