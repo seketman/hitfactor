@@ -106,7 +106,7 @@ Ver [`docs/data-model.md`](./docs/data-model.md) para el detalle.
 
 ## Contribuir
 
-Pull Requests bienvenidos. Antes de mandar uno, leé [CONTRIBUTING.md](./CONTRIBUTING.md)
+Pull Requests bienvenidos. Antes de mandar uno, leé [CONTRIBUTING.md](./.github/CONTRIBUTING.md)
 — tiene el setup local, las convenciones de commit (usamos
 [conventional commits](https://www.conventionalcommits.org) para que
 release-please calcule las versiones automáticamente), y el flujo de PR.

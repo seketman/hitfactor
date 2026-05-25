@@ -29,7 +29,7 @@ cp .env.example .env.local           # completar con credenciales de Supabase
 npm run dev                          # http://localhost:3000
 ```
 
-Más detalle en [docs/development.md](./docs/development.md).
+Más detalle en [docs/development.md](../docs/development.md).
 
 ## Antes de mandar el PR
 
@@ -109,7 +109,7 @@ nos ahorramos retrabajos.
 ## Licencia
 
 Al contribuir aceptás que tu código se distribuye bajo
-[AGPL v3 o posterior](./LICENSE), la misma licencia del proyecto. En
+[AGPL v3 o posterior](../LICENSE), la misma licencia del proyecto. En
 particular: si alguien aloja HitFactor (o un fork) como servicio
 público, está obligado a publicar el código fuente — incluido el tuyo.
 
