@@ -104,8 +104,12 @@ export function stripNameSuffixes(name: string): string {
 const TRAILING_NOISE_TOKENS = new Set<string>([
   // Regiones IPSC habituales en planillas argentinas.
   "ARG", "CAN", "USA", "URU", "CHI", "BRA", "PAR", "BOL",
-  // Roles ICS.
-  "RO", "ICS",
+  // Roles ICS / Oficial de Campo.
+  "RO", "ICS", "OC",
+  // Categorías IPSC multi-letra (Super Senior, Grand Senior). Las de una
+  // sola letra (S/J/L) NO las incluimos: el riesgo de pisar una inicial
+  // del nombre (ej. "Diego J", "Martin S") es alto.
+  "SS", "GS",
   // Marcadores de discipline/segmento que vimos colarse.
   "ESC", "1TH",
   // Códigos de división IPSC / Steel / FBI que a veces se cuelan en el

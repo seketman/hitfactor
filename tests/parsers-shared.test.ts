@@ -113,4 +113,25 @@ describe("stripNameSuffixes", () => {
   it("normaliza acentos al chequear el token (REVÓLVER -> REVOLVER)", () => {
     expect(stripNameSuffixes("Pérez, José REVÓLVER")).toBe("Pérez, José");
   });
+
+  it("saca rol Oficial de Campo (OC) al final del nombre", () => {
+    expect(stripNameSuffixes("SUAREZ, Rodrigo Daniel ARG OC")).toBe(
+      "SUAREZ, Rodrigo Daniel",
+    );
+  });
+
+  it("saca categorías IPSC multi-letra Super Senior (SS) y Grand Senior (GS)", () => {
+    expect(stripNameSuffixes("TONDINI, Claudio Oscar SS ARG OC")).toBe(
+      "TONDINI, Claudio Oscar",
+    );
+    expect(stripNameSuffixes("ZARATE, Jose GS ARG OC")).toBe("ZARATE, Jose");
+  });
+
+  it("NO saca categorías de una sola letra (riesgo de inicial del nombre)", () => {
+    // "S" puede ser Senior o una inicial del segundo nombre. Lo dejamos
+    // para no introducir falsos positivos.
+    expect(stripNameSuffixes("TEJERINA, Eduardo Martin S ARG OC")).toBe(
+      "TEJERINA, Eduardo Martin S",
+    );
+  });
 });
