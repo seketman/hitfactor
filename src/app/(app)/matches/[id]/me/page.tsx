@@ -17,6 +17,7 @@ import {
   getMatchFirearmLog,
   listMyFirearms,
 } from "@/lib/db/firearms";
+import { listMyAmmo } from "@/lib/db/ammo";
 import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import type { MyMatchSummary } from "@/lib/db/types";
@@ -112,11 +113,13 @@ export default async function PersonalMatchPage({
   const clubCode = getClubCode(match.region);
   const clubName = getClubName(match.region, clubLookup);
 
-  const [myFirearms, currentFirearmLog, stageResults] = await Promise.all([
-    listMyFirearms(supabase, userId),
-    getMatchFirearmLog(supabase, entry.id),
-    listStageResultsForEntry(supabase, entry.id, id),
-  ]);
+  const [myFirearms, myAmmo, currentFirearmLog, stageResults] =
+    await Promise.all([
+      listMyFirearms(supabase, userId),
+      listMyAmmo(supabase, userId),
+      getMatchFirearmLog(supabase, entry.id),
+      listStageResultsForEntry(supabase, entry.id, id),
+    ]);
   const suggestedRounds = estimateRoundsFired(
     match.disciplines?.code,
     stageResults.length,
@@ -168,6 +171,7 @@ export default async function PersonalMatchPage({
         matchEntryId={entry.id}
         matchId={id}
         firearms={myFirearms}
+        ammo={myAmmo}
         current={currentFirearmLog}
         suggestedRounds={suggestedRounds}
       />

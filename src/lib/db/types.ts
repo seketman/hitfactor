@@ -223,6 +223,11 @@ export interface MatchFirearmLog {
   firearm_id: string;
   rounds_fired: number;
   notes: string | null;
+  /**
+   * Tipo de munición usado en este match. Null = no especificado.
+   * ON DELETE SET NULL: borrar el tipo no destruye el historial.
+   */
+  ammunition_type_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -230,6 +235,49 @@ export interface MatchFirearmLog {
 /** Estadísticas de uso de un arma a partir del log. */
 export interface FirearmUsageStats {
   firearm: Firearm;
+  totalMatches: number;
+  totalRounds: number;
+  /** Fecha del último match (YYYY-MM-DD), o null si no se usó nunca. */
+  lastUsedDate: string | null;
+}
+
+/**
+ * Tipo de munición del catálogo del tirador. Cubre factory (compradas)
+ * y reload (recargadas). Los campos opcionales se completan en función
+ * de cuánto detalle quiera registrar el tirador — solo `name` y `type`
+ * son obligatorios a nivel schema.
+ */
+export interface AmmunitionType {
+  id: string;
+  owner_user_id: string;
+  name: string;
+  type: "factory" | "reload";
+  caliber: string | null;
+  brand: string | null;
+  /** Peso de la punta en grains (1 grain ≈ 64.8 mg). */
+  bullet_weight_grains: number | null;
+  /** FMJ, HP, JSP, etc. — texto libre. */
+  bullet_type: string | null;
+  /** Solo relevante para type=reload. */
+  powder: string | null;
+  /** Carga de pólvora en grains. Solo relevante para type=reload. */
+  powder_charge_grains: number | null;
+  /** Factor declarado (no calculado). */
+  power_factor: "Min" | "Maj" | null;
+  /**
+   * Power factor medido en cronógrafo (peso × velocidad / 1000).
+   * Independiente del campo categórico `power_factor` — un tirador puede
+   * haber medido el valor exacto sin haberse clasificado todavía.
+   */
+  power_factor_measured: number | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Estadísticas de uso de un tipo de munición a partir del log. */
+export interface AmmunitionUsageStats {
+  ammo: AmmunitionType;
   totalMatches: number;
   totalRounds: number;
   /** Fecha del último match (YYYY-MM-DD), o null si no se usó nunca. */

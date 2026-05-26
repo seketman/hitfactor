@@ -20,6 +20,9 @@ export const AUDIT_ACTION = {
   MATCH_FIREARM_SET: "match_firearm.set",
   MATCH_FIREARM_CLEAR: "match_firearm.clear",
   ENTRY_UPDATE_ABSENT: "entry.update_absent",
+  AMMO_CREATE: "ammo.create",
+  AMMO_UPDATE: "ammo.update",
+  AMMO_DELETE: "ammo.delete",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];
