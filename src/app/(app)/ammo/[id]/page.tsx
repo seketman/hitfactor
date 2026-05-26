@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -94,6 +95,92 @@ export default async function AmmoDetailPage({
       </div>
 
       <section className="mb-8">
+        <details className="group">
+          <CollapsibleHeading label="Editar datos de la munición" />
+          <Card className="mt-3 p-6">
+            <form action={updateAmmo} className="space-y-4">
+              <input type="hidden" name="id" value={ammo.id} />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="Nombre"
+                  name="name"
+                  required
+                  defaultValue={ammo.name}
+                />
+                <Select label="Tipo" name="type" required defaultValue={ammo.type}>
+                  <option value="factory">Factory</option>
+                  <option value="reload">Recarga</option>
+                </Select>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Input
+                  label="Calibre"
+                  name="caliber"
+                  defaultValue={ammo.caliber ?? ""}
+                />
+                <Input
+                  label="Marca"
+                  name="brand"
+                  defaultValue={ammo.brand ?? ""}
+                />
+                <Input
+                  label="Peso de punta (gr)"
+                  name="bullet_weight_grains"
+                  type="number"
+                  step="0.1"
+                  defaultValue={ammo.bullet_weight_grains ?? ""}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Input
+                  label="Tipo de punta"
+                  name="bullet_type"
+                  defaultValue={ammo.bullet_type ?? ""}
+                />
+                <Input
+                  label="Pólvora"
+                  name="powder"
+                  defaultValue={ammo.powder ?? ""}
+                />
+                <Input
+                  label="Carga (gr)"
+                  name="powder_charge_grains"
+                  type="number"
+                  step="0.01"
+                  defaultValue={ammo.powder_charge_grains ?? ""}
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Select
+                  label="Factor declarado"
+                  name="power_factor"
+                  defaultValue={ammo.power_factor ?? ""}
+                >
+                  <option value="">— Sin declarar —</option>
+                  <option value="Min">Min</option>
+                  <option value="Maj">Maj</option>
+                </Select>
+                <Input
+                  label="Factor medido (PF)"
+                  name="power_factor_measured"
+                  type="number"
+                  step="0.1"
+                  defaultValue={ammo.power_factor_measured ?? ""}
+                  hint="peso (gr) × velocidad (fps) / 1000"
+                />
+              </div>
+              <Input
+                label="Notas"
+                name="notes"
+                defaultValue={ammo.notes ?? ""}
+              />
+              <Button type="submit">Guardar cambios</Button>
+            </form>
+          </Card>
+        </details>
+      </section>
+
+      <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
           Historial de uso
         </h2>
@@ -139,92 +226,6 @@ export default async function AmmoDetailPage({
             </Table>
           </Card>
         )}
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
-          Editar
-        </h2>
-        <Card className="p-6">
-          <form action={updateAmmo} className="space-y-4">
-            <input type="hidden" name="id" value={ammo.id} />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="Nombre"
-                name="name"
-                required
-                defaultValue={ammo.name}
-              />
-              <Select label="Tipo" name="type" required defaultValue={ammo.type}>
-                <option value="factory">Factory</option>
-                <option value="reload">Recarga</option>
-              </Select>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Input
-                label="Calibre"
-                name="caliber"
-                defaultValue={ammo.caliber ?? ""}
-              />
-              <Input
-                label="Marca"
-                name="brand"
-                defaultValue={ammo.brand ?? ""}
-              />
-              <Input
-                label="Peso de punta (gr)"
-                name="bullet_weight_grains"
-                type="number"
-                step="0.1"
-                defaultValue={ammo.bullet_weight_grains ?? ""}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Input
-                label="Tipo de punta"
-                name="bullet_type"
-                defaultValue={ammo.bullet_type ?? ""}
-              />
-              <Input
-                label="Pólvora"
-                name="powder"
-                defaultValue={ammo.powder ?? ""}
-              />
-              <Input
-                label="Carga (gr)"
-                name="powder_charge_grains"
-                type="number"
-                step="0.01"
-                defaultValue={ammo.powder_charge_grains ?? ""}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Select
-                label="Factor declarado"
-                name="power_factor"
-                defaultValue={ammo.power_factor ?? ""}
-              >
-                <option value="">— Sin declarar —</option>
-                <option value="Min">Min</option>
-                <option value="Maj">Maj</option>
-              </Select>
-              <Input
-                label="Factor medido (PF)"
-                name="power_factor_measured"
-                type="number"
-                step="0.1"
-                defaultValue={ammo.power_factor_measured ?? ""}
-                hint="peso (gr) × velocidad (fps) / 1000"
-              />
-            </div>
-            <Input
-              label="Notas"
-              name="notes"
-              defaultValue={ammo.notes ?? ""}
-            />
-            <Button type="submit">Guardar cambios</Button>
-          </form>
-        </Card>
       </section>
     </PageContainer>
   );
