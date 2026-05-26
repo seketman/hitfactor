@@ -149,7 +149,7 @@ export async function toggleEntryAbsent(formData: FormData) {
   const { data: entry } = await supabase
     .from("match_entries")
     .select(
-      "id, match_id, shooter_id, is_absent, shooters(linked_user_id, full_name), matches(name, imported_by_user_id)",
+      "id, match_id, shooter_id, is_absent, match_points, match_percentage, shooters(linked_user_id, full_name), matches(name, imported_by_user_id)",
     )
     .eq("id", entryId)
     .maybeSingle();
@@ -171,6 +171,22 @@ export async function toggleEntryAbsent(formData: FormData) {
   }
 
   const nextValue = !entry.is_absent;
+
+  // Defense-in-depth: si la entry tiene puntaje o % > 0, el tirador
+  // claramente disparó al menos un tiro. Marcar ausencia ahí distorsionaría
+  // los stats. La UI ya esconde el botón en ese caso, pero validamos
+  // server-side por si alguien arma el POST a mano. La acción inversa
+  // (quitar ausente) siempre se permite — útil para corregir un marcado
+  // erróneo aunque el entry "ya tenga datos" por cualquier razón.
+  if (
+    nextValue === true &&
+    (entry.match_points > 0 || entry.match_percentage > 0)
+  ) {
+    redirectWithError(
+      `/matches/${matchId}`,
+      "No se puede marcar ausente: el entry tiene puntaje o porcentaje > 0",
+    );
+  }
 
   const { error } = await supabase
     .from("match_entries")
