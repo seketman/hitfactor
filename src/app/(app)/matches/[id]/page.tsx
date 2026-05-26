@@ -196,8 +196,19 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                     // Toggle de ausencia: la RLS (0008) habilita tres autores
                     // y acá replicamos esa lógica para mostrar el botón solo
                     // cuando el flip va a funcionar.
+                    //
+                    // Además gateamos por score: solo tiene sentido marcar
+                    // ausente a alguien con todo en cero. Si tiene puntos o %
+                    // > 0, claramente disparó al menos un tiro y NO puede ser
+                    // un ausente (forzando esa marca distorsionaría la verdad
+                    // del registro). El botón "Sí asistió" sí aparece sobre
+                    // entries ya marcadas como ausentes, para poder revertir.
+                    const isLikelyAbsent =
+                      e.match_points === 0 && e.match_percentage === 0;
                     const canToggleAbsent =
-                      !e.is_dq && (isImporter || isAdmin || isMine);
+                      !e.is_dq &&
+                      (e.is_absent || isLikelyAbsent) &&
+                      (isImporter || isAdmin || isMine);
                     return (
                       <TR
                         key={e.id}
