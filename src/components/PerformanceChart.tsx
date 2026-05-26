@@ -10,14 +10,15 @@ import type { MatchTimelinePoint } from "@/lib/stats/shooter-stats";
  *
  * Modos:
  *  - `"percentage"` (default): grafica `matchPercentage`. Eje Y de 0 a 100+
- *    con grid en 0/25/50/75/100. DQs en y=0.
+ *    con grid en 0/25/50/75/100. DQs y ausencias en y=0 (no en la línea).
  *  - `"hits"`: grafica `hits` (Tiro FBI). Eje Y de 0 a 40 con grid en
  *    0/10/20/30/40. Filtra puntos sin hits (otras disciplinas).
  *
  * Comportamiento común:
  *  - Eje X: orden cronológico (los gaps de fecha se "comprimen" para que la
  *    línea sea legible aun cuando hay períodos sin matches).
- *  - DQs se dibujan como puntos rojos sobre y=0.
+ *  - DQs se dibujan como puntos rojos sobre y=0, sin afectar la línea.
+ *  - Ausentes se dibujan como puntos grises sobre y=0, sin afectar la línea.
  *  - Hover muestra tooltip con detalle.
  */
 
@@ -77,10 +78,12 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
   const yFor = (v: number) =>
     PAD_T + innerH - ((v - yMin) / (yMax - yMin)) * innerH;
 
-  // Línea solo con los no-DQ (los DQ se muestran como puntos sueltos).
+  // Línea solo con los matches válidos (no DQ y no ausentes). Los inválidos
+  // se muestran como puntos sueltos sobre y=0 — sino tirarían la línea a 0
+  // y darían una falsa impresión de bajón de rendimiento.
   const linePoints = filteredPoints
     .map((p, i) => ({ p, i }))
-    .filter(({ p }) => !p.isDq);
+    .filter(({ p }) => !p.isDq && !p.isAbsent);
 
   const pathD = linePoints
     .map(({ p, i }, idx) => {
@@ -160,8 +163,14 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
         {/* Puntos */}
         {filteredPoints.map((p, i) => {
           const cx = xFor(i);
-          const cy = p.isDq ? yFor(0) : yFor(valueOf(p));
+          const isInvalid = p.isDq || p.isAbsent;
+          const cy = isInvalid ? yFor(0) : yFor(valueOf(p));
           const isHover = hover === i;
+          const statusLabel = p.isDq
+            ? "DQ"
+            : p.isAbsent
+              ? "Ausente"
+              : formatValue(valueOf(p));
           return (
             <g key={p.matchId + i}>
               <circle
@@ -170,7 +179,11 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
                 r={isHover ? 4.5 : 3}
                 className={cn(
                   "transition-all",
-                  p.isDq ? "fill-danger" : "fill-accent",
+                  p.isDq
+                    ? "fill-danger"
+                    : p.isAbsent
+                      ? "fill-fg-subtle"
+                      : "fill-accent",
                 )}
                 stroke="var(--surface)"
                 strokeWidth={1.5}
@@ -186,7 +199,7 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
                 onFocus={() => setHover(i)}
                 onBlur={() => setHover(null)}
                 tabIndex={0}
-                aria-label={`${p.matchName}: ${p.isDq ? "DQ" : formatValue(valueOf(p))}`}
+                aria-label={`${p.matchName}: ${statusLabel}`}
               />
             </g>
           );
@@ -222,12 +235,15 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
           <span className="ml-auto font-mono">
             {filteredPoints[hover].isDq
               ? "DQ"
-              : formatValue(valueOf(filteredPoints[hover]))}
-            {!filteredPoints[hover].isDq && (
-              <span className="ml-2 text-fg-subtle">
-                puesto #{filteredPoints[hover].place}
-              </span>
-            )}
+              : filteredPoints[hover].isAbsent
+                ? "Ausente"
+                : formatValue(valueOf(filteredPoints[hover]))}
+            {!filteredPoints[hover].isDq &&
+              !filteredPoints[hover].isAbsent && (
+                <span className="ml-2 text-fg-subtle">
+                  puesto #{filteredPoints[hover].place}
+                </span>
+              )}
           </span>
         </div>
       )}
