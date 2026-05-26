@@ -154,8 +154,10 @@ export async function listFirearmUsageLog(
 }
 
 /**
- * Historial de uso de un arma específica: cada (match, rounds, date).
- * Más recientes primero.
+ * Historial de uso de un arma específica: cada (match, rounds, date, ammo).
+ * Más recientes primero. Embebe el nombre de la munición (si se registró
+ * cuál se usó) — sino la columna "Munición" en `/firearms/[id]` queda
+ * siempre vacía para los matches aunque el dato exista en `match_firearm_log`.
  */
 export async function listFirearmHistory(
   supabase: TypedSupabaseClient,
@@ -168,12 +170,13 @@ export async function listFirearmHistory(
     matchDate: string;
     disciplineName: string | null;
     roundsFired: number;
+    ammoName: string | null;
   }>
 > {
   const { data } = await supabase
     .from("match_firearm_log")
     .select(
-      "match_entry_id, rounds_fired, match_entries(id, matches(id, name, date, disciplines(name)))",
+      "match_entry_id, rounds_fired, ammunition_types(name), match_entries(id, matches(id, name, date, disciplines(name)))",
     )
     .eq("firearm_id", firearmId);
 
@@ -188,6 +191,7 @@ export async function listFirearmHistory(
       matchDate: r.match_entries!.matches!.date,
       disciplineName: r.match_entries!.matches!.disciplines?.name ?? null,
       roundsFired: r.rounds_fired,
+      ammoName: r.ammunition_types?.name ?? null,
     }))
     .sort((a, b) => b.matchDate.localeCompare(a.matchDate));
 }

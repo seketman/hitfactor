@@ -5,14 +5,18 @@ import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Alert } from "@/components/ui/Alert";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
+import { isInternalAppPath } from "@/lib/redirects";
 import { login } from "./actions";
 
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; info?: string }>;
+  searchParams: Promise<{ error?: string; info?: string; next?: string }>;
 }) {
   const params = await searchParams;
+  // Validamos el `next` acá mismo: si no es interno, no lo metemos en el
+  // form (la server action también lo re-valida — defense in depth).
+  const next = isInternalAppPath(params.next) ? params.next : null;
 
   return (
     <AuthLayout
@@ -47,6 +51,7 @@ export default async function LoginPage({
       </div>
 
       <form action={login} className="space-y-4">
+        {next && <input type="hidden" name="next" value={next} />}
         <Input label="Email" type="email" name="email" required autoComplete="email" />
         <PasswordInput
           label="Contraseña"

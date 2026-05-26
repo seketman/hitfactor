@@ -2,11 +2,19 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { redirectWithError } from "@/lib/redirects";
+import { redirectWithError, safeBackPath } from "@/lib/redirects";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  // Destino post-login. Validado con safeBackPath (whitelist de rutas
+  // internas) para evitar open redirects. Si el campo viene vacío o con
+  // basura, caemos al dashboard como antes.
+  const nextRaw = formData.get("next");
+  const next = safeBackPath(
+    typeof nextRaw === "string" ? nextRaw : null,
+    "/dashboard",
+  );
 
   if (!email || !password) {
     redirectWithError("/login", "Faltan credenciales");
@@ -37,5 +45,5 @@ export async function login(formData: FormData) {
     redirectWithError("/login", error.message);
   }
 
-  redirect("/dashboard");
+  redirect(next);
 }

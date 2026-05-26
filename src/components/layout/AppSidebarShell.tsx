@@ -89,7 +89,7 @@ export function AppSidebarShell({
   return (
     <>
       {/* Top bar mobile (solo visible <md) */}
-      <div className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur md:hidden">
+      <div className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur md:hidden print:hidden">
         <button
           type="button"
           aria-label="Abrir menú"
@@ -118,7 +118,7 @@ export function AppSidebarShell({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-bg transition-[width,transform] md:sticky md:top-0 md:h-screen md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border bg-bg transition-[width,transform] md:sticky md:top-0 md:h-screen md:translate-x-0 print:hidden",
           collapsed ? "md:w-16" : "md:w-60",
           mobileOpen ? "w-64 translate-x-0" : "w-64 -translate-x-full md:translate-x-0",
         )}
