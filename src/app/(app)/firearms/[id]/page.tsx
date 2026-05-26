@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, QrCode } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/require-user";
 import {
   getFirearmById,
   listFirearmHistory,
@@ -25,7 +25,7 @@ import { formatDate } from "@/lib/utils";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; log?: string }>;
 }
 
 /**
@@ -63,11 +63,15 @@ export default async function FirearmDetailPage({
   searchParams,
 }: PageProps) {
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, log } = await searchParams;
 
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) notFound();
+  // `returnTo` con el path interno (la query/hash las completa el QR-target;
+  // isInternalAppPath solo valida path por seguridad). Si la sesión expiró,
+  // el usuario vuelve acá tras el login y vuelve a expandir el form
+  // manualmente — papercut chico para una sesión expirada.
+  const { supabase, user } = await requireUser({
+    returnTo: `/firearms/${id}`,
+  });
 
   const firearm = await getFirearmById(supabase, id);
   if (!firearm) notFound();
@@ -75,8 +79,13 @@ export default async function FirearmDetailPage({
   const [matchHistory, usageLogs, myAmmo] = await Promise.all([
     listFirearmHistory(supabase, id),
     listFirearmUsageLog(supabase, id),
-    listMyAmmo(supabase, userData.user.id),
+    listMyAmmo(supabase, user.id),
   ]);
+
+  // Auto-expand del form de práctica cuando el deep-link del QR llega
+  // con `?log=1`. La página también tiene `#log-form` como anchor — el
+  // browser lo scrollea solo si la sección ya está abierta.
+  const autoOpenLog = log === "1";
 
   const matchRounds = matchHistory.reduce((acc, h) => acc + h.roundsFired, 0);
   const sessionRounds = usageLogs.reduce((acc, l) => acc + l.rounds_fired, 0);
@@ -94,7 +103,7 @@ export default async function FirearmDetailPage({
         href: `/matches/${h.matchId}/me`,
         discipline: h.disciplineName,
         rounds: h.roundsFired,
-        ammoName: null,
+        ammoName: h.ammoName,
         logId: null,
       }),
     ),
@@ -123,13 +132,23 @@ export default async function FirearmDetailPage({
         ← Tus armas
       </Link>
 
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">{firearm.name}</h1>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-muted">
-          {firearm.brand && <span>{firearm.brand}</span>}
-          {firearm.model && <span>{firearm.model}</span>}
-          {firearm.caliber && <Badge tone="default">{firearm.caliber}</Badge>}
-        </p>
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">{firearm.name}</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-muted">
+            {firearm.brand && <span>{firearm.brand}</span>}
+            {firearm.model && <span>{firearm.model}</span>}
+            {firearm.caliber && <Badge tone="default">{firearm.caliber}</Badge>}
+          </p>
+        </div>
+        <Link
+          href={`/firearms/${firearm.id}/qr`}
+          className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-accent"
+          title="QR para pegar al estuche y registrar consumo con la cámara"
+        >
+          <QrCode className="h-4 w-4" aria-hidden />
+          QR para imprimir
+        </Link>
       </header>
 
       {error && (
@@ -250,8 +269,8 @@ export default async function FirearmDetailPage({
         )}
       </section>
 
-      <section>
-        <details className="group">
+      <section id="log-form">
+        <details className="group" open={autoOpenLog}>
           <CollapsibleHeading label="Registrar sesión de práctica" />
           <Card className="mt-3 p-6">
           <form action={createFirearmUsage} className="space-y-4">

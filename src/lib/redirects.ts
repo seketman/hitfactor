@@ -43,7 +43,7 @@ export function isInternalAppPath(
     /^\/matches\/[A-Za-z0-9-]+(\/[a-z]+)?$/.test(value) ||
     /^\/dashboard(\/[a-z_]+)?$/.test(value) ||
     /^\/firearms$/.test(value) ||
-    /^\/firearms\/[A-Za-z0-9-]+$/.test(value) ||
+    /^\/firearms\/[A-Za-z0-9-]+(\/[a-z]+)?$/.test(value) ||
     /^\/activity$/.test(value) ||
     /^\/about$/.test(value)
   );
