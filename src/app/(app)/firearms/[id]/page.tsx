@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronDown, QrCode } from "lucide-react";
+import { QrCode } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -325,24 +326,6 @@ export default async function FirearmDetailPage({
         </details>
       </section>
     </PageContainer>
-  );
-}
-
-/**
- * Heading clicable que actúa de toggle del `<details>` padre. Mantiene la
- * tipografía (uppercase + tracking) de las otras secciones para que la
- * pantalla se sienta consistente; el único agregado visual es el chevron
- * que rota 180° cuando el contenedor está abierto.
- */
-function CollapsibleHeading({ label }: { label: string }) {
-  return (
-    <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium uppercase tracking-wider text-fg-muted hover:text-fg [&::-webkit-details-marker]:hidden">
-      <ChevronDown
-        className="h-4 w-4 transition-transform group-open:rotate-180"
-        aria-hidden
-      />
-      {label}
-    </summary>
   );
 }
 
