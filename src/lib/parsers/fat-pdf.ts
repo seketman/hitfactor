@@ -219,6 +219,8 @@ export function parseFatText(text: string, filename: string): ParsedMatch {
     // El PDF ya viene rankeado: la primera fila es el ganador.
     const winnerPoints = section.rows[0]?.points ?? 0;
     for (const row of section.rows) {
+      const matchPercentage =
+        winnerPoints > 0 ? (row.points / winnerPoints) * 100 : 0;
       matchEntries.push({
         shooter: {
           fullName: stripNameSuffixes(row.name),
@@ -231,13 +233,18 @@ export function parseFatText(text: string, filename: string): ParsedMatch {
         category: categoryByName.get(normalizeName(row.name)) ?? null,
         place: row.rank,
         matchPoints: row.points,
-        matchPercentage:
-          winnerPoints > 0 ? (row.points / winnerPoints) * 100 : 0,
+        matchPercentage,
         totalTimeSeconds: null,
         // El primer número del "x / y" son impactos: solo aplica a las
         // disciplinas que rankean por impactos (Tiro FBI).
         hits: hitsBased ? row.hits : null,
         isDq: false,
+        // FAT no marca DQs en el ranking, así que 0 puntos + 0% es ausente.
+        // Para hits-based (Tiro FBI), exigimos también 0 impactos.
+        isAbsent:
+          row.points === 0 &&
+          matchPercentage === 0 &&
+          (hitsBased ? row.hits === 0 : true),
       });
     }
   }

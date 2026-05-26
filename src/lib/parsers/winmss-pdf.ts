@@ -649,8 +649,11 @@ function parseOverallRows(
         matchPercentage,
         totalTimeSeconds: null,
         hits: null, // IPSC scoring es hit factor, no impactos.
-        // Si el tirador terminó con 0 puntos, lo marcamos como DQ.
-        isDq: matchPoints === 0,
+        // WinMSS reporta los DQ explícitamente vía DQ_ROW_RE (más abajo).
+        // En las filas "normales", 0 puntos significa que el tirador estaba
+        // anotado pero no se presentó — no es DQ, es ausente.
+        isDq: false,
+        isAbsent: matchPoints === 0 && matchPercentage === 0,
       });
       continue;
     }
@@ -677,6 +680,7 @@ function parseOverallRows(
         totalTimeSeconds: null,
         hits: null,
         isDq: true,
+        isAbsent: false,
       });
     }
   }
@@ -862,6 +866,7 @@ function parseDqPageRows(text: string): ParsedMatchEntry[] {
       totalTimeSeconds: null,
       hits: null,
       isDq: true,
+      isAbsent: false,
     });
   }
   return out;

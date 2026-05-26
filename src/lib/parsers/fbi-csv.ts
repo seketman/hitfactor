@@ -235,6 +235,8 @@ export function parseFbiCsv(content: string): ParsedMatch {
     });
     const winnerPuntos = group[0]?.puntos ?? 0;
     group.forEach((e, i) => {
+      const matchPercentage =
+        winnerPuntos > 0 ? (e.puntos / winnerPuntos) * 100 : 0;
       matchEntries.push({
         shooter: e.shooter,
         divisionCode: e.divisionCode,
@@ -243,11 +245,14 @@ export function parseFbiCsv(content: string): ParsedMatch {
         category: e.category,
         place: i + 1,
         matchPoints: e.puntos,
-        matchPercentage:
-          winnerPuntos > 0 ? (e.puntos / winnerPuntos) * 100 : 0,
+        matchPercentage,
         totalTimeSeconds: null,
         hits: e.impactos,
         isDq: false,
+        // FBI rankea por impactos: 0 impactos + 0 puntos + 0% = anotado pero
+        // no se presentó. La planilla no usa el prefijo "(DQ)" porque ese
+        // concepto vive a nivel stage en FBI (`hasNonNumericMarker`).
+        isAbsent: e.impactos === 0 && e.puntos === 0 && matchPercentage === 0,
       });
     });
   }

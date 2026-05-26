@@ -204,6 +204,8 @@ function parseMatchRow(
 
   const { fullName: rawName, isDq } = stripDqPrefix(nameRaw);
   const fullName = stripNameSuffixes(rawName);
+  const matchPoints = parseFloatOr(get("Match Pts"), 0);
+  const matchPercentage = parsePercentage(get("Match %"));
 
   return {
     shooter: {
@@ -220,11 +222,14 @@ function parseMatchRow(
     powerFactor: parsePowerFactor(get("PF")),
     category: nullIfEmpty(get("Category")),
     place: parseIntOr(placeRaw, 0),
-    matchPoints: parseFloatOr(get("Match Pts"), 0),
-    matchPercentage: parsePercentage(get("Match %")),
+    matchPoints,
+    matchPercentage,
     totalTimeSeconds: null, // IPSC no usa tiempo total; queda explícito.
     hits: null, // IPSC no usa impactos — el scoring es hit factor.
     isDq,
+    // Tirador anotado pero ausente: queda con 0 puntos y 0%. Solo cuando
+    // NO es DQ (que es una señal más fuerte y específica).
+    isAbsent: !isDq && matchPoints === 0 && matchPercentage === 0,
   };
 }
 

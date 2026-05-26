@@ -503,13 +503,17 @@ describe("parseWinmssText — overall", () => {
     // ICS=RO no se persiste hoy en match_entry, pero no debe ensuciar el nombre
   });
 
-  it("marca isDq cuando matchPoints = 0", () => {
+  it("marca isAbsent (no isDq) cuando matchPoints = 0 en una fila normal", () => {
+    // WinMSS lista los DQs explícitamente en una página separada
+    // (parseDqPageRows). Una fila del listado overall con 0 puntos casi
+    // siempre es un tirador anotado que no se presentó — no es DQ.
     const parsed = parseWinmssText(pages(overallPistolaPage));
-    const dq = parsed.matchEntries.find(
+    const entry = parsed.matchEntries.find(
       (e) => e.shooter.fullName === "ELIZALDE, Luciano",
     );
-    expect(dq?.isDq).toBe(true);
-    expect(dq?.matchPoints).toBe(0);
+    expect(entry?.isDq).toBe(false);
+    expect(entry?.isAbsent).toBe(true);
+    expect(entry?.matchPoints).toBe(0);
   });
 
   it("agrega entries de varias divisiones en el mismo PDF", () => {

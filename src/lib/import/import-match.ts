@@ -731,6 +731,7 @@ function mapMatchEntryToRow(
     total_time_seconds: entry.totalTimeSeconds,
     hits: entry.hits,
     is_dq: entry.isDq,
+    is_absent: entry.isAbsent,
   };
 }
 

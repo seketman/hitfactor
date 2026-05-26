@@ -149,6 +149,22 @@ export function describeAuditEntry(row: AuditLogRow): AuditDescription {
       };
     }
 
+    case "entry.update_absent": {
+      const shooterName = s(m.shooter_full_name) ?? "un tirador";
+      const matchName = s(m.match_name);
+      const after = obj(m.after) ?? {};
+      const becameAbsent = after.is_absent === true;
+      return {
+        summary: becameAbsent
+          ? `Marcaste como ausente a "${shooterName}"`
+          : `Quitaste la marca de ausente a "${shooterName}"`,
+        detail: matchName ? `en "${matchName}"` : undefined,
+        link: s(m.match_id)
+          ? { href: `/matches/${m.match_id}`, label: "Ver match" }
+          : undefined,
+      };
+    }
+
     default:
       return { summary: row.action };
   }

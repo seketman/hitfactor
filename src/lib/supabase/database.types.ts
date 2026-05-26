@@ -198,6 +198,7 @@ export type Database = {
           division_id: number
           hits: number | null
           id: string
+          is_absent: boolean
           is_dq: boolean
           match_id: string
           match_percentage: number
@@ -214,6 +215,7 @@ export type Database = {
           division_id: number
           hits?: number | null
           id?: string
+          is_absent?: boolean
           is_dq?: boolean
           match_id: string
           match_percentage?: number
@@ -230,6 +232,7 @@ export type Database = {
           division_id?: number
           hits?: number | null
           id?: string
+          is_absent?: boolean
           is_dq?: boolean
           match_id?: string
           match_percentage?: number

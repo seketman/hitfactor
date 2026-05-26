@@ -167,6 +167,7 @@ describe("importParsedMatch — Match overall", () => {
           totalTimeSeconds: null,
           hits: null,
           isDq: false,
+          isAbsent: false,
         },
         {
           shooter: repeatedShooter,
@@ -180,6 +181,7 @@ describe("importParsedMatch — Match overall", () => {
           totalTimeSeconds: null,
           hits: null,
           isDq: false,
+          isAbsent: false,
         },
         {
           shooter: repeatedShooter,
@@ -193,6 +195,7 @@ describe("importParsedMatch — Match overall", () => {
           totalTimeSeconds: null,
           hits: null,
           isDq: false,
+          isAbsent: false,
         },
       ],
     };
@@ -272,6 +275,7 @@ describe("importParsedMatch — Dedup de shooters por member_number", () => {
           totalTimeSeconds: null,
           hits: null,
           isDq: false,
+          isAbsent: false,
         },
       ],
       stages: [],
@@ -314,6 +318,7 @@ describe("importParsedMatch — Dedup de shooters por member_number", () => {
           totalTimeSeconds: null,
           hits: null,
           isDq: false,
+          isAbsent: false,
         },
       ],
       stages: [],
@@ -355,6 +360,7 @@ describe("importParsedMatch — Dedup de shooters por member_number", () => {
           totalTimeSeconds: null,
           hits: null,
           isDq: false,
+          isAbsent: false,
         },
       ],
       stages: [],
@@ -471,6 +477,7 @@ describe("importParsedMatch — Stage results", () => {
           totalTimeSeconds: null,
           hits: null,
           isDq: true,
+          isAbsent: false,
         },
       ],
       stages: [

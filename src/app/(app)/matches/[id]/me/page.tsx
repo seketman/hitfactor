@@ -226,10 +226,18 @@ function IpscSummaryCard({ entry }: { entry: EntrySummary }) {
         </Stat>
         <Stat label="Categoría">{entry.category ?? "General"}</Stat>
         <Stat label="Puesto">
-          {entry.is_dq ? <Badge tone="danger">DQ</Badge> : entry.place}
+          {entry.is_dq ? (
+            <Badge tone="danger">DQ</Badge>
+          ) : entry.is_absent ? (
+            <Badge tone="default">Ausente</Badge>
+          ) : (
+            entry.place
+          )}
         </Stat>
         <Stat label="Match %" mono>
-          {entry.is_dq ? "—" : formatPercent(entry.match_percentage)}
+          {entry.is_dq || entry.is_absent
+            ? "—"
+            : formatPercent(entry.match_percentage)}
         </Stat>
       </div>
     </Card>
@@ -249,15 +257,23 @@ function SteelSummaryCard({ entry }: { entry: EntrySummary }) {
         </Stat>
         <Stat label="Categoría">{entry.category ?? "General"}</Stat>
         <Stat label="Puesto">
-          {entry.is_dq ? <Badge tone="danger">DQ</Badge> : entry.place}
+          {entry.is_dq ? (
+            <Badge tone="danger">DQ</Badge>
+          ) : entry.is_absent ? (
+            <Badge tone="default">Ausente</Badge>
+          ) : (
+            entry.place
+          )}
         </Stat>
         <Stat label="Tiempo total" mono>
-          {entry.is_dq || entry.total_time_seconds == null
+          {entry.is_dq || entry.is_absent || entry.total_time_seconds == null
             ? "—"
             : `${formatNumber(entry.total_time_seconds, 2)}s`}
         </Stat>
         <Stat label="Match %" mono>
-          {entry.is_dq ? "—" : formatPercent(entry.match_percentage)}
+          {entry.is_dq || entry.is_absent
+            ? "—"
+            : formatPercent(entry.match_percentage)}
         </Stat>
       </div>
     </Card>
@@ -382,13 +398,23 @@ function FbiSummaryCard({ entry }: { entry: EntrySummary }) {
         </Stat>
         <Stat label="Categoría">{entry.category ?? "General"}</Stat>
         <Stat label="Puesto">
-          {entry.is_dq ? <Badge tone="danger">DQ</Badge> : entry.place}
+          {entry.is_dq ? (
+            <Badge tone="danger">DQ</Badge>
+          ) : entry.is_absent ? (
+            <Badge tone="default">Ausente</Badge>
+          ) : (
+            entry.place
+          )}
         </Stat>
         <Stat label="Impactos" mono>
-          {entry.is_dq || entry.hits == null ? "—" : `${entry.hits}/40`}
+          {entry.is_dq || entry.is_absent || entry.hits == null
+            ? "—"
+            : `${entry.hits}/40`}
         </Stat>
         <Stat label="Puntos" mono>
-          {entry.is_dq ? "—" : formatNumber(entry.match_points, 0)}
+          {entry.is_dq || entry.is_absent
+            ? "—"
+            : formatNumber(entry.match_points, 0)}
         </Stat>
       </div>
     </Card>

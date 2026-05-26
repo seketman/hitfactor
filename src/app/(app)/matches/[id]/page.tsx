@@ -29,6 +29,7 @@ import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 import { isHitsBasedDiscipline } from "@/lib/disciplines";
 import { isInternalAppPath } from "@/lib/redirects";
+import { toggleEntryAbsent } from "./actions";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -45,18 +46,27 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const match = await getMatchById(supabase, id);
   if (!match) notFound();
 
-  const [importerProfile, entries, stages, myShooters, clubs, claimAliases] =
-    await Promise.all([
-      getProfile(supabase, match.imported_by_user_id),
-      listEntriesByMatch(supabase, id),
-      listStagesByMatch(supabase, id),
-      listMyShooters(supabase, userId),
-      listClubs(supabase),
-      getMyClaimAliases(supabase, userId),
-    ]);
+  const [
+    importerProfile,
+    currentProfile,
+    entries,
+    stages,
+    myShooters,
+    clubs,
+    claimAliases,
+  ] = await Promise.all([
+    getProfile(supabase, match.imported_by_user_id),
+    getProfile(supabase, userId),
+    listEntriesByMatch(supabase, id),
+    listStagesByMatch(supabase, id),
+    listMyShooters(supabase, userId),
+    listClubs(supabase),
+    getMyClaimAliases(supabase, userId),
+  ]);
 
   const myShooterIds = new Set(myShooters.map((s) => s.id));
   const isImporter = match.imported_by_user_id === userId;
+  const isAdmin = currentProfile?.is_admin === true;
   const parsedClub = parseRegion(match.region);
   const clubLookup = buildClubLookup(clubs);
   const clubLabel =
@@ -183,6 +193,11 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                       !!shooter &&
                       shooter.linked_user_id === null &&
                       isClaimCandidate(shooter, claimAliases);
+                    // Toggle de ausencia: la RLS (0008) habilita tres autores
+                    // y acá replicamos esa lógica para mostrar el botón solo
+                    // cuando el flip va a funcionar.
+                    const canToggleAbsent =
+                      !e.is_dq && (isImporter || isAdmin || isMine);
                     return (
                       <TR
                         key={e.id}
@@ -193,7 +208,13 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                         }
                       >
                         <TD className="text-fg-muted">
-                          {e.is_dq ? <Badge tone="danger">DQ</Badge> : e.place}
+                          {e.is_dq ? (
+                            <Badge tone="danger">DQ</Badge>
+                          ) : e.is_absent ? (
+                            <Badge tone="default">Ausente</Badge>
+                          ) : (
+                            e.place
+                          )}
                         </TD>
                         <TD>
                           <div className="flex items-center gap-2 font-medium">
@@ -216,7 +237,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                         </TD>
                         {isHitsBased && (
                           <TD className="text-right font-mono font-semibold text-fg">
-                            {e.is_dq ? "—" : (e.hits ?? "—")}
+                            {e.is_dq || e.is_absent ? "—" : (e.hits ?? "—")}
                           </TD>
                         )}
                         <TD
@@ -225,7 +246,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                             isHitsBased && "text-fg-muted",
                           )}
                         >
-                          {e.is_dq ? "—" : formatNumber(e.match_points, 2)}
+                          {e.is_dq || e.is_absent
+                            ? "—"
+                            : formatNumber(e.match_points, 2)}
                         </TD>
                         <TD
                           className={cn(
@@ -233,33 +256,61 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                             isHitsBased && "text-fg-muted",
                           )}
                         >
-                          {e.is_dq ? "—" : formatPercent(e.match_percentage)}
+                          {e.is_dq || e.is_absent
+                            ? "—"
+                            : formatPercent(e.match_percentage)}
                         </TD>
                         <TD>
-                          {canClaim && (
-                            <form action={claimShooter}>
-                              <input
-                                type="hidden"
-                                name="shooter_id"
-                                value={shooter!.id}
-                              />
-                              <input
-                                type="hidden"
-                                name="match_id"
-                                value={match.id}
-                              />
-                              <Button type="submit" variant="secondary" size="sm">
-                                Soy yo
-                              </Button>
-                            </form>
-                          )}
-                          {!canClaim &&
-                            shooter?.linked_user_id &&
-                            !isMine && (
-                              <span className="text-xs text-fg-subtle">
-                                ya asociado
-                              </span>
+                          <div className="flex flex-col items-start gap-1">
+                            {canClaim && (
+                              <form action={claimShooter}>
+                                <input
+                                  type="hidden"
+                                  name="shooter_id"
+                                  value={shooter!.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="match_id"
+                                  value={match.id}
+                                />
+                                <Button type="submit" variant="secondary" size="sm">
+                                  Soy yo
+                                </Button>
+                              </form>
                             )}
+                            {!canClaim &&
+                              shooter?.linked_user_id &&
+                              !isMine && (
+                                <span className="text-xs text-fg-subtle">
+                                  ya asociado
+                                </span>
+                              )}
+                            {canToggleAbsent && (
+                              <form action={toggleEntryAbsent}>
+                                <input
+                                  type="hidden"
+                                  name="match_id"
+                                  value={match.id}
+                                />
+                                <input
+                                  type="hidden"
+                                  name="entry_id"
+                                  value={e.id}
+                                />
+                                <Button
+                                  type="submit"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs"
+                                >
+                                  {e.is_absent
+                                    ? "Sí asistió"
+                                    : "Marcar ausente"}
+                                </Button>
+                              </form>
+                            )}
+                          </div>
                         </TD>
                       </TR>
                     );

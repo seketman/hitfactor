@@ -78,9 +78,11 @@ export async function listEntriesByMatch(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, total_time_seconds, hits, is_dq, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
+      "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
     )
     .eq("match_id", matchId)
+    // Ausentes y DQs van al final del listado para que el podio quede arriba.
+    .order("is_absent", { ascending: true })
     .order("is_dq", { ascending: true })
     .order("place", { ascending: true });
   // `power_factor` es `text` en la DB; el parser de import garantiza que solo
@@ -128,7 +130,7 @@ export async function listEntriesByShooters(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name, scoring_type))",
+      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name, scoring_type))",
     )
     .in("shooter_id", shooterIds)
     .order("matches(date)", { ascending: false });
@@ -154,7 +156,7 @@ export async function listMyEntriesInMatch(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, power_factor, category, classification, divisions(code, name)",
+      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, classification, divisions(code, name)",
     )
     .eq("match_id", matchId)
     .in("shooter_id", shooterIds)
