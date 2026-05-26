@@ -1,6 +1,7 @@
 import type { TypedSupabaseClient } from "../supabase/types";
 import type {
   Firearm,
+  FirearmUsageLog,
   FirearmUsageStats,
   MatchFirearmLog,
 } from "./types";
@@ -47,11 +48,15 @@ export async function getMatchFirearmLog(
 }
 
 /**
- * Estadísticas agregadas de uso por arma del usuario:
- * total de matches en los que fue usada, total de tiros y último uso.
+ * Estadísticas agregadas de uso por arma del usuario. Suma TANTO los
+ * match_firearm_log (uso en torneos) COMO los firearm_usage_log (uso
+ * manual de práctica). `totalMatches` y `totalSessions` se exponen por
+ * separado para que la UI pueda desglosar; `totalRounds` y `lastUsedDate`
+ * son la unión de ambas fuentes.
  *
- * Se hace una sola query al log + join contra matches para la fecha del
- * último uso.
+ * Dos queries en paralelo + agregación en memoria. La alternativa sería
+ * una sola RPC con UNION ALL pero por ahora el volumen es chico y los
+ * tipos generados de Supabase para RPCs son más fricción.
  */
 export async function listFirearmUsageStats(
   supabase: TypedSupabaseClient,
@@ -59,33 +64,56 @@ export async function listFirearmUsageStats(
 ): Promise<FirearmUsageStats[]> {
   const firearms = await listMyFirearms(supabase, userId);
   if (firearms.length === 0) return [];
+  const firearmIds = firearms.map((f) => f.id);
 
-  const { data } = await supabase
-    .from("match_firearm_log")
-    .select("firearm_id, rounds_fired, match_entries(matches(date))")
-    .in(
-      "firearm_id",
-      firearms.map((f) => f.id),
-    );
-
-  const logs = data ?? [];
+  const [matchLogsRes, usageLogsRes] = await Promise.all([
+    supabase
+      .from("match_firearm_log")
+      .select("firearm_id, rounds_fired, match_entries(matches(date))")
+      .in("firearm_id", firearmIds),
+    supabase
+      .from("firearm_usage_log")
+      .select("firearm_id, rounds_fired, used_on")
+      .in("firearm_id", firearmIds),
+  ]);
 
   const byFirearm = new Map<
     string,
-    { matches: number; rounds: number; lastDate: string | null }
+    {
+      matches: number;
+      sessions: number;
+      rounds: number;
+      lastDate: string | null;
+    }
   >();
   for (const f of firearms) {
-    byFirearm.set(f.id, { matches: 0, rounds: 0, lastDate: null });
+    byFirearm.set(f.id, {
+      matches: 0,
+      sessions: 0,
+      rounds: 0,
+      lastDate: null,
+    });
   }
-  for (const log of logs) {
+
+  const bump = (bucket: ReturnType<typeof byFirearm.get>, date: string | null) => {
+    if (!bucket || !date) return;
+    if (!bucket.lastDate || date > bucket.lastDate) bucket.lastDate = date;
+  };
+
+  for (const log of matchLogsRes.data ?? []) {
     const bucket = byFirearm.get(log.firearm_id);
     if (!bucket) continue;
     bucket.matches += 1;
     bucket.rounds += log.rounds_fired;
-    const date = log.match_entries?.matches?.date ?? null;
-    if (date && (!bucket.lastDate || date > bucket.lastDate)) {
-      bucket.lastDate = date;
-    }
+    bump(bucket, log.match_entries?.matches?.date ?? null);
+  }
+
+  for (const log of usageLogsRes.data ?? []) {
+    const bucket = byFirearm.get(log.firearm_id);
+    if (!bucket) continue;
+    bucket.sessions += 1;
+    bucket.rounds += log.rounds_fired;
+    bump(bucket, log.used_on);
   }
 
   return firearms.map((f) => {
@@ -93,10 +121,36 @@ export async function listFirearmUsageStats(
     return {
       firearm: f,
       totalMatches: b.matches,
+      totalSessions: b.sessions,
       totalRounds: b.rounds,
       lastUsedDate: b.lastDate,
     };
   });
+}
+
+/**
+ * Lista los logs manuales de práctica de un arma, más recientes primero.
+ * Embebe el nombre del tipo de munición usado (si está) para no requerir
+ * un segundo round-trip en la página de detalle.
+ */
+export async function listFirearmUsageLog(
+  supabase: TypedSupabaseClient,
+  firearmId: string,
+): Promise<
+  Array<
+    FirearmUsageLog & { ammunition_types: { name: string } | null }
+  >
+> {
+  const { data } = await supabase
+    .from("firearm_usage_log")
+    .select(
+      "id, firearm_id, ammunition_type_id, used_on, rounds_fired, notes, created_at, updated_at, ammunition_types(name)",
+    )
+    .eq("firearm_id", firearmId)
+    .order("used_on", { ascending: false });
+  return (data ?? []) as Array<
+    FirearmUsageLog & { ammunition_types: { name: string } | null }
+  >;
 }
 
 /**

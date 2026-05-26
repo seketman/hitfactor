@@ -255,6 +255,61 @@ describe("describeAuditEntry", () => {
     expect(desc.detail).toContain("9x19");
   });
 
+  it("firearm_usage.create: arma, tiros, fecha y munición", () => {
+    const desc = describeAuditEntry(
+      row({
+        action: "firearm_usage.create",
+        metadata: {
+          firearm_id: "f-1",
+          firearm_name: "Glock 17",
+          used_on: "2026-05-12",
+          rounds_fired: 150,
+          ammunition_name: "Magtech 124gr",
+        },
+      }),
+    );
+    expect(desc.summary).toContain("Glock 17");
+    expect(desc.detail).toContain("150 tiros");
+    expect(desc.detail).toContain("2026-05-12");
+    expect(desc.detail).toContain("Magtech 124gr");
+    expect(desc.link?.href).toBe("/firearms/f-1");
+  });
+
+  it("firearm_usage.create sin munición: omite ese fragmento", () => {
+    const desc = describeAuditEntry(
+      row({
+        action: "firearm_usage.create",
+        metadata: {
+          firearm_id: "f-1",
+          firearm_name: "Glock 17",
+          used_on: "2026-05-12",
+          rounds_fired: 80,
+          ammunition_name: null,
+        },
+      }),
+    );
+    expect(desc.detail).toContain("80 tiros");
+    expect(desc.detail).not.toContain("null");
+  });
+
+  it("firearm_usage.delete: arma y datos del borrado", () => {
+    const desc = describeAuditEntry(
+      row({
+        action: "firearm_usage.delete",
+        metadata: {
+          firearm_id: "f-1",
+          firearm_name: "Glock 17",
+          used_on: "2026-05-12",
+          rounds_fired: 80,
+        },
+      }),
+    );
+    expect(desc.summary).toContain("Borraste");
+    expect(desc.summary).toContain("Glock 17");
+    expect(desc.detail).toContain("80 tiros");
+    expect(desc.link?.href).toBe("/firearms/f-1");
+  });
+
   it("acción desconocida: cae al fallback con el code crudo", () => {
     const desc = describeAuditEntry(row({ action: "future.thing" }));
     expect(desc.summary).toBe("future.thing");

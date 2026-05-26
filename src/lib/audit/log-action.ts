@@ -23,6 +23,8 @@ export const AUDIT_ACTION = {
   AMMO_CREATE: "ammo.create",
   AMMO_UPDATE: "ammo.update",
   AMMO_DELETE: "ammo.delete",
+  FIREARM_USAGE_CREATE: "firearm_usage.create",
+  FIREARM_USAGE_DELETE: "firearm_usage.delete",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];

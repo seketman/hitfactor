@@ -232,12 +232,36 @@ export interface MatchFirearmLog {
   updated_at: string;
 }
 
-/** Estadísticas de uso de un arma a partir del log. */
+/**
+ * Log manual de uso de un arma fuera de torneos (entrenamiento, práctica).
+ * Complementa `match_firearm_log` — entre ambos cubren todo el desgaste
+ * real del arma. La unión cronológica se muestra en `/firearms/[id]`.
+ */
+export interface FirearmUsageLog {
+  id: string;
+  firearm_id: string;
+  ammunition_type_id: string | null;
+  /** Fecha del consumo (date sin hora). */
+  used_on: string;
+  rounds_fired: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Estadísticas de uso de un arma. `totalRounds` ya suma matches + manual;
+ * `totalMatches` y `totalSessions` permiten desglosar en la UI.
+ */
 export interface FirearmUsageStats {
   firearm: Firearm;
+  /** Matches en los que se usó. */
   totalMatches: number;
+  /** Sesiones de práctica registradas a mano. */
+  totalSessions: number;
+  /** Tiros totales — suma de match_firearm_log + firearm_usage_log. */
   totalRounds: number;
-  /** Fecha del último match (YYYY-MM-DD), o null si no se usó nunca. */
+  /** Última fecha de uso (matches o sesiones), o null si nunca se usó. */
   lastUsedDate: string | null;
 }
 

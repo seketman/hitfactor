@@ -244,6 +244,54 @@ export type Database = {
         }
         Relationships: []
       }
+      firearm_usage_log: {
+        Row: {
+          ammunition_type_id: string | null
+          created_at: string
+          firearm_id: string
+          id: string
+          notes: string | null
+          rounds_fired: number
+          updated_at: string
+          used_on: string
+        }
+        Insert: {
+          ammunition_type_id?: string | null
+          created_at?: string
+          firearm_id: string
+          id?: string
+          notes?: string | null
+          rounds_fired: number
+          updated_at?: string
+          used_on: string
+        }
+        Update: {
+          ammunition_type_id?: string | null
+          created_at?: string
+          firearm_id?: string
+          id?: string
+          notes?: string | null
+          rounds_fired?: number
+          updated_at?: string
+          used_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firearm_usage_log_ammunition_type_id_fkey"
+            columns: ["ammunition_type_id"]
+            isOneToOne: false
+            referencedRelation: "ammunition_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firearm_usage_log_firearm_id_fkey"
+            columns: ["firearm_id"]
+            isOneToOne: false
+            referencedRelation: "firearms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_entries: {
         Row: {
           category: string | null
