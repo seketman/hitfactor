@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/seketman/hitfactor/compare/v1.10.0...v1.10.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* **matches:** only allow marking absent when score is zero ([#54](https://github.com/seketman/hitfactor/issues/54)) ([bb65fe1](https://github.com/seketman/hitfactor/commit/bb65fe11c8ea2fc58ba382a3794114b2001e5f66))
+
 ## [1.10.0](https://github.com/seketman/hitfactor/compare/v1.9.1...v1.10.0) (2026-05-26)
 
 
