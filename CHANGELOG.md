@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/seketman/hitfactor/compare/v1.11.0...v1.12.0) (2026-05-26)
+
+
+### Features
+
+* **firearms:** QR scan for quick range session logging ([#59](https://github.com/seketman/hitfactor/issues/59)) ([72464c4](https://github.com/seketman/hitfactor/commit/72464c4d2893877706d2cf19f2d0eddbb6aad8ae))
+
 ## [1.11.0](https://github.com/seketman/hitfactor/compare/v1.10.1...v1.11.0) (2026-05-26)
 
 
