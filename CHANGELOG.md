@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/seketman/hitfactor/compare/v1.9.0...v1.9.1) (2026-05-26)
+
+
+### Bug Fixes
+
+* **dashboard:** show absences distinctly in KPI hint and timeline chart ([#50](https://github.com/seketman/hitfactor/issues/50)) ([085a5cc](https://github.com/seketman/hitfactor/commit/085a5ccdc030b935a8c83dc6e03ee79c99f7ca60))
+
 ## [1.9.0](https://github.com/seketman/hitfactor/compare/v1.8.0...v1.9.0) (2026-05-26)
 
 
