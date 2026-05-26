@@ -22,13 +22,23 @@ interface DashboardViewProps {
   disciplineCode: DisciplineCode | null;
   /** Nombre legible de la disciplina (cuando se filtra). */
   disciplineName?: string | null;
+  /**
+   * Filtra entries a una división específica dentro de la disciplina. Solo
+   * aplica cuando `disciplineCode` está seteado — `division` solo tiene
+   * sentido dentro de una disciplina (los codes se solapan entre IPSC y
+   * FBI: `PIS`, `PCC`).
+   */
+  divisionCode?: string | null;
+  /** Nombre legible de la división (cuando se filtra). */
+  divisionName?: string | null;
 }
 
 /**
  * Vista del dashboard. Server Component que se reutiliza desde dos rutas:
  *  - `/dashboard` (consolidado, disciplineCode=null): muestra todas las
  *    disciplinas agregadas
- *  - `/dashboard/[discipline]`: filtra a una disciplina específica
+ *  - `/dashboard/[discipline]`: filtra a una disciplina específica;
+ *    opcional `?division=<code>` filtra además a una división.
  *
  * Foco: información del tirador (KPIs + historial). El listado de matches
  * vive en `/matches` y el catálogo de armas en `/firearms`.
@@ -36,6 +46,8 @@ interface DashboardViewProps {
 export async function DashboardView({
   disciplineCode,
   disciplineName,
+  divisionCode = null,
+  divisionName = null,
 }: DashboardViewProps) {
   const { supabase, user } = await requireUser();
   const userId = user.id;
@@ -62,11 +74,19 @@ export async function DashboardView({
     myShooters.map((s) => s.id),
   );
 
-  const myEntries = isConsolidated
+  // Entries dentro de la disciplina activa (o todos, si consolidado). Se
+  // usan para armar la lista de divisiones disponibles en el filtro tabs.
+  const disciplineEntries = isConsolidated
     ? allEntries
     : allEntries.filter(
         (e) => e.matches?.disciplines?.code === disciplineCode,
       );
+
+  // Entries que efectivamente alimentan KPIs e historial. Si hay división
+  // filtrada, además acotamos por ella.
+  const myEntries = divisionCode
+    ? disciplineEntries.filter((e) => e.divisions?.code === divisionCode)
+    : disciplineEntries;
 
   const uniqueMatchIds = Array.from(
     new Set(myEntries.map((e) => e.matches?.id).filter((id): id is string => !!id)),
@@ -81,11 +101,20 @@ export async function DashboardView({
 
   const headerTitle = isConsolidated
     ? `Hola, ${profile?.display_name ?? "tirador"}`
-    : (disciplineName ?? "Disciplina");
+    : divisionCode
+      ? `${disciplineName ?? "Disciplina"} · ${divisionName ?? divisionCode}`
+      : (disciplineName ?? "Disciplina");
 
   const headerSubtitle = isConsolidated
     ? renderConsolidatedSubtitle(myShooters)
-    : `${myEntries.length} torneo${myEntries.length === 1 ? "" : "s"} disputado${myEntries.length === 1 ? "" : "s"} en esta disciplina`;
+    : renderDisciplineSubtitle(myEntries.length, divisionCode);
+
+  // Lista de divisiones disponibles para el tab filter. Solo la mostramos
+  // si el usuario tiene entries en más de una división dentro de esta
+  // disciplina — con una sola, el filtro no agregaría nada.
+  const divisionOptions = !isConsolidated
+    ? collectDivisionOptions(disciplineEntries)
+    : [];
 
   return (
     <PageContainer>
@@ -93,6 +122,14 @@ export async function DashboardView({
         <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
         <p className="mt-1 text-sm text-fg-muted">{headerSubtitle}</p>
       </header>
+
+      {!isConsolidated && divisionOptions.length > 1 && (
+        <DivisionFilterTabs
+          disciplineCode={disciplineCode}
+          divisions={divisionOptions}
+          activeDivision={divisionCode}
+        />
+      )}
 
       {myEntries.length > 0 ? (
         <>
@@ -121,6 +158,84 @@ export async function DashboardView({
       )}
     </PageContainer>
   );
+}
+
+/**
+ * Tabs para filtrar el dashboard a una sola división dentro de la
+ * disciplina activa. "Todas" navega a la URL sin `?division`.
+ */
+function DivisionFilterTabs({
+  disciplineCode,
+  divisions,
+  activeDivision,
+}: {
+  disciplineCode: string;
+  divisions: Array<{ code: string; name: string }>;
+  activeDivision: string | null;
+}) {
+  const tabClass = (active: boolean) =>
+    [
+      "rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+      active
+        ? "border-accent bg-accent-soft text-fg"
+        : "border-border bg-surface-2 text-fg-muted hover:border-border-strong hover:text-fg",
+    ].join(" ");
+
+  return (
+    <div className="mb-8 flex flex-wrap items-center gap-2">
+      <span className="text-xs uppercase tracking-wider text-fg-muted">
+        División
+      </span>
+      <Link
+        href={`/dashboard/${disciplineCode}`}
+        className={tabClass(activeDivision === null)}
+      >
+        Todas
+      </Link>
+      {divisions.map((d) => (
+        <Link
+          key={d.code}
+          href={`/dashboard/${disciplineCode}?division=${encodeURIComponent(d.code)}`}
+          title={d.name}
+          className={tabClass(activeDivision === d.code)}
+        >
+          {d.code}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Deriva la lista de divisiones (code+name) presentes en los entries del
+ * usuario para esta disciplina, ordenada alfabéticamente por code.
+ */
+function collectDivisionOptions(
+  entries: Awaited<ReturnType<typeof listEntriesByShooters>>,
+): Array<{ code: string; name: string }> {
+  const map = new Map<string, string>();
+  for (const e of entries) {
+    const code = e.divisions?.code;
+    if (!code) continue;
+    if (!map.has(code)) map.set(code, e.divisions?.name ?? code);
+  }
+  return [...map.entries()]
+    .map(([code, name]) => ({ code, name }))
+    .sort((a, b) => a.code.localeCompare(b.code));
+}
+
+function renderDisciplineSubtitle(
+  filteredEntriesCount: number,
+  divisionCode: string | null,
+): string {
+  // Nota: aún cuando el tirador haya corrido el mismo torneo en 2
+  // divisiones, este subtítulo cuenta entries (cada participación). Las
+  // KPIs adentro sí deduplican por match. Si querés ver "torneos únicos",
+  // está en la card "Torneos disputados" más abajo.
+  const palabra = filteredEntriesCount === 1 ? "participación" : "participaciones";
+  return divisionCode
+    ? `${filteredEntriesCount} ${palabra} en esta división`
+    : `${filteredEntriesCount} ${palabra} en esta disciplina`;
 }
 
 /**

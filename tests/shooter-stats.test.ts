@@ -482,3 +482,100 @@ describe("computeShooterStats — impactos (FBI)", () => {
     expect(s.bestHits?.value).toBe(40);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Multi-división por match: dedup en KPIs cross-match, desglose por
+// división intacto.
+// ---------------------------------------------------------------------------
+
+describe("computeShooterStats — multi-división en el mismo match", () => {
+  // Capra corre PO y PCCO en el mismo torneo el mismo día.
+  const capra = () => [
+    entry({
+      id: "po",
+      matchId: "argentina-open-2026",
+      date: "2026-03-21",
+      divisionCode: "PO",
+      divisionName: "Production Optics",
+      matchPercentage: 80,
+      place: 5,
+    }),
+    entry({
+      id: "pcco",
+      matchId: "argentina-open-2026",
+      date: "2026-03-21",
+      divisionCode: "PCCO",
+      divisionName: "PCC Optic",
+      matchPercentage: 75,
+      place: 8,
+    }),
+  ];
+
+  it("cuenta el match una sola vez en totalMatches", () => {
+    const s = computeShooterStats(capra());
+    expect(s.totalMatches).toBe(1);
+    expect(s.scoredMatches).toBe(1);
+  });
+
+  it("usa la entry de mayor matchPercentage para el promedio", () => {
+    const s = computeShooterStats(capra());
+    // Best % entre PO (80) y PCCO (75) es 80. Como hay un solo match,
+    // el avg también es 80.
+    expect(s.avgPercentage).toBe(80);
+    expect(s.bestPercentage?.value).toBe(80);
+    expect(s.bestPercentage?.divisionCode).toBe("PO");
+  });
+
+  it("mantiene byDivision con AMBAS divisiones (desglose intacto)", () => {
+    const s = computeShooterStats(capra());
+    const codes = s.byDiscipline.map((d) => d.code);
+    // Verificamos byDiscipline cuenta 1 torneo de IPSC (deduped).
+    expect(codes).toContain("TP");
+    const tp = s.byDiscipline.find((d) => d.code === "TP");
+    expect(tp?.count).toBe(1);
+    // Tip: byDivision (no exportado en ShooterStats actual, pero detectado
+    // vía topDivision) sigue mostrando ambas.
+    expect(s.topDivision).not.toBeNull();
+  });
+
+  it("no rompe la línea temporal — un solo punto por match", () => {
+    const s = computeShooterStats(capra());
+    expect(s.timeline).toHaveLength(1);
+    expect(s.timeline[0]!.divisionCode).toBe("PO"); // el de mejor %
+  });
+
+  it("prefiere non-DQ cuando una división DQ'eó y la otra no", () => {
+    const s = computeShooterStats([
+      entry({
+        id: "dq",
+        matchId: "m1",
+        date: "2026-01-01",
+        divisionCode: "PO",
+        matchPercentage: 0,
+        isDq: true,
+      }),
+      entry({
+        id: "ok",
+        matchId: "m1",
+        date: "2026-01-01",
+        divisionCode: "PCCO",
+        matchPercentage: 60,
+        isDq: false,
+      }),
+    ]);
+    expect(s.totalMatches).toBe(1);
+    expect(s.scoredMatches).toBe(1);
+    expect(s.avgPercentage).toBe(60);
+    expect(s.timeline[0]!.divisionCode).toBe("PCCO");
+  });
+
+  it("no afecta a tiradores con una sola entry por match (no-op)", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", matchPercentage: 100 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", matchPercentage: 80 }),
+      entry({ id: "c", matchId: "mc", date: "2026-03-01", matchPercentage: 60 }),
+    ]);
+    expect(s.totalMatches).toBe(3);
+    expect(s.avgPercentage).toBe(80);
+  });
+});

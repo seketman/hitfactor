@@ -168,9 +168,24 @@ export function computeShooterStats(
   entries: MyEntryRow[],
   options: ComputeShooterStatsOptions = {},
 ): ShooterStats {
-  const points = toTimelinePoints(entries, options.divisionSizes).sort((a, b) =>
-    a.date.localeCompare(b.date),
+  const allPoints = toTimelinePoints(entries, options.divisionSizes).sort(
+    (a, b) => a.date.localeCompare(b.date),
   );
+
+  // Dedup por match: si un tirador corrió 2+ divisiones en el mismo torneo
+  // (ej. PO y PCCO el mismo día), cuenta como UN torneo en las KPIs
+  // cross-match. Política de selección por match: preferimos non-DQ y luego
+  // el `matchPercentage` más alto — su mejor desempeño del día representa
+  // al match en la línea temporal y en los promedios.
+  //
+  // El usuario puede inspeccionar cada participación por separado vía el
+  // filtro de división del dashboard (`?division=XX`); en ese caso los
+  // entries que llegan ya están filtrados a una sola división y este dedup
+  // queda como no-op.
+  //
+  // `byDivision` sigue armándose sobre TODOS los entries (sin dedup) — ese
+  // desglose precisamente quiere ver cada división por separado.
+  const points = dedupByMatch(allPoints);
 
   const scored = points.filter((p) => !p.isDq);
   const scoredMatches = scored.length;
@@ -228,8 +243,12 @@ export function computeShooterStats(
   const cadence = computeCadence(points, now);
   const stageStats = computeStageStats(options.stageResults);
 
+  // `byDiscipline` cuenta torneos únicos por disciplina → usa el set deduped.
+  // `byDivision` muestra el desglose por división → usa todos los entries
+  // (un mismo torneo aparece en PO y PCCO si el tirador corrió ambas).
+  const allScored = allPoints.filter((p) => !p.isDq);
   const byDiscipline = aggregateByDiscipline(scored);
-  const byDivision = aggregateByDivision(scored);
+  const byDivision = aggregateByDivision(allScored);
 
   return {
     totalMatches: points.length,
@@ -289,6 +308,36 @@ export function computeShooterStats(
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
+
+/**
+ * Reduce una lista de puntos a uno por match. Política:
+ *  1. Si hay un entry non-DQ y otro DQ para el mismo match, gana el non-DQ
+ *     (el DQ no debería borrar la participación válida).
+ *  2. Empate (ambos non-DQ o ambos DQ): gana el `matchPercentage` más alto.
+ *
+ * Preserva el orden del input (ya viene sorted por fecha).
+ */
+function dedupByMatch(points: MatchTimelinePoint[]): MatchTimelinePoint[] {
+  const chosen = new Map<string, MatchTimelinePoint>();
+  for (const p of points) {
+    const current = chosen.get(p.matchId);
+    if (!current) {
+      chosen.set(p.matchId, p);
+      continue;
+    }
+    if (current.isDq && !p.isDq) {
+      chosen.set(p.matchId, p);
+      continue;
+    }
+    if (!current.isDq && p.isDq) continue;
+    if (p.matchPercentage > current.matchPercentage) {
+      chosen.set(p.matchId, p);
+    }
+  }
+  // Filtramos preservando el orden original: para cada matchId queda solo
+  // la referencia elegida.
+  return points.filter((p) => chosen.get(p.matchId) === p);
+}
 
 function toTimelinePoints(
   entries: MyEntryRow[],
