@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.0](https://github.com/seketman/hitfactor/compare/v1.7.0...v1.8.0) (2026-05-26)
+
+
+### Features
+
+* **admin:** "view as profile" mode for diagnostic dashboards ([#41](https://github.com/seketman/hitfactor/issues/41)) ([ed90571](https://github.com/seketman/hitfactor/commit/ed905717fd4ffcc263fe669eaf2e61042b0509b5))
+
+
+### Bug Fixes
+
+* **parser:** strip WinMSS Tag column tokens (MD/RM/ST/ASM) from names ([#42](https://github.com/seketman/hitfactor/issues/42)) ([2e83e3b](https://github.com/seketman/hitfactor/commit/2e83e3b03f0ba0014c076ea075daed96bdf08090))
+
 ## [1.7.0](https://github.com/seketman/hitfactor/compare/v1.6.0...v1.7.0) (2026-05-26)
 
 
