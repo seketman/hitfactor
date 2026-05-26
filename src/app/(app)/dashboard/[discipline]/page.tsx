@@ -5,7 +5,7 @@ import type { DisciplineCode } from "@/lib/disciplines";
 
 interface PageProps {
   params: Promise<{ discipline: string }>;
-  searchParams: Promise<{ division?: string }>;
+  searchParams: Promise<{ division?: string; asProfile?: string }>;
 }
 
 /**
@@ -23,7 +23,7 @@ export default async function DisciplineDashboardPage({
   searchParams,
 }: PageProps) {
   const { discipline } = await params;
-  const { division } = await searchParams;
+  const { division, asProfile } = await searchParams;
 
   const supabase = await createClient();
   const { data: disciplineRow } = await supabase
@@ -58,6 +58,7 @@ export default async function DisciplineDashboardPage({
       disciplineName={disciplineRow.name as string}
       divisionCode={divisionCode}
       divisionName={divisionName}
+      asProfile={asProfile ?? null}
     />
   );
 }
