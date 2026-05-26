@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/seketman/hitfactor/compare/v1.6.0...v1.7.0) (2026-05-26)
+
+
+### Features
+
+* **dashboard:** dedup multi-division-per-match KPIs + division filter ([#39](https://github.com/seketman/hitfactor/issues/39)) ([735674b](https://github.com/seketman/hitfactor/commit/735674b8e32553259dfdb7afe186c746969f8de7))
+
 ## [1.6.0](https://github.com/seketman/hitfactor/compare/v1.5.1...v1.6.0) (2026-05-25)
 
 
