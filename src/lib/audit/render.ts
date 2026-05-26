@@ -201,6 +201,40 @@ export function describeAuditEntry(row: AuditLogRow): AuditDescription {
             .join(" · ") || undefined,
       };
 
+    case "firearm_usage.create": {
+      const firearmName = s(m.firearm_name) ?? "un arma";
+      const rounds = n(m.rounds_fired);
+      const date = s(m.used_on);
+      const ammo = s(m.ammunition_name);
+      const detailParts: string[] = [];
+      if (rounds != null) detailParts.push(`${rounds} tiros`);
+      if (date) detailParts.push(date);
+      if (ammo) detailParts.push(ammo);
+      return {
+        summary: `Registraste una sesión con "${firearmName}"`,
+        detail: detailParts.length > 0 ? detailParts.join(" · ") : undefined,
+        link: s(m.firearm_id)
+          ? { href: `/firearms/${m.firearm_id}`, label: "Ver arma" }
+          : undefined,
+      };
+    }
+
+    case "firearm_usage.delete": {
+      const firearmName = s(m.firearm_name) ?? "un arma";
+      const rounds = n(m.rounds_fired);
+      const date = s(m.used_on);
+      const detailParts: string[] = [];
+      if (rounds != null) detailParts.push(`${rounds} tiros`);
+      if (date) detailParts.push(date);
+      return {
+        summary: `Borraste una sesión de "${firearmName}"`,
+        detail: detailParts.length > 0 ? detailParts.join(" · ") : undefined,
+        link: s(m.firearm_id)
+          ? { href: `/firearms/${m.firearm_id}`, label: "Ver arma" }
+          : undefined,
+      };
+    }
+
     default:
       return { summary: row.action };
   }

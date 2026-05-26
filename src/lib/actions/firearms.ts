@@ -153,6 +153,132 @@ export async function deleteFirearm(formData: FormData) {
 }
 
 /**
+ * Registra una sesión de uso del arma fuera de torneos (entrenamiento /
+ * práctica). Requiere fecha + tiros > 0. Tipo de munición opcional.
+ * Audita siempre — el desgaste manual es input del tirador y querés
+ * trazabilidad si después sale un número raro.
+ */
+export async function createFirearmUsage(formData: FormData) {
+  const firearmId = String(formData.get("firearm_id") ?? "");
+  const usedOn = String(formData.get("used_on") ?? "").trim();
+  const roundsRaw = String(formData.get("rounds_fired") ?? "");
+  const ammoIdRaw = String(formData.get("ammunition_type_id") ?? "");
+  const notes = trimOrNull(formData.get("notes"));
+
+  const errorTarget = firearmId ? `/firearms/${firearmId}` : "/firearms";
+
+  if (!firearmId) {
+    redirectWithError("/firearms", "Arma no especificada");
+  }
+  if (!usedOn) {
+    redirectWithError(errorTarget, "Falta la fecha");
+  }
+  const rounds = Number.parseInt(roundsRaw, 10);
+  if (!Number.isFinite(rounds) || rounds <= 0) {
+    redirectWithError(
+      errorTarget,
+      "Tiros disparados debe ser mayor que cero",
+    );
+  }
+
+  const { supabase, user } = await requireUser();
+
+  const payload = {
+    firearm_id: firearmId,
+    used_on: usedOn,
+    rounds_fired: rounds,
+    ammunition_type_id: ammoIdRaw === "" ? null : ammoIdRaw,
+    notes,
+  };
+
+  const { data: created, error } = await supabase
+    .from("firearm_usage_log")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error) {
+    redirectWithError(errorTarget, error.message);
+  }
+
+  // Resolvemos nombres de arma + munición para alimentar el audit log
+  // con algo legible — sino la pantalla `/activity` queda con solo IDs.
+  const [{ data: firearmRow }, { data: ammoRow }] = await Promise.all([
+    supabase
+      .from("firearms")
+      .select("name")
+      .eq("id", firearmId)
+      .maybeSingle(),
+    payload.ammunition_type_id
+      ? supabase
+          .from("ammunition_types")
+          .select("name")
+          .eq("id", payload.ammunition_type_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  await logAction(supabase, user.id, {
+    action: AUDIT_ACTION.FIREARM_USAGE_CREATE,
+    entityType: "firearm_usage",
+    entityId: created?.id,
+    metadata: {
+      firearm_id: firearmId,
+      firearm_name: firearmRow?.name ?? null,
+      used_on: usedOn,
+      rounds_fired: rounds,
+      ammunition_name: ammoRow?.name ?? null,
+    },
+  });
+
+  revalidateFirearmPaths(firearmId);
+  redirect(`/firearms/${firearmId}`);
+}
+
+export async function deleteFirearmUsage(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const firearmId = String(formData.get("firearm_id") ?? "");
+  if (!id || !firearmId) return;
+
+  const { supabase, user } = await requireUser();
+
+  const { data: snapshot } = await supabase
+    .from("firearm_usage_log")
+    .select(
+      "used_on, rounds_fired, firearms(name), ammunition_types(name)",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("firearm_usage_log")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    redirectWithError(`/firearms/${firearmId}`, error.message);
+  }
+
+  if (snapshot) {
+    await logAction(supabase, user.id, {
+      action: AUDIT_ACTION.FIREARM_USAGE_DELETE,
+      entityType: "firearm_usage",
+      entityId: id,
+      metadata: {
+        firearm_id: firearmId,
+        firearm_name: snapshot.firearms?.name ?? null,
+        used_on: snapshot.used_on,
+        rounds_fired: snapshot.rounds_fired,
+        ammunition_name: snapshot.ammunition_types?.name ?? null,
+      },
+    });
+  }
+
+  revalidateFirearmPaths(firearmId);
+  redirect(`/firearms/${firearmId}`);
+}
+
+/**
  * Asigna un arma a un match_entry y registra la cantidad de tiros.
  * Si `firearm_id` viene vacío, borra el log existente (i.e. "no recuerdo / no aplica").
  */
