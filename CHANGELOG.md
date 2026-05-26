@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.1](https://github.com/seketman/hitfactor/compare/v1.12.0...v1.12.1) (2026-05-26)
+
+
+### Refactors
+
+* **ammo:** match firearm detail layout (collapsible edit above history) ([#61](https://github.com/seketman/hitfactor/issues/61)) ([576bcb9](https://github.com/seketman/hitfactor/commit/576bcb94f2cd28741fec2a8e9d65815d4e70e57f))
+
 ## [1.12.0](https://github.com/seketman/hitfactor/compare/v1.11.0...v1.12.0) (2026-05-26)
 
 
