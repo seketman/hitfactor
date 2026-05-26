@@ -104,8 +104,9 @@ export function stripNameSuffixes(name: string): string {
 const TRAILING_NOISE_TOKENS = new Set<string>([
   // Regiones IPSC habituales en planillas argentinas.
   "ARG", "CAN", "USA", "URU", "CHI", "BRA", "PAR", "BOL",
-  // Roles ICS / Oficial de Campo.
-  "RO", "ICS", "OC",
+  // Roles ICS / organización del torneo (Oficial de Campo, Match Director,
+  // Range Master, Stats, Assistant Match Director).
+  "RO", "ICS", "OC", "MD", "RM", "ST", "ASM",
   // Categorías IPSC multi-letra (Super Senior, Grand Senior). Las de una
   // sola letra (S/J/L) NO las incluimos: el riesgo de pisar una inicial
   // del nombre (ej. "Diego J", "Martin S") es alto.

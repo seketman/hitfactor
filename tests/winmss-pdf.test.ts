@@ -671,3 +671,57 @@ World Classification System used Page 1`;
     expect(parsed2.date).toBe("2026-12-31");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tokens de la columna Tag (MD, RM, ST, ASM) que antes bloqueaban la
+// pasada de strip y dejaban "S ARG MD" pegado al nombre.
+// ---------------------------------------------------------------------------
+
+describe("parseWinmssText — Tags de organización del torneo", () => {
+  // Fila real del PDF "1er Ranking Social 2026" — PRODUCTION OPTICS:
+  //   2 86,11 467,2091 1 CAPRA, Claudio Alberto S ARG MD
+  // Sin reconocer MD, el parser frenaba en MD y dejaba "CAPRA, Claudio
+  // Alberto S ARG MD" como `fullName`, creando un shooter duplicado al
+  // re-importar.
+  const pageWithMdTag = `PRODUCTION OPTICS -- Overall Match Results
+1er Ranking Social 2026 Printed marzo 28, 2026 at 17:43
+% Points CompetitorCompetitor Cat Reg Cls Tag ICS
+1 100,00 542,5598 16 LARROUDE, Javier ARG RO
+2 86,11 467,2091 1 CAPRA, Claudio Alberto S ARG MD
+World Classification System used Page 1`;
+
+  it("pela el tag 'MD' (Match Director) y deja el nombre limpio", () => {
+    const parsed = parseWinmssText([{ num: 1, text: pageWithMdTag }]);
+    const capra = parsed.matchEntries.find((e) =>
+      e.shooter.fullName.toLowerCase().includes("capra"),
+    );
+    expect(capra).toBeDefined();
+    expect(capra!.shooter.fullName).toBe("CAPRA, Claudio Alberto");
+    // El "S" (Senior) que antes quedaba pegado, ahora se identifica como
+    // categoría y se persiste en el campo correcto.
+    expect(capra!.category).toBe("S");
+    expect(capra!.shooter.region).toBe("ARG");
+  });
+
+  it("LARROUDE (sin tag, solo región y RO) sigue parseándose igual", () => {
+    const parsed = parseWinmssText([{ num: 1, text: pageWithMdTag }]);
+    const larroude = parsed.matchEntries.find((e) =>
+      e.shooter.fullName.toLowerCase().includes("larroude"),
+    );
+    expect(larroude!.shooter.fullName).toBe("LARROUDE, Javier");
+    expect(larroude!.shooter.region).toBe("ARG");
+  });
+
+  it("también pela 'ST' (Stats) — visto en producción para 'ZAPPULLA'", () => {
+    const pageWithSt = pageWithMdTag.replace(
+      "1 CAPRA, Claudio Alberto S ARG MD",
+      "1 ZAPPULLA, Marcio ARG ST",
+    );
+    const parsed = parseWinmssText([{ num: 1, text: pageWithSt }]);
+    const z = parsed.matchEntries.find((e) =>
+      e.shooter.fullName.toLowerCase().includes("zappulla"),
+    );
+    expect(z!.shooter.fullName).toBe("ZAPPULLA, Marcio");
+    expect(z!.shooter.region).toBe("ARG");
+  });
+});

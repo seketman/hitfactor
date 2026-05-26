@@ -119,9 +119,9 @@ const DIVISION_NAME_TO_CODE: Record<string, string> = {
 };
 
 // Tokens cortos uppercase que aparecen como columnas de metadata en las
-// filas de overall (Cat, Reg, Cls, ICS). Usamos sets explícitos en lugar
-// de heuristics de longitud para no confundir un apellido en mayúsculas
-// (ej. "EMILIO") con metadata.
+// filas de overall (Cat, Reg, Cls, Tag, ICS). Usamos sets explícitos en
+// lugar de heuristics de longitud para no confundir un apellido en
+// mayúsculas (ej. "EMILIO") con metadata.
 const KNOWN_CATEGORIES = new Set(["S", "SS", "GS", "J", "L"]);
 const KNOWN_REGIONS = new Set([
   "ARG",
@@ -134,7 +134,14 @@ const KNOWN_REGIONS = new Set([
   "BOL",
 ]);
 const KNOWN_CLASSIFICATIONS = new Set(["GM", "M", "A", "B", "C", "D", "U"]);
+// Roles ICS y de organización del torneo. Estos viven en columnas
+// distintas en el PDF (ICS vs Tag) pero para el parser son lo mismo:
+// tokens trailing que hay que pelar del nombre. Sin esto, "MD" (Match
+// Director) o "ST" (Stats) bloquean la pasada y dejan tokens previos
+// (S/ARG) pegados al apellido — generando duplicados de identidad al
+// re-importar.
 const KNOWN_ICS = new Set(["RO"]);
+const KNOWN_TAGS = new Set(["MD", "RM", "ST", "ASM"]);
 
 /**
  * Heurística de detección. Un PDF es WinMSS si tiene una sección
@@ -892,7 +899,8 @@ function splitNameFromMeta(rest: string): { name: string; meta: ParsedMeta } {
       KNOWN_CATEGORIES.has(t) ||
       KNOWN_REGIONS.has(t) ||
       KNOWN_CLASSIFICATIONS.has(t) ||
-      KNOWN_ICS.has(t)
+      KNOWN_ICS.has(t) ||
+      KNOWN_TAGS.has(t)
     ) {
       i--;
       continue;
@@ -904,6 +912,8 @@ function splitNameFromMeta(rest: string): { name: string; meta: ParsedMeta } {
     else if (KNOWN_REGIONS.has(t)) meta.reg = t;
     else if (KNOWN_CLASSIFICATIONS.has(t)) meta.cls = t;
     else if (KNOWN_ICS.has(t)) meta.ics = t;
+    // KNOWN_TAGS no se persiste como meta (no hay campo en match_entries
+    // para "rol en el torneo") — alcanza con haberlo pelado del nombre.
   }
   // `stripNameSuffixes` corre como red de seguridad: si quedó algún token
   // que la cosecha por sets conocidos no atajó (ej. "ESC" pegado al final
