@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/seketman/hitfactor/compare/v1.8.0...v1.9.0) (2026-05-26)
+
+
+### Features
+
+* **stats:** detect & exclude absent shooters from KPIs ([#48](https://github.com/seketman/hitfactor/issues/48)) ([5cb49c1](https://github.com/seketman/hitfactor/commit/5cb49c183007bedab6ae9a6d1292d48ffaaa811d))
+
 ## [1.8.0](https://github.com/seketman/hitfactor/compare/v1.7.0...v1.8.0) (2026-05-26)
 
 
