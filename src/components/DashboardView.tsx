@@ -8,6 +8,7 @@ import { StatsOverview } from "@/components/StatsOverview";
 import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
+import type { Shooter } from "@/lib/db/types";
 import { listClubs } from "@/lib/db/clubs";
 import {
   getDivisionSizes,
@@ -31,6 +32,17 @@ interface DashboardViewProps {
   divisionCode?: string | null;
   /** Nombre legible de la división (cuando se filtra). */
   divisionName?: string | null;
+  /**
+   * Override de admin: UUID de un profile (= auth user id) para "ver el
+   * dashboard como ese usuario". Se cargan TODOS sus shooters linkeados,
+   * así la vista refleja exactamente lo que vería ese usuario al entrar
+   * con su cuenta (incluyendo la consolidación multi-identidad).
+   *
+   * Se ignora silenciosamente si el usuario logueado no es admin o el
+   * UUID no existe. El admin no cambia de sesión: las escrituras siguen
+   * yendo a su propia cuenta.
+   */
+  asProfile?: string | null;
 }
 
 /**
@@ -48,6 +60,7 @@ export async function DashboardView({
   disciplineName,
   divisionCode = null,
   divisionName = null,
+  asProfile = null,
 }: DashboardViewProps) {
   const { supabase, user } = await requireUser();
   const userId = user.id;
@@ -59,19 +72,48 @@ export async function DashboardView({
     listClubs(supabase),
   ]);
 
+  // Override de admin: si el usuario logueado es admin y pasó
+  // `?asProfile=<uuid>` con un profile válido, sustituimos la identidad
+  // activa por la de ese usuario — cargamos su profile + TODOS sus
+  // shooters linkeados. El resto del dashboard (entries, stats, historial,
+  // filtro de división) opera sobre ese set efectivo, así que el admin ve
+  // exactamente lo que ve ese usuario al entrar con su cuenta.
+  //
+  // Sigue siendo la sesión del admin: cualquier escritura (claim, import,
+  // etc.) se atribuye al admin, no al usuario impersonado.
+  let impersonatedProfile: Awaited<ReturnType<typeof getProfile>> = null;
+  let impersonatedShooters: Shooter[] = [];
+  if (profile?.is_admin === true && asProfile) {
+    const [impProfileRes, impShootersRes] = await Promise.all([
+      getProfile(supabase, asProfile),
+      listMyShooters(supabase, asProfile),
+    ]);
+    if (impProfileRes) {
+      impersonatedProfile = impProfileRes;
+      impersonatedShooters = impShootersRes;
+    }
+  }
+
+  const isImpersonating = impersonatedProfile !== null;
+  const activeProfile = isImpersonating ? impersonatedProfile : profile;
+  const effectiveShooters = isImpersonating ? impersonatedShooters : myShooters;
+
   // Onboarding: si nunca claimó ninguna identidad, el dashboard no tiene
   // nada para mostrarle (todos los KPIs/historial dependen de tener al
   // menos un shooter linkeado). Lo redirigimos a `/matches`, donde la card
   // de sugerencias le presenta candidatos detectados por similitud. Solo
   // aplica al dashboard consolidado — en `/dashboard/[discipline]` el
   // usuario navega con intención y aceptamos mostrar el empty state.
-  if (isConsolidated && myShooters.length === 0) {
+  //
+  // No redirigimos bajo impersonación: el admin puede estar diagnosticando
+  // a un usuario sin shooters y necesita ver el empty state real.
+  if (isConsolidated && !isImpersonating && effectiveShooters.length === 0) {
     redirect("/matches");
   }
 
   const allEntries = await listEntriesByShooters(
     supabase,
-    myShooters.map((s) => s.id),
+    effectiveShooters.map((s) => s.id),
   );
 
   // Entries dentro de la disciplina activa (o todos, si consolidado). Se
@@ -99,14 +141,18 @@ export async function DashboardView({
     ),
   ]);
 
+  // Bajo impersonación el dashboard mira el mundo desde la perspectiva del
+  // usuario impersonado — incluyendo el "Hola, [display_name]" del header,
+  // así el admin ve EXACTAMENTE lo que vería ese usuario. El banner deja
+  // claro que es impersonación, no la sesión real del admin.
   const headerTitle = isConsolidated
-    ? `Hola, ${profile?.display_name ?? "tirador"}`
+    ? `Hola, ${activeProfile?.display_name ?? "tirador"}`
     : divisionCode
       ? `${disciplineName ?? "Disciplina"} · ${divisionName ?? divisionCode}`
       : (disciplineName ?? "Disciplina");
 
   const headerSubtitle = isConsolidated
-    ? renderConsolidatedSubtitle(myShooters)
+    ? renderConsolidatedSubtitle(effectiveShooters)
     : renderDisciplineSubtitle(myEntries.length, divisionCode);
 
   // Lista de divisiones disponibles para el tab filter. Solo la mostramos
@@ -116,8 +162,22 @@ export async function DashboardView({
     ? collectDivisionOptions(disciplineEntries)
     : [];
 
+  // URL para "Salir de impersonación": misma vista, sin `?asProfile`.
+  // Preserva `division` para no perder el contexto del filtro activo.
+  const exitImpersonationHref = isConsolidated
+    ? "/dashboard"
+    : `/dashboard/${disciplineCode}${divisionCode ? `?division=${encodeURIComponent(divisionCode)}` : ""}`;
+
   return (
     <PageContainer>
+      {isImpersonating && impersonatedProfile && (
+        <ImpersonationBanner
+          profileName={impersonatedProfile.display_name}
+          shooterCount={effectiveShooters.length}
+          exitHref={exitImpersonationHref}
+        />
+      )}
+
       <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">{headerTitle}</h1>
         <p className="mt-1 text-sm text-fg-muted">{headerSubtitle}</p>
@@ -128,6 +188,7 @@ export async function DashboardView({
           disciplineCode={disciplineCode}
           divisions={divisionOptions}
           activeDivision={divisionCode}
+          asProfile={isImpersonating ? asProfile : null}
         />
       )}
 
@@ -154,9 +215,49 @@ export async function DashboardView({
           </Section>
         </>
       ) : (
-        <EmptyState hasIdentities={myShooters.length > 0} />
+        <EmptyState hasIdentities={effectiveShooters.length > 0} />
       )}
     </PageContainer>
+  );
+}
+
+/**
+ * Banner persistente arriba del dashboard cuando el admin está viendo
+ * "como" otro usuario. Visual deliberadamente notorio (border accent +
+ * bg soft) para que no se confunda con la sesión real del admin.
+ */
+function ImpersonationBanner({
+  profileName,
+  shooterCount,
+  exitHref,
+}: {
+  profileName: string;
+  shooterCount: number;
+  exitHref: string;
+}) {
+  const identityText =
+    shooterCount === 0
+      ? "sin identidades linkeadas"
+      : shooterCount === 1
+        ? "1 identidad linkeada"
+        : `${shooterCount} identidades linkeadas`;
+
+  return (
+    <Card className="mb-6 border-accent/40 bg-accent-soft/40">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
+        <span className="text-fg-muted">
+          Modo admin · viendo el dashboard como{" "}
+          <strong className="text-fg">{profileName}</strong>{" "}
+          <span className="text-fg-subtle">({identityText})</span>
+        </span>
+        <Link
+          href={exitHref}
+          className="rounded-md border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-fg-muted hover:border-border-strong hover:text-fg"
+        >
+          Salir
+        </Link>
+      </div>
+    </Card>
   );
 }
 
@@ -168,10 +269,16 @@ function DivisionFilterTabs({
   disciplineCode,
   divisions,
   activeDivision,
+  asProfile = null,
 }: {
   disciplineCode: string;
   divisions: Array<{ code: string; name: string }>;
   activeDivision: string | null;
+  /**
+   * Si hay impersonación activa, se preserva en los links de las tabs —
+   * sino el admin pierde el contexto al cambiar de división.
+   */
+  asProfile?: string | null;
 }) {
   const tabClass = (active: boolean) =>
     [
@@ -181,21 +288,27 @@ function DivisionFilterTabs({
         : "border-border bg-surface-2 text-fg-muted hover:border-border-strong hover:text-fg",
     ].join(" ");
 
+  // Construye la URL con los query params correctos (division y/o asProfile).
+  const hrefFor = (divisionCode: string | null): string => {
+    const params = new URLSearchParams();
+    if (divisionCode) params.set("division", divisionCode);
+    if (asProfile) params.set("asProfile", asProfile);
+    const qs = params.toString();
+    return `/dashboard/${disciplineCode}${qs ? `?${qs}` : ""}`;
+  };
+
   return (
     <div className="mb-8 flex flex-wrap items-center gap-2">
       <span className="text-xs uppercase tracking-wider text-fg-muted">
         División
       </span>
-      <Link
-        href={`/dashboard/${disciplineCode}`}
-        className={tabClass(activeDivision === null)}
-      >
+      <Link href={hrefFor(null)} className={tabClass(activeDivision === null)}>
         Todas
       </Link>
       {divisions.map((d) => (
         <Link
           key={d.code}
-          href={`/dashboard/${disciplineCode}?division=${encodeURIComponent(d.code)}`}
+          href={hrefFor(d.code)}
           title={d.name}
           className={tabClass(activeDivision === d.code)}
         >

@@ -365,6 +365,7 @@ export type Database = {
           display_name: string
           full_name: string | null
           id: string
+          is_admin: boolean
           member_number: string | null
           ui_prefs: Json
           updated_at: string
@@ -375,6 +376,7 @@ export type Database = {
           display_name: string
           full_name?: string | null
           id: string
+          is_admin?: boolean
           member_number?: string | null
           ui_prefs?: Json
           updated_at?: string
@@ -385,6 +387,7 @@ export type Database = {
           display_name?: string
           full_name?: string | null
           id?: string
+          is_admin?: boolean
           member_number?: string | null
           ui_prefs?: Json
           updated_at?: string

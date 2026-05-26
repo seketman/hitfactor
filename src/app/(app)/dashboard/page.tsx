@@ -1,5 +1,10 @@
 import { DashboardView } from "@/components/DashboardView";
 
-export default function DashboardPage() {
-  return <DashboardView disciplineCode={null} />;
+interface PageProps {
+  searchParams: Promise<{ asProfile?: string }>;
+}
+
+export default async function DashboardPage({ searchParams }: PageProps) {
+  const { asProfile } = await searchParams;
+  return <DashboardView disciplineCode={null} asProfile={asProfile ?? null} />;
 }

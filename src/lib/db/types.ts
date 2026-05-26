@@ -13,6 +13,11 @@ export interface Profile {
   display_name: string;
   full_name: string | null;
   member_number: string | null;
+  /**
+   * Administrador del sitio. Bootstrap manual vía SQL (UPDATE profiles).
+   * Habilita vistas de diagnóstico como "ver el dashboard como otro tirador".
+   */
+  is_admin: boolean;
 }
 
 /**
