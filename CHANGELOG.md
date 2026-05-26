@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/seketman/hitfactor/compare/v1.5.1...v1.6.0) (2026-05-25)
+
+
+### Features
+
+* improve shooter recognition (member# dedup, fuzzy claim, name suffix stripping) ([#37](https://github.com/seketman/hitfactor/issues/37)) ([d128c00](https://github.com/seketman/hitfactor/commit/d128c0084943c5283583e335fbdefa985f4b0394))
+
 ## [1.5.1](https://github.com/seketman/hitfactor/compare/v1.5.0...v1.5.1) (2026-05-25)
 
 
