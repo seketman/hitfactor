@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/seketman/hitfactor/compare/v1.10.1...v1.11.0) (2026-05-26)
+
+
+### Features
+
+* **firearms:** log practice sessions outside tournaments ([#56](https://github.com/seketman/hitfactor/issues/56)) ([90a896b](https://github.com/seketman/hitfactor/commit/90a896b8cf1b1c4f37bffa87f90a3b4713a84c71))
+
 ## [1.10.1](https://github.com/seketman/hitfactor/compare/v1.10.0...v1.10.1) (2026-05-26)
 
 
