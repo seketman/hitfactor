@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/seketman/hitfactor/compare/v1.9.1...v1.10.0) (2026-05-26)
+
+
+### Features
+
+* **ammo:** catalog of ammunition types (factory + reload) ([#52](https://github.com/seketman/hitfactor/issues/52)) ([feb9969](https://github.com/seketman/hitfactor/commit/feb9969dfb24753b2b11e7bb9f10a22efc0b176d))
+
 ## [1.9.1](https://github.com/seketman/hitfactor/compare/v1.9.0...v1.9.1) (2026-05-26)
 
 
