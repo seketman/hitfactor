@@ -35,6 +35,21 @@ export function StatsOverview({
   // Si los hits son la primaria, no necesitamos una fila extra.
   const showHitsExtraRow = !showHitsAsPrimary && hasHits;
 
+  // Desglosamos la diferencia entre `totalMatches` y `scoredMatches` en DQ
+  // vs ausencia para que el hint del KPI sea preciso (antes decía "DQ"
+  // genérico aunque fueran ausencias).
+  const dqCount = stats.timeline.filter((p) => p.isDq).length;
+  const absentCount = stats.timeline.filter((p) => p.isAbsent).length;
+  const invalidParts: string[] = [];
+  if (dqCount > 0) invalidParts.push(`${dqCount} DQ`);
+  if (absentCount > 0) {
+    invalidParts.push(`${absentCount} ausente${absentCount === 1 ? "" : "s"}`);
+  }
+  const invalidHint =
+    invalidParts.length > 0
+      ? `${stats.scoredMatches} válidos · ${invalidParts.join(" · ")}`
+      : undefined;
+
   return (
     <div className="space-y-4">
       {/* Fila 1: performance — métrica primaria */}
@@ -42,11 +57,7 @@ export function StatsOverview({
         <KpiCard
           label="Torneos disputados"
           value={String(stats.totalMatches)}
-          hint={
-            stats.totalMatches !== stats.scoredMatches
-              ? `${stats.scoredMatches} válidos · ${stats.totalMatches - stats.scoredMatches} DQ`
-              : undefined
-          }
+          hint={invalidHint}
         />
 
         {showHitsAsPrimary ? (
