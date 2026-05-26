@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      ammunition_types: {
+        Row: {
+          brand: string | null
+          bullet_type: string | null
+          bullet_weight_grains: number | null
+          caliber: string | null
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          owner_user_id: string
+          power_factor: string | null
+          power_factor_measured: number | null
+          powder: string | null
+          powder_charge_grains: number | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          bullet_type?: string | null
+          bullet_weight_grains?: number | null
+          caliber?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          owner_user_id: string
+          power_factor?: string | null
+          power_factor_measured?: number | null
+          powder?: string | null
+          powder_charge_grains?: number | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          bullet_type?: string | null
+          bullet_weight_grains?: number | null
+          caliber?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          owner_user_id?: string
+          power_factor?: string | null
+          power_factor_measured?: number | null
+          powder?: string | null
+          powder_charge_grains?: number | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -268,6 +322,7 @@ export type Database = {
       }
       match_firearm_log: {
         Row: {
+          ammunition_type_id: string | null
           created_at: string
           firearm_id: string
           match_entry_id: string
@@ -276,6 +331,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          ammunition_type_id?: string | null
           created_at?: string
           firearm_id: string
           match_entry_id: string
@@ -284,6 +340,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          ammunition_type_id?: string | null
           created_at?: string
           firearm_id?: string
           match_entry_id?: string
@@ -292,6 +349,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "match_firearm_log_ammunition_type_id_fkey"
+            columns: ["ammunition_type_id"]
+            isOneToOne: false
+            referencedRelation: "ammunition_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "match_firearm_log_firearm_id_fkey"
             columns: ["firearm_id"]

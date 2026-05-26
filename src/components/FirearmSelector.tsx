@@ -9,12 +9,18 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { setMatchFirearm } from "@/lib/actions/firearms";
-import type { Firearm, MatchFirearmLog } from "@/lib/db/types";
+import type { AmmunitionType, Firearm, MatchFirearmLog } from "@/lib/db/types";
 
 interface FirearmSelectorProps {
   matchEntryId: string;
   matchId: string;
   firearms: Firearm[];
+  /**
+   * Catálogo de municiones del tirador. Vacío = no se muestra el dropdown
+   * de munición; el resto del form sigue funcionando igual (el campo es
+   * opcional a nivel schema).
+   */
+  ammo: AmmunitionType[];
   current: MatchFirearmLog | null;
   /** Tiros estimados según disciplina/stages. Null = no se puede estimar. */
   suggestedRounds: number | null;
@@ -31,6 +37,7 @@ export function FirearmSelector({
   matchEntryId,
   matchId,
   firearms,
+  ammo,
   current,
   suggestedRounds,
 }: FirearmSelectorProps) {
@@ -54,7 +61,7 @@ export function FirearmSelector({
   return (
     <Card className="mb-8 px-5 py-4">
       <p className="mb-3 text-xs font-medium uppercase tracking-wider text-fg-muted">
-        Arma usada
+        Arma y munición
       </p>
       {/*
         key={matchEntryId} fuerza remount cuando cambia la entry (ej: el
@@ -68,6 +75,7 @@ export function FirearmSelector({
         matchEntryId={matchEntryId}
         matchId={matchId}
         firearms={firearms}
+        ammo={ammo}
         current={current}
         suggestedRounds={suggestedRounds}
       />
@@ -79,10 +87,12 @@ function FirearmForm({
   matchEntryId,
   matchId,
   firearms,
+  ammo,
   current,
   suggestedRounds,
 }: FirearmSelectorProps) {
   const initialFirearmId = current?.firearm_id ?? "";
+  const initialAmmoId = current?.ammunition_type_id ?? "";
 
   // Default de tiros:
   //  - Si hay un valor guardado real (>0), lo usamos.
@@ -96,6 +106,7 @@ function FirearmForm({
       : suggestedRounds;
 
   const [firearmId, setFirearmId] = useState<string>(initialFirearmId);
+  const [ammoId, setAmmoId] = useState<string>(initialAmmoId);
   const [rounds, setRounds] = useState<string>(
     initialRoundsNumber != null ? String(initialRoundsNumber) : "",
   );
@@ -148,6 +159,27 @@ function FirearmForm({
           }
         />
       </div>
+
+      {/* Munición: solo aparece si el tirador tiene catálogo cargado.
+          Opcional — un log sin munición sigue siendo válido (compat
+          con logs viejos pre-catálogo). */}
+      {ammo.length > 0 && (
+        <Select
+          label="Munición (opcional)"
+          name="ammunition_type_id"
+          value={ammoId}
+          onChange={(e) => setAmmoId(e.target.value)}
+          disabled={isClearing}
+        >
+          <option value="">— Sin especificar —</option>
+          {ammo.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+              {a.caliber ? ` (${a.caliber})` : ""}
+            </option>
+          ))}
+        </Select>
+      )}
 
       <div className="flex justify-end">
         <SubmitButton isUpdate={!!current} isClearing={isClearing} />

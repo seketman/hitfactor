@@ -161,6 +161,10 @@ export async function setMatchFirearm(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
   const firearmId = String(formData.get("firearm_id") ?? "");
   const roundsRaw = String(formData.get("rounds_fired") ?? "");
+  // Munición opcional: si viene vacío, queda NULL (mantiene compat con
+  // logs viejos que no tenían esta columna).
+  const ammoIdRaw = String(formData.get("ammunition_type_id") ?? "");
+  const ammunitionTypeId = ammoIdRaw === "" ? null : ammoIdRaw;
 
   if (!matchEntryId) return;
 
@@ -173,7 +177,9 @@ export async function setMatchFirearm(formData: FormData) {
   const [logRes, matchNameRes] = await Promise.all([
     supabase
       .from("match_firearm_log")
-      .select("firearm_id, rounds_fired, firearms(name)")
+      .select(
+        "firearm_id, rounds_fired, ammunition_type_id, firearms(name), ammunition_types(name)",
+      )
       .eq("match_entry_id", matchEntryId)
       .maybeSingle(),
     matchId
@@ -225,6 +231,7 @@ export async function setMatchFirearm(formData: FormData) {
         match_entry_id: matchEntryId,
         firearm_id: firearmId,
         rounds_fired: rounds,
+        ammunition_type_id: ammunitionTypeId,
         notes: trimOrNull(formData.get("notes")),
       },
       { onConflict: "match_entry_id" },
@@ -233,12 +240,18 @@ export async function setMatchFirearm(formData: FormData) {
       redirectWithError(errorTarget, error.message);
     }
 
-    // Resolver el nombre del firearm asignado para el audit metadata.
-    const { data: firearmRow } = await supabase
-      .from("firearms")
-      .select("name")
-      .eq("id", firearmId)
-      .maybeSingle();
+    // Resolver nombres para el audit metadata. Si no hay ammo, evitamos
+    // la query — la mayoría de los logs no van a tener munición asignada.
+    const [{ data: firearmRow }, { data: ammoRow }] = await Promise.all([
+      supabase.from("firearms").select("name").eq("id", firearmId).maybeSingle(),
+      ammunitionTypeId
+        ? supabase
+            .from("ammunition_types")
+            .select("name")
+            .eq("id", ammunitionTypeId)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
 
     await logAction(supabase, user.id, {
       action: AUDIT_ACTION.MATCH_FIREARM_SET,
@@ -252,12 +265,16 @@ export async function setMatchFirearm(formData: FormData) {
               firearm_id: logBefore.firearm_id,
               firearm_name: logBefore.firearms?.name,
               rounds_fired: logBefore.rounds_fired,
+              ammunition_type_id: logBefore.ammunition_type_id,
+              ammunition_name: logBefore.ammunition_types?.name,
             }
           : null,
         after: {
           firearm_id: firearmId,
           firearm_name: firearmRow?.name,
           rounds_fired: rounds,
+          ammunition_type_id: ammunitionTypeId,
+          ammunition_name: ammoRow?.name ?? null,
         },
       },
     });

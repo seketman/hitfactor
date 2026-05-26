@@ -13,6 +13,7 @@ import {
   Crosshair,
   History,
   Info,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -203,6 +204,13 @@ export function AppSidebarShell({
               icon={<Crosshair className="h-4 w-4" aria-hidden />}
               label="Armas"
               active={pathname.startsWith("/firearms")}
+              collapsed={collapsed}
+            />
+            <NavItem
+              href="/ammo"
+              icon={<Package className="h-4 w-4" aria-hidden />}
+              label="Municiones"
+              active={pathname.startsWith("/ammo")}
               collapsed={collapsed}
             />
             <NavItem

@@ -195,6 +195,66 @@ describe("describeAuditEntry", () => {
     expect(desc.link?.href).toBe("/matches/m-1");
   });
 
+  it("ammo.create: nombre, tipo legible y atributos", () => {
+    const desc = describeAuditEntry(
+      row({
+        action: "ammo.create",
+        entity_id: "a-1",
+        metadata: {
+          name: "9mm Hornady 124gr",
+          type: "reload",
+          caliber: "9x19",
+          brand: "Hornady",
+        },
+      }),
+    );
+    expect(desc.summary).toContain("9mm Hornady 124gr");
+    // "reload" se renderiza como "recarga" en español.
+    expect(desc.detail).toContain("recarga");
+    expect(desc.detail).toContain("9x19");
+    expect(desc.detail).toContain("Hornady");
+    expect(desc.link?.href).toBe("/ammo/a-1");
+  });
+
+  it("ammo.update: diff de campos cambiados", () => {
+    const desc = describeAuditEntry(
+      row({
+        action: "ammo.update",
+        entity_id: "a-1",
+        metadata: {
+          before: {
+            name: "9mm Hornady",
+            powder_charge_grains: 4.3,
+            powder: "N320",
+          },
+          after: {
+            name: "9mm Hornady",
+            powder_charge_grains: 4.4,
+            powder: "N320",
+          },
+        },
+      }),
+    );
+    expect(desc.detail).toContain("powder_charge_grains");
+    expect(desc.detail).not.toContain("powder:"); // unchanged
+  });
+
+  it("ammo.delete: nombre y atributos del borrado", () => {
+    const desc = describeAuditEntry(
+      row({
+        action: "ammo.delete",
+        metadata: {
+          name: "9mm Hornady 124gr",
+          type: "factory",
+          caliber: "9x19",
+        },
+      }),
+    );
+    expect(desc.summary).toContain("9mm Hornady 124gr");
+    expect(desc.detail).toContain("factory");
+    expect(desc.detail).toContain("9x19");
+  });
+
   it("acción desconocida: cae al fallback con el code crudo", () => {
     const desc = describeAuditEntry(row({ action: "future.thing" }));
     expect(desc.summary).toBe("future.thing");

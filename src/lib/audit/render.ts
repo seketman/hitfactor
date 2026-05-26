@@ -165,6 +165,42 @@ export function describeAuditEntry(row: AuditLogRow): AuditDescription {
       };
     }
 
+    case "ammo.create": {
+      const name = s(m.name) ?? "?";
+      const tags = [
+        s(m.type) === "reload" ? "recarga" : s(m.type) === "factory" ? "factory" : undefined,
+        s(m.caliber),
+        s(m.brand),
+      ].filter((x): x is string => !!x);
+      return {
+        summary: `Agregaste el tipo de munición "${name}"`,
+        detail: tags.length > 0 ? tags.join(" · ") : undefined,
+        link: row.entity_id
+          ? { href: `/ammo/${row.entity_id}`, label: "Ver munición" }
+          : undefined,
+      };
+    }
+
+    case "ammo.update": {
+      const after = obj(m.after) ?? {};
+      return {
+        summary: `Editaste el tipo de munición "${s(after.name) ?? s(m.name) ?? "?"}"`,
+        detail: describeDiff(obj(m.before), after),
+        link: row.entity_id
+          ? { href: `/ammo/${row.entity_id}`, label: "Ver munición" }
+          : undefined,
+      };
+    }
+
+    case "ammo.delete":
+      return {
+        summary: `Borraste el tipo de munición "${s(m.name) ?? "?"}"`,
+        detail:
+          [s(m.type), s(m.caliber), s(m.brand)]
+            .filter((x): x is string => !!x)
+            .join(" · ") || undefined,
+      };
+
     default:
       return { summary: row.action };
   }
