@@ -53,6 +53,12 @@ export interface ParsedMatchEntry {
    */
   hits: number | null;
   isDq: boolean;
+  /**
+   * True si el tirador estaba anotado pero no se presentó (0 puntos, 0%).
+   * Excluido de las stats agregadas, igual que isDq, pero con un badge
+   * neutro en la UI (no señala una infracción).
+   */
+  isAbsent: boolean;
 }
 
 /**

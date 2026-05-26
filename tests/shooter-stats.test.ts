@@ -15,6 +15,7 @@ function entry(overrides: Partial<EntryInput> = {}): MyEntryRow {
     matchPercentage: 100,
     hits: null,
     isDq: false,
+    isAbsent: false,
     divisionCode: "PR",
     divisionName: "Production",
     disciplineCode: "TP",
@@ -29,6 +30,7 @@ function entry(overrides: Partial<EntryInput> = {}): MyEntryRow {
     total_time_seconds: null,
     hits: e.hits,
     is_dq: e.isDq,
+    is_absent: e.isAbsent,
     power_factor: null,
     category: null,
     divisions: { code: e.divisionCode, name: e.divisionName },
@@ -51,6 +53,7 @@ interface EntryInput {
   matchPercentage: number;
   hits: number | null;
   isDq: boolean;
+  isAbsent: boolean;
   divisionCode: string;
   divisionName: string;
   disciplineCode: string;
@@ -121,6 +124,54 @@ describe("computeShooterStats — exclusión de DQ", () => {
     expect(s.avgPercentage).toBe(0);
     expect(s.bestPercentage).toBeNull();
     expect(s.bestPlace).toBeNull();
+  });
+});
+
+describe("computeShooterStats — exclusión de ausentes", () => {
+  it("ausentes NO bajan promedio ni cuentan como matches scoreados", () => {
+    // Antes del fix: un ausente con 0% destruía el avgPercentage del
+    // tirador. La regresión que esto previene fue reportada por usuarios
+    // reales que se anotaron a un torneo y no asistieron.
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", matchPercentage: 90, place: 1 }),
+      entry({
+        id: "b",
+        matchId: "mb",
+        date: "2026-02-01",
+        matchPercentage: 0,
+        place: 99,
+        isAbsent: true,
+      }),
+    ]);
+    expect(s.totalMatches).toBe(2);
+    expect(s.scoredMatches).toBe(1);
+    expect(s.avgPercentage).toBe(90);
+    expect(s.bestPercentage?.matchId).toBe("ma");
+  });
+
+  it("multi-división con una ausencia: prefiere el entry válido en dedup", () => {
+    // Caso real: un tirador se anota en PO y PCCO, solo participa en PO.
+    // El dedup por match debe quedarse con PO (válido), no con PCCO (ausente).
+    const s = computeShooterStats([
+      entry({
+        id: "a",
+        matchId: "m1",
+        matchPercentage: 85,
+        place: 3,
+        divisionCode: "PO",
+      }),
+      entry({
+        id: "b",
+        matchId: "m1",
+        matchPercentage: 0,
+        place: 99,
+        divisionCode: "PCCO",
+        isAbsent: true,
+      }),
+    ]);
+    expect(s.totalMatches).toBe(1);
+    expect(s.scoredMatches).toBe(1);
+    expect(s.avgPercentage).toBe(85);
   });
 });
 

@@ -259,11 +259,17 @@ export function HistoryTable({
                         : "—"}
                     </TD>
                     <TD className="text-right font-mono">
-                      {e.is_dq ? <Badge tone="danger">DQ</Badge> : e.place}
+                      {e.is_dq ? (
+                        <Badge tone="danger">DQ</Badge>
+                      ) : e.is_absent ? (
+                        <Badge tone="default">Ausente</Badge>
+                      ) : (
+                        e.place
+                      )}
                     </TD>
                     {showHits && (
                       <TD className="text-right font-mono font-semibold text-fg">
-                        {e.is_dq ? "—" : (e.hits ?? "—")}
+                        {e.is_dq || e.is_absent ? "—" : (e.hits ?? "—")}
                       </TD>
                     )}
                     <TD
@@ -272,7 +278,9 @@ export function HistoryTable({
                         hasHits && "text-fg-muted",
                       )}
                     >
-                      {e.is_dq ? "—" : formatPercent(e.match_percentage)}
+                      {e.is_dq || e.is_absent
+                        ? "—"
+                        : formatPercent(e.match_percentage)}
                     </TD>
                   </TR>
                 );

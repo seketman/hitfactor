@@ -98,6 +98,11 @@ export interface MatchEntry {
   /** Impactos (sólo Tiro FBI: 0..40 — ranking primario). NULL en IPSC/Steel. */
   hits: number | null;
   is_dq: boolean;
+  /**
+   * Tirador anotado pero no asistió (0 puntos, 0%). Excluido de KPIs igual
+   * que `is_dq`, pero el badge UI es neutro (no señala una infracción).
+   */
+  is_absent: boolean;
 }
 
 export interface MatchEntryWithRelations extends MatchEntry {
@@ -114,6 +119,7 @@ export interface MyEntryRow {
   /** Impactos (Tiro FBI). NULL en disciplinas no hits-based. */
   hits: number | null;
   is_dq: boolean;
+  is_absent: boolean;
   power_factor: "Min" | "Maj" | null;
   category: string | null;
   divisions: { code: string; name: string } | null;
@@ -242,6 +248,7 @@ export interface MyMatchSummary {
     /** Impactos del match (Tiro FBI). NULL en otras disciplinas. */
     hits: number | null;
     is_dq: boolean;
+    is_absent: boolean;
     power_factor: "Min" | "Maj" | null;
     category: string | null;
     classification: string | null;

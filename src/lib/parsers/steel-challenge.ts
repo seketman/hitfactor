@@ -158,6 +158,7 @@ function parseEntryRow(
   const { fullName: rawName, isDq } = stripDqPrefix(nameRaw);
   const fullName = stripNameSuffixes(rawName);
   const totalTime = parseFloatOrNull(get("Time"));
+  const matchPercentage = parsePercentage(get("%"));
 
   return {
     shooter: {
@@ -171,10 +172,12 @@ function parseEntryRow(
     category: nullIfEmpty(get("Category")),
     place: parseIntOr(placeRaw, 0),
     matchPoints: 0,
-    matchPercentage: parsePercentage(get("%")),
+    matchPercentage,
     totalTimeSeconds: totalTime,
     hits: null, // Steel scoring es time-based, no impactos.
     isDq,
+    // Steel mide tiempo: ausente = no hay tiempo registrado y 0% (y no DQ).
+    isAbsent: !isDq && totalTime === null && matchPercentage === 0,
   };
 }
 

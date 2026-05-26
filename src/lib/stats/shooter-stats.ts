@@ -31,6 +31,7 @@ export interface MatchTimelinePoint {
   disciplineCode: string;
   disciplineName: string;
   isDq: boolean;
+  isAbsent: boolean;
 }
 
 export interface MatchHighlight {
@@ -187,7 +188,9 @@ export function computeShooterStats(
   // desglose precisamente quiere ver cada división por separado.
   const points = dedupByMatch(allPoints);
 
-  const scored = points.filter((p) => !p.isDq);
+  // Ausentes y DQs no cuentan como participación scoreable: bajaban
+  // artificialmente promedio, consistencia y trayectoria.
+  const scored = points.filter((p) => !p.isDq && !p.isAbsent);
   const scoredMatches = scored.length;
 
   const avgPercentage =
@@ -246,7 +249,7 @@ export function computeShooterStats(
   // `byDiscipline` cuenta torneos únicos por disciplina → usa el set deduped.
   // `byDivision` muestra el desglose por división → usa todos los entries
   // (un mismo torneo aparece en PO y PCCO si el tirador corrió ambas).
-  const allScored = allPoints.filter((p) => !p.isDq);
+  const allScored = allPoints.filter((p) => !p.isDq && !p.isAbsent);
   const byDiscipline = aggregateByDiscipline(scored);
   const byDivision = aggregateByDivision(allScored);
 
@@ -311,25 +314,29 @@ export function computeShooterStats(
 
 /**
  * Reduce una lista de puntos a uno por match. Política:
- *  1. Si hay un entry non-DQ y otro DQ para el mismo match, gana el non-DQ
- *     (el DQ no debería borrar la participación válida).
- *  2. Empate (ambos non-DQ o ambos DQ): gana el `matchPercentage` más alto.
+ *  1. Una participación "válida" (no DQ y no ausente) gana sobre cualquier
+ *     no-válida del mismo match. Cubre el caso multi-división donde alguien
+ *     se anotó en dos divisiones y solo participó en una.
+ *  2. Empate (ambos válidos o ambos no-válidos): gana `matchPercentage` mayor.
  *
  * Preserva el orden del input (ya viene sorted por fecha).
  */
 function dedupByMatch(points: MatchTimelinePoint[]): MatchTimelinePoint[] {
   const chosen = new Map<string, MatchTimelinePoint>();
+  const isValid = (p: MatchTimelinePoint) => !p.isDq && !p.isAbsent;
   for (const p of points) {
     const current = chosen.get(p.matchId);
     if (!current) {
       chosen.set(p.matchId, p);
       continue;
     }
-    if (current.isDq && !p.isDq) {
+    const curValid = isValid(current);
+    const newValid = isValid(p);
+    if (!curValid && newValid) {
       chosen.set(p.matchId, p);
       continue;
     }
-    if (!current.isDq && p.isDq) continue;
+    if (curValid && !newValid) continue;
     if (p.matchPercentage > current.matchPercentage) {
       chosen.set(p.matchId, p);
     }
@@ -364,6 +371,7 @@ function toTimelinePoints(
       disciplineCode: e.matches.disciplines?.code ?? "",
       disciplineName: e.matches.disciplines?.name ?? "",
       isDq: e.is_dq,
+      isAbsent: e.is_absent,
     });
   }
   return out;
