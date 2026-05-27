@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.1](https://github.com/seketman/hitfactor/compare/v1.13.0...v1.13.1) (2026-05-27)
+
+
+### Bug Fixes
+
+* **firearms:** use column DEFAULT for qr_code so gen_types marks it optional ([#73](https://github.com/seketman/hitfactor/issues/73)) ([2aa7d3d](https://github.com/seketman/hitfactor/commit/2aa7d3d071a6095cb27f80b89dd0f00bbe3f8669))
+
 ## [1.13.0](https://github.com/seketman/hitfactor/compare/v1.12.3...v1.13.0) (2026-05-27)
 
 
