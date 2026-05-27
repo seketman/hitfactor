@@ -38,6 +38,12 @@ export default async function FirearmQrPage({ params }: PageProps) {
   // Construimos la URL absoluta a partir de los headers del request:
   // x-forwarded-* cuando hay proxy (Vercel, Cloudflare), fallback a host.
   // Usamos `https` por default en prod; `http` solo en dev/localhost.
+  //
+  // Usamos `/q/{qr_code}` (6 chars) en lugar del `/firearms/{uuid}?log=1
+  // #log-form` original. Esto baja la URL de ~85 chars a ~30, lo cual
+  // baja el QR de 33×33 módulos a ~25×25 (≈60% del área) y permite
+  // imprimir stickers más chicos sin perder legibilidad. La ruta `/q/...`
+  // resuelve el code → id vía RPC y redirige al detalle.
   const headersList = await headers();
   const host =
     headersList.get("x-forwarded-host") ?? headersList.get("host") ?? "";
@@ -45,7 +51,7 @@ export default async function FirearmQrPage({ params }: PageProps) {
     headersList.get("x-forwarded-proto") ??
     (host.startsWith("localhost") ? "http" : "https");
   const origin = `${proto}://${host}`;
-  const targetUrl = `${origin}/firearms/${id}?log=1#log-form`;
+  const targetUrl = `${origin}/q/${firearm.qr_code}`;
 
   // QR como SVG inline para que escale bien al imprimir (vs PNG raster).
   // ECC level "M" balancea capacidad vs robustez — un QR con marcas/polvo
