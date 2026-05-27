@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.3](https://github.com/seketman/hitfactor/compare/v1.12.2...v1.12.3) (2026-05-27)
+
+
+### Bug Fixes
+
+* **matches:** disable "Actualizar" until form has real changes ([#67](https://github.com/seketman/hitfactor/issues/67)) ([99a3a6c](https://github.com/seketman/hitfactor/commit/99a3a6c4601ce474525f870cdc6024527490d824))
+
 ## [1.12.2](https://github.com/seketman/hitfactor/compare/v1.12.1...v1.12.2) (2026-05-27)
 
 
