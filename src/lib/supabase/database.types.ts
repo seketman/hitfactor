@@ -218,6 +218,7 @@ export type Database = {
           name: string
           notes: string | null
           owner_user_id: string
+          qr_code: string
           updated_at: string
         }
         Insert: {
@@ -229,6 +230,7 @@ export type Database = {
           name: string
           notes?: string | null
           owner_user_id: string
+          qr_code?: string
           updated_at?: string
         }
         Update: {
@@ -240,6 +242,7 @@ export type Database = {
           name?: string
           notes?: string | null
           owner_user_id?: string
+          qr_code?: string
           updated_at?: string
         }
         Relationships: []
@@ -658,6 +661,10 @@ export type Database = {
           count: number
           name: string
         }[]
+      }
+      resolve_firearm_qr_code: {
+        Args: { p_code: string }
+        Returns: string
       }
     }
     Enums: {

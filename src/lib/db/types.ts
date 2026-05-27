@@ -214,6 +214,13 @@ export interface Firearm {
   model: string | null;
   caliber: string | null;
   notes: string | null;
+  /**
+   * Código corto único (6 chars del alfabeto sin ambiguities) usado en
+   * la ruta `/q/{code}` para que el QR pegado físicamente al estuche
+   * encodee una URL ~30 chars en lugar de ~85 (firearm UUID + query +
+   * hash). Asignado vía trigger en la DB; siempre presente.
+   */
+  qr_code: string;
   created_at: string;
   updated_at: string;
 }
