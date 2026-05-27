@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.2](https://github.com/seketman/hitfactor/compare/v1.12.1...v1.12.2) (2026-05-27)
+
+
+### Bug Fixes
+
+* **import:** resolve stages when match is renamed and accept Spanish stage labels ([#65](https://github.com/seketman/hitfactor/issues/65)) ([dd35b8b](https://github.com/seketman/hitfactor/commit/dd35b8b1c244a9c78a238f215fced7f7267ebc75))
+
 ## [1.12.1](https://github.com/seketman/hitfactor/compare/v1.12.0...v1.12.1) (2026-05-26)
 
 
