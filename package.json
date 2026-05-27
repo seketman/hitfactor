@@ -35,6 +35,6 @@
     "@vitejs/plugin-react": "^6.0.2",
     "tailwindcss": "^4",
     "typescript": "^6",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.7"
   }
 }
