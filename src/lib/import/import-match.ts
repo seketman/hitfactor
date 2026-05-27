@@ -815,8 +815,21 @@ async function resolveMatchForStage(
 }
 
 /**
- * Devuelve el match cuyo nombre normalizado es prefijo del título del stage,
- * priorizando el más largo (más específico). Exportada para testing.
+ * Resuelve un match candidato a partir del título del stage entre matches
+ * del mismo día/disciplina. Estrategia:
+ *
+ *  1. **Forward prefix**: el nombre del match es prefijo del título del
+ *     stage (convención PractiScore: "Final Curso - Stage 1" → "Final Curso").
+ *     Se prefiere el match con nombre MÁS LARGO (más específico).
+ *
+ *  2. **Reverse prefix** (fallback): el título del stage limpio es prefijo
+ *     del nombre del match. Cubre el caso "el usuario renombró el match
+ *     después del import original con un sufijo para distinguirlo en su
+ *     historial" — ej. "Final Curso" en el archivo, "Final Curso 2025-06"
+ *     en DB. Solo se acepta si hay EXACTAMENTE UN candidato reverse —
+ *     múltiples serían ambiguos (no podríamos decidir cuál).
+ *
+ * Exportada para testing.
  */
 export function findBestPrefixMatch<T extends { name: string }>(
   stageTitle: string,
@@ -825,29 +838,45 @@ export function findBestPrefixMatch<T extends { name: string }>(
   const norm = (s: string) =>
     s
       .normalize("NFD")
-      .replace(/[̀-ͯ]/gu, "")
+      .replace(/[̀-ͯ]/g, "")
       .toLowerCase()
       .trim();
 
-  const target = norm(stageTitle);
-  let best: T | null = null;
+  const PREFIX_SEPS = [" ", "-", " -", " –", " —"]; // last two: en-dash, em-dash
 
+  const startsWithSep = (haystack: string, needle: string): boolean => {
+    if (haystack === needle) return true;
+    return PREFIX_SEPS.some((sep) => haystack.startsWith(needle + sep));
+  };
+
+  const targetDirty = norm(stageTitle);
+
+  // 1) Forward: nombre del match es prefijo del título del stage.
+  let best: T | null = null;
   for (const c of candidates) {
     const cn = norm(c.name);
     if (cn.length === 0) continue;
-    const isPrefix =
-      target === cn ||
-      target.startsWith(cn + " ") ||
-      target.startsWith(cn + "-") ||
-      target.startsWith(cn + " -") ||
-      target.startsWith(cn + " –") || // en-dash
-      target.startsWith(cn + " —"); // em-dash
-    if (isPrefix && (!best || c.name.length > best.name.length)) {
-      best = c;
+    if (startsWithSep(targetDirty, cn)) {
+      if (!best || c.name.length > best.name.length) best = c;
     }
   }
+  if (best) return best;
 
-  return best;
+  // 2) Reverse fallback: título limpio del stage es prefijo del nombre del
+  // match. Solo aceptamos si hay un único candidato — múltiples serían
+  // ambiguos (ej. "Final Curso 2025-06" y "Final Curso 2024-12" ambos
+  // empiezan con "Final Curso"). El strip del sufijo del stage acá es
+  // independiente al que hace el caller para la búsqueda exacta — pasamos
+  // por stripStageSuffix sí o sí para no depender del orden de pasos.
+  const targetClean = norm(stripStageSuffix(stageTitle));
+  if (targetClean.length === 0) return null;
+  const reverseHits: T[] = [];
+  for (const c of candidates) {
+    const cn = norm(c.name);
+    if (cn === targetClean) continue; // ya lo hubiese cazado el forward exacto
+    if (startsWithSep(cn, targetClean)) reverseHits.push(c);
+  }
+  return reverseHits.length === 1 ? reverseHits[0]! : null;
 }
 
 /**

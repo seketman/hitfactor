@@ -151,6 +151,48 @@ describe("parsePractiscoreHtml — Stage 6 cross-check", () => {
   });
 });
 
+describe("parsePractiscoreHtml — stageNumber para títulos en español", () => {
+  // PractiScore para Android genera títulos de stage en el idioma del
+  // device del organizador. Casos reales con "Ejercicio N" — antes
+  // quedaban con stageNumber=null y `attachStagesToMatch` los filtraba
+  // sin insertarlos, mientras el UI reportaba "se agregaron stages: 0".
+  const stageHtml = (heading: string) => `
+    <!DOCTYPE html><html><head><title>${heading}</title></head><body>
+    <h3>${heading}</h3>
+    <table><tr><td class="division_head"><b>Stage Results - Production</b></td></tr>
+    <tr><th>Place</th><th>Name</th><th>No.</th><th>Class</th><th>Div</th><th>PF</th><th>Points</th><th>Pen</th><th>Time</th><th>Hit Factor</th><th>Stage Pts</th><th>Stage %</th></tr>
+    <tr><td>1</td><td>Demarziani, Diego</td><td></td><td>U</td><td>P</td><td>Min</td><td>50</td><td>0</td><td>15.81</td><td>3.1626</td><td>50.0000</td><td>100.00%</td></tr>
+    </table></body></html>`;
+
+  it("Ejercicio N: extrae el número", () => {
+    const result = parsePractiscoreHtml(
+      stageHtml("Final Curso - Ejercicio 1 - 2025-07-06"),
+    );
+    expect(result.stages[0]?.stageNumber).toBe(1);
+  });
+
+  it("Etapa N: extrae el número", () => {
+    const result = parsePractiscoreHtml(
+      stageHtml("Torneo X - Etapa 3 - 2025-07-06"),
+    );
+    expect(result.stages[0]?.stageNumber).toBe(3);
+  });
+
+  it("Stand N: extrae el número", () => {
+    const result = parsePractiscoreHtml(
+      stageHtml("Torneo X - Stand 7 - 2025-07-06"),
+    );
+    expect(result.stages[0]?.stageNumber).toBe(7);
+  });
+
+  it("Ej. N (abreviatura con punto): extrae el número", () => {
+    const result = parsePractiscoreHtml(
+      stageHtml("Torneo X - Ej. 4 - 2025-07-06"),
+    );
+    expect(result.stages[0]?.stageNumber).toBe(4);
+  });
+});
+
 describe("parsePractiscoreHtml — Ranking by-division", () => {
   it("returns multiple match-entries across divisions", () => {
     const html = read("ranking-social-2026-by-division.html");
