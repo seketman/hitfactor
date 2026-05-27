@@ -8,7 +8,22 @@ import { Select } from "@/components/ui/Select";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
 import { cn, formatDate, formatPercent } from "@/lib/utils";
 import { buildClubLookup, getClubCode, getClubName } from "@/lib/clubs";
+import {
+  getAmmoExtrasTier,
+  type AmmoExtrasTier,
+} from "@/lib/stats/shooter-stats";
 import type { Club, MyEntryRow } from "@/lib/db/types";
+
+// Mismo mapping de tier→color se reutiliza en match-me y StatsOverview.
+// Lo dejamos local (no en un util compartido) porque cada surface usa el
+// tono de forma ligeramente distinta (acá solo color de texto) y mover esto
+// fuera no compensa la indirección.
+const EXTRAS_TIER_CLASS: Record<AmmoExtrasTier, string> = {
+  perfect: "text-success",
+  neutral: "",
+  warning: "text-accent",
+  danger: "text-danger",
+};
 
 type SortKey = "date_desc" | "date_asc" | "pct_desc" | "pct_asc" | "place_asc";
 
@@ -122,6 +137,21 @@ export function HistoryTable({
     [filtered],
   );
 
+  // Mostramos columna "Extras" (disparos por encima del mínimo, issue #75)
+  // solo si al menos una fila tiene ambos datos: el match con `min_shots`
+  // poblado y el log del arma con `rounds_fired`. Para usuarios que no
+  // registraron armas / matches sin mínimo, la columna desaparece y el
+  // ancho de la tabla no se infla con un mar de "—".
+  const showExtras = useMemo(
+    () =>
+      filtered.some(
+        (e) =>
+          e.matches?.min_shots != null &&
+          e.match_firearm_log?.rounds_fired != null,
+      ),
+    [filtered],
+  );
+
   return (
     <div>
       <div
@@ -211,6 +241,11 @@ export function HistoryTable({
                 <TH>Factor</TH>
                 <TH className="text-right">Puesto</TH>
                 {showHits && <TH className="text-right">Impactos</TH>}
+                {showExtras && (
+                  <TH className="text-right" title="Disparos por encima del mínimo del match">
+                    Extras
+                  </TH>
+                )}
                 <TH className="text-right">%</TH>
               </TR>
             </THead>
@@ -272,6 +307,14 @@ export function HistoryTable({
                         {e.is_dq || e.is_absent ? "—" : (e.hits ?? "—")}
                       </TD>
                     )}
+                    {showExtras && (
+                      <TD className="text-right font-mono">
+                        <ExtrasCell
+                          minShots={e.matches?.min_shots ?? null}
+                          roundsFired={e.match_firearm_log?.rounds_fired ?? null}
+                        />
+                      </TD>
+                    )}
                     <TD
                       className={cn(
                         "text-right font-mono",
@@ -290,5 +333,37 @@ export function HistoryTable({
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Celda de "disparos extra" (issue #75). Renderiza:
+ *  - `+N` en rojo cuando el tirador usó más balas que el mínimo (caso típico).
+ *  - `0` en verde cuando coincide exactamente con el mínimo (eficiencia perfecta).
+ *  - `—` cuando falta cualquiera de los dos datos (no debería pasar si la
+ *    columna se muestra, pero defensivo).
+ *
+ * Tooltip con el desglose mín/usados para que el usuario entienda de dónde
+ * sale el número sin abrir el detalle del match.
+ */
+function ExtrasCell({
+  minShots,
+  roundsFired,
+}: {
+  minShots: number | null;
+  roundsFired: number | null;
+}) {
+  if (minShots == null || roundsFired == null) {
+    return <span className="text-fg-subtle">—</span>;
+  }
+  const extras = roundsFired - minShots;
+  const tier = getAmmoExtrasTier(extras, minShots);
+  return (
+    <span
+      title={`${minShots} mín / ${roundsFired} usados`}
+      className={cn("tabular-nums", EXTRAS_TIER_CLASS[tier])}
+    >
+      {extras > 0 ? `+${extras}` : extras}
+    </span>
   );
 }

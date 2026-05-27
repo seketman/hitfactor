@@ -120,6 +120,90 @@ export async function updateMatchClub(formData: FormData) {
 }
 
 /**
+ * Edita el `min_shots` de un match (issue #75). Puede hacerlo:
+ *  - El importador del match (cuando se le pasó el dato post-import).
+ *  - Cualquier admin (para completar matches viejos importados antes de la
+ *    feature). La policy `matches_update_admin` (migración 0014) lo permite.
+ *
+ * Validamos también en server-side para devolver un error claro cuando el
+ * usuario no califica — sino RLS solo devuelve "0 filas actualizadas" sin
+ * razón visible.
+ *
+ * El valor llega como texto desde el form. "" → null (limpia el campo, útil
+ * para revertir un valor mal ingresado). Cualquier int positivo → ese int.
+ * Otros → error.
+ */
+export async function updateMatchMinShots(formData: FormData) {
+  const matchId = String(formData.get("match_id") ?? "");
+  if (!matchId) return;
+
+  const raw = String(formData.get("min_shots") ?? "").trim();
+  let nextValue: number | null;
+  if (raw === "") {
+    nextValue = null;
+  } else {
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n <= 0) {
+      redirectWithError(
+        `/matches/${matchId}`,
+        "Ingresá un número entero positivo o vacío para limpiar",
+      );
+    }
+    nextValue = n;
+  }
+
+  const { supabase, user } = await requireUser();
+
+  const { data: matchBefore } = await supabase
+    .from("matches")
+    .select("name, min_shots, imported_by_user_id")
+    .eq("id", matchId)
+    .maybeSingle();
+
+  if (!matchBefore) {
+    redirectWithError(`/matches/${matchId}`, "Match no encontrado");
+  }
+
+  const profile = await getProfile(supabase, user.id);
+  const isImporter = matchBefore.imported_by_user_id === user.id;
+  const isAdmin = profile?.is_admin === true;
+
+  if (!isImporter && !isAdmin) {
+    redirectWithError(
+      `/matches/${matchId}`,
+      "Solo el importador o un admin pueden editar el mínimo de disparos",
+    );
+  }
+
+  const { error } = await supabase
+    .from("matches")
+    .update({ min_shots: nextValue })
+    .eq("id", matchId);
+
+  if (error) {
+    redirectWithError(
+      `/matches/${matchId}`,
+      "No se pudo actualizar: " + error.message,
+    );
+  }
+
+  await logAction(supabase, user.id, {
+    action: AUDIT_ACTION.MATCH_UPDATE_MIN_SHOTS,
+    entityType: "match",
+    entityId: matchId,
+    metadata: {
+      match_name: matchBefore.name,
+      before: { min_shots: matchBefore.min_shots },
+      after: { min_shots: nextValue },
+    },
+  });
+
+  revalidatePath(`/matches/${matchId}`);
+  revalidatePath("/dashboard");
+  redirect(`/matches/${matchId}`);
+}
+
+/**
  * Alterna el flag `is_absent` de un match_entry. La RLS de update se amplió
  * en la migration 0008 para aceptar tres autores:
  *   - importador del match (mismo modelo que las otras ediciones).

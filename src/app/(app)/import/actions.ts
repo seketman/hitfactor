@@ -10,6 +10,7 @@ import type { TypedSupabaseClient } from "@/lib/supabase/types";
 import {
   importParsedMatch,
   ImportError,
+  type ImportOptions,
   type ImportResult,
 } from "@/lib/import/import-match";
 
@@ -35,6 +36,12 @@ export type ImportFormState =
       disciplineLabel: string;
       entriesCount: number;
       divisions: string[];
+      /**
+       * `min_shots` que el usuario completó en el primer submit. Lo
+       * preservamos para usarlo en el segundo (FAT pide fecha en una
+       * pantalla aparte; no queremos hacerle reingresar el mínimo).
+       */
+      minShots: number | null;
       /** Error del segundo submit (no perdemos el ParsedMatch). */
       error?: string;
     };
@@ -72,6 +79,10 @@ export async function importHtml(
   if (!isPdf && !isText) {
     redirectWithError("/import", "Solo se aceptan archivos HTML, CSV o PDF");
   }
+
+  // `min_shots`: opcional en el form. Si está vacío o no parsea como int
+  // positivo, queda null (el importer aplica 45 si es FBI; resto queda null).
+  const minShots = parseMinShotsField(formData.get("min_shots"));
 
   console.log(
     `[import] start ${startedAt.toISOString()} file=${filename} size=${file.size}b`,
@@ -113,12 +124,15 @@ export async function importHtml(
           DISCIPLINE_LABELS[parsed.discipline] ?? parsed.discipline,
         entriesCount: parsed.matchEntries.length,
         divisions: [...new Set(parsed.matchEntries.map((e) => e.divisionCode))],
+        minShots,
       };
     }
     redirectWithError("/import", "El archivo no parece ser un reporte válido.");
   }
 
-  const result = await runImport(supabase, user.id, parsed, filename);
+  const result = await runImport(supabase, user.id, parsed, filename, {
+    minShots,
+  });
 
   const tTotal = Date.now() - t0;
   console.log(
@@ -160,6 +174,7 @@ async function confirmFatImport(
       parsed,
       user.id,
       prevState.filename,
+      { minShots: prevState.minShots },
     );
   } catch (e) {
     if (e instanceof ImportError) {
@@ -180,10 +195,11 @@ async function runImport(
   userId: string,
   parsed: ParsedMatch,
   filename: string,
+  options: ImportOptions = {},
 ): Promise<ImportResult> {
   let result: ImportResult;
   try {
-    result = await importParsedMatch(supabase, parsed, userId, filename);
+    result = await importParsedMatch(supabase, parsed, userId, filename, options);
   } catch (e) {
     if (e instanceof ImportError) {
       redirectWithError("/import", e.message);
@@ -192,6 +208,20 @@ async function runImport(
   }
   await logImport(supabase, userId, result);
   return result;
+}
+
+/**
+ * Lee el campo `min_shots` del FormData. Devuelve `null` si está vacío,
+ * mal formado o no es un entero positivo. La UI ya valida cliente-side
+ * (input type=number min=1) pero blindamos el server-side igual.
+ */
+function parseMinShotsField(raw: FormDataEntryValue | null): number | null {
+  if (raw === null || raw === undefined) return null;
+  const trimmed = String(raw).trim();
+  if (trimmed === "") return null;
+  const n = Number(trimmed);
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return n;
 }
 
 async function logImport(

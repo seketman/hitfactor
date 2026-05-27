@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeShooterStats } from "@/lib/stats/shooter-stats";
+import {
+  computeAmmoEfficiency,
+  computeShooterStats,
+  getAmmoExtrasTier,
+} from "@/lib/stats/shooter-stats";
 import type { MyEntryRow } from "@/lib/db/types";
 
 /**
@@ -39,8 +43,11 @@ function entry(overrides: Partial<EntryInput> = {}): MyEntryRow {
       name: e.matchName,
       date: e.date,
       region: null,
+      min_shots: e.minShots ?? null,
       disciplines: { code: e.disciplineCode, name: e.disciplineName },
     },
+    match_firearm_log:
+      e.roundsFired != null ? { rounds_fired: e.roundsFired } : null,
   };
 }
 
@@ -58,6 +65,10 @@ interface EntryInput {
   divisionName: string;
   disciplineCode: string;
   disciplineName: string;
+  /** Disparos mínimos del match (issue #75). Opcional en fixtures. */
+  minShots?: number | null;
+  /** Disparos reales del entry (vía match_firearm_log). */
+  roundsFired?: number | null;
 }
 
 describe("computeShooterStats — casos vacíos", () => {
@@ -628,5 +639,146 @@ describe("computeShooterStats — multi-división en el mismo match", () => {
     ]);
     expect(s.totalMatches).toBe(3);
     expect(s.avgPercentage).toBe(80);
+  });
+});
+
+describe("computeAmmoEfficiency (issue #75)", () => {
+  const base = (overrides: Partial<EntryInput>): EntryInput => ({
+    id: "x",
+    matchId: "m",
+    matchName: "M",
+    date: "2026-01-01",
+    place: 1,
+    matchPercentage: 80,
+    hits: null,
+    isDq: false,
+    isAbsent: false,
+    divisionCode: "PO",
+    divisionName: "Production Optics",
+    disciplineCode: "ipsc",
+    disciplineName: "IPSC",
+    ...overrides,
+  });
+
+  it("devuelve null si no hay entries", () => {
+    expect(computeAmmoEfficiency([])).toBeNull();
+  });
+
+  it("ignora entries sin min_shots", () => {
+    const e = entry(base({ id: "a", minShots: null, roundsFired: 50 }));
+    expect(computeAmmoEfficiency([e])).toBeNull();
+  });
+
+  it("ignora entries sin rounds_fired", () => {
+    const e = entry(base({ id: "a", minShots: 45, roundsFired: null }));
+    expect(computeAmmoEfficiency([e])).toBeNull();
+  });
+
+  it("computa avg y total sobre entries con ambos datos", () => {
+    // FBI: 45 mín. Tirador usó 47, 50, 45 en tres FBI distintos.
+    // extras por entry: 2, 5, 0 → total 7, avg 7/3 ≈ 2.333.
+    // totalMinShots: 45+45+45 = 135 (denominador para % en KPI agregado).
+    const entries = [
+      entry(
+        base({ id: "a", matchId: "m1", minShots: 45, roundsFired: 47 }),
+      ),
+      entry(
+        base({ id: "b", matchId: "m2", minShots: 45, roundsFired: 50 }),
+      ),
+      entry(
+        base({ id: "c", matchId: "m3", minShots: 45, roundsFired: 45 }),
+      ),
+    ];
+    const eff = computeAmmoEfficiency(entries);
+    expect(eff).not.toBeNull();
+    expect(eff!.matchCount).toBe(3);
+    expect(eff!.totalExtras).toBe(7);
+    expect(eff!.totalMinShots).toBe(135);
+    expect(eff!.avgExtras).toBeCloseTo(7 / 3, 5);
+  });
+
+  it("cuenta multi-división del mismo match como entries separados", () => {
+    // Un FBI con Pistola + PCC: 45 + 45 = 90 mín agregado, 47 + 48 usados.
+    // Dos entries → matchCount=2, totalExtras=5, avg=2.5.
+    const entries = [
+      entry(
+        base({
+          id: "po",
+          matchId: "fbi",
+          minShots: 45,
+          roundsFired: 47,
+          divisionCode: "PIS",
+        }),
+      ),
+      entry(
+        base({
+          id: "pcc",
+          matchId: "fbi",
+          minShots: 45,
+          roundsFired: 48,
+          divisionCode: "PCC",
+        }),
+      ),
+    ];
+    const eff = computeAmmoEfficiency(entries);
+    expect(eff!.matchCount).toBe(2);
+    expect(eff!.totalExtras).toBe(5);
+    expect(eff!.avgExtras).toBe(2.5);
+  });
+
+  it("mezcla entries con y sin datos — solo cuenta los completos", () => {
+    const entries = [
+      entry(base({ id: "ok", minShots: 45, roundsFired: 50 })),
+      entry(base({ id: "no_min", minShots: null, roundsFired: 99 })),
+      entry(base({ id: "no_log", minShots: 45, roundsFired: null })),
+    ];
+    const eff = computeAmmoEfficiency(entries);
+    expect(eff!.matchCount).toBe(1);
+    expect(eff!.totalExtras).toBe(5);
+    expect(eff!.totalMinShots).toBe(45);
+    expect(eff!.avgExtras).toBe(5);
+  });
+});
+
+describe("getAmmoExtrasTier (issue #75)", () => {
+  it("0 extras → perfect (verde)", () => {
+    expect(getAmmoExtrasTier(0, 45)).toBe("perfect");
+    expect(getAmmoExtrasTier(0, 150)).toBe("perfect");
+  });
+
+  it("≤5% extras → neutral (sin color, ruido normal)", () => {
+    // FBI 45: 1 extra = 2.2%, 2 extras = 4.4% — ambos neutral.
+    expect(getAmmoExtrasTier(1, 45)).toBe("neutral");
+    expect(getAmmoExtrasTier(2, 45)).toBe("neutral");
+    // En el borde exacto (5%) sigue siendo neutral.
+    expect(getAmmoExtrasTier(5, 100)).toBe("neutral");
+  });
+
+  it("(5%, 15%] → warning (amber)", () => {
+    // FBI 45: 3 extras = 6.7%, 6 extras = 13.3%.
+    expect(getAmmoExtrasTier(3, 45)).toBe("warning");
+    expect(getAmmoExtrasTier(6, 45)).toBe("warning");
+    // Borde exacto 15%.
+    expect(getAmmoExtrasTier(15, 100)).toBe("warning");
+  });
+
+  it("> 15% → danger (rojo)", () => {
+    // FBI 45: 7 extras = 15.6%, 10 extras = 22.2%.
+    expect(getAmmoExtrasTier(7, 45)).toBe("danger");
+    expect(getAmmoExtrasTier(10, 45)).toBe("danger");
+    expect(getAmmoExtrasTier(16, 100)).toBe("danger");
+  });
+
+  it("normaliza por disciplina (mismo % = mismo tier)", () => {
+    // 10% en FBI (mín 45) y en IPSC (mín 150) → ambos warning.
+    expect(getAmmoExtrasTier(4, 45)).toBe(getAmmoExtrasTier(15, 150));
+  });
+
+  it("negativos quedan en neutral (no celebramos under-report)", () => {
+    expect(getAmmoExtrasTier(-2, 45)).toBe("neutral");
+  });
+
+  it("minShots inválido (0) cae en neutral aunque haya extras", () => {
+    expect(getAmmoExtrasTier(5, 0)).toBe("neutral");
   });
 });

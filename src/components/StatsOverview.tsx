@@ -2,7 +2,22 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { PerformanceChart } from "@/components/PerformanceChart";
 import { cn, formatPercent, formatDate } from "@/lib/utils";
-import type { CadenceStats, ShooterStats } from "@/lib/stats/shooter-stats";
+import {
+  getAmmoExtrasTier,
+  type AmmoEfficiencyStats,
+  type AmmoExtrasTier,
+  type CadenceStats,
+  type ShooterStats,
+} from "@/lib/stats/shooter-stats";
+
+// Misma escala que HistoryTable / match-me — tocar los thresholds solo
+// en `getAmmoExtrasTier` para mantener coherencia entre surfaces.
+const EXTRAS_TIER_CLASS: Record<AmmoExtrasTier, string> = {
+  perfect: "text-success",
+  neutral: "",
+  warning: "text-accent",
+  danger: "text-danger",
+};
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 /**
@@ -199,6 +214,19 @@ export function StatsOverview({
             value={formatPercent(stats.stageStats.bestStagePercentage)}
             hint="máximo % de stage"
           />
+        </div>
+      )}
+
+      {/*
+        Eficiencia de munición (issue #75): promedio y acumulado de disparos
+        extra. Solo aparece cuando hay datos (al menos 1 entry con
+        min_shots + rounds_fired). Si N<3 mostramos el N para que el
+        usuario sepa que la muestra es chica.
+      */}
+      {stats.ammoEfficiency && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <AmmoAvgExtrasCard ammo={stats.ammoEfficiency} />
+          <AmmoTotalExtrasCard ammo={stats.ammoEfficiency} />
         </div>
       )}
 
@@ -478,6 +506,54 @@ function PenaltyRateCard({ rate }: { rate: number | null }) {
       label="Tasa de penalties"
       value={`${rate.toFixed(0)}%`}
       hint={`${tag} · stages con penalties`}
+    />
+  );
+}
+
+/**
+ * Tile de "Promedio disparos extra" (issue #75). El número es +N por entry
+ * sobre el mínimo.
+ *
+ * Color por tier: usamos el promedio total (`totalExtras` vs `totalMinShots`)
+ * para calcular el %, así normaliza disciplinas con mínimos distintos
+ * (FBI 45 vs IPSC 150). Mismos thresholds que el badge per-match:
+ * 0=verde, ≤5%=default, ≤15%=amber, >15%=rojo.
+ */
+function AmmoAvgExtrasCard({ ammo }: { ammo: AmmoEfficiencyStats }) {
+  const avg = ammo.avgExtras;
+  const sign = avg > 0 ? "+" : "";
+  const tier = getAmmoExtrasTier(ammo.totalExtras, ammo.totalMinShots);
+  const sampleHint =
+    ammo.matchCount < 3
+      ? `n=${ammo.matchCount} · muestra chica`
+      : `sobre ${ammo.matchCount} entries con datos`;
+  return (
+    <KpiCard
+      label="Promedio disparos extra"
+      value={`${sign}${avg.toFixed(1)}`}
+      hint={sampleHint}
+      tone={EXTRAS_TIER_CLASS[tier] || undefined}
+    />
+  );
+}
+
+/**
+ * Tile de "Disparos extra acumulados" (issue #75). Es el desperdicio total
+ * traducible a costo de munición. Usamos el mismo tier que el avg
+ * (basado en el %) en lugar de "cualquier >0 es rojo" — sino un tirador
+ * con muchos matches y promedio bajo terminaba con total visualmente
+ * alarmante aunque la eficiencia fuera buena.
+ */
+function AmmoTotalExtrasCard({ ammo }: { ammo: AmmoEfficiencyStats }) {
+  const total = ammo.totalExtras;
+  const sign = total > 0 ? "+" : "";
+  const tier = getAmmoExtrasTier(ammo.totalExtras, ammo.totalMinShots);
+  return (
+    <KpiCard
+      label="Disparos extra acumulados"
+      value={`${sign}${total}`}
+      hint={`sumados sobre ${ammo.matchCount} entries`}
+      tone={EXTRAS_TIER_CLASS[tier] || undefined}
     />
   );
 }

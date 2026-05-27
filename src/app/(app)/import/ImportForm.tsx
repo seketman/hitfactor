@@ -122,6 +122,23 @@ function UploadBody({
         </label>
       </div>
 
+      {/*
+        Disparos mínimos del match (issue #75). Opcional acá: para FBI el
+        importer aplica 45 automáticamente; para IPSC/Steel/Combat el
+        admin lo completa al importar (si lo sabe) o después desde el
+        detalle del match. Sin valor no rompe nada — el match queda sin
+        métrica de eficiencia hasta que se complete.
+      */}
+      <Input
+        label="Disparos mínimos del match"
+        name="min_shots"
+        type="number"
+        min={1}
+        step={1}
+        placeholder="Ej. 90"
+        hint="Opcional. Tiro FBI se asigna en 45 automáticamente. Para IPSC, Steel Challenge y Combat Solutions ingresá el mínimo de disparos por entry. Se usa para mostrar 'disparos extra' en el detalle y promediar la eficiencia del tirador."
+      />
+
       <Button type="submit" className="w-full" aria-busy={pending}>
         {pending ? (
           <>

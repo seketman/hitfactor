@@ -69,6 +69,14 @@ export interface Match {
   imported_at: string;
   imported_by_user_id: string;
   source_filename: string | null;
+  /**
+   * Mínimo de disparos requerido por la disciplina. FBI=45 fijo (auto al
+   * importar). IPSC/Steel/Combat: variable, ingresado a mano en el form
+   * de import. NULL en matches viejos antes de la feature (admin completa).
+   * Comparado con SUM(match_firearm_log.rounds_fired) para mostrar
+   * "disparos extra" del tirador.
+   */
+  min_shots: number | null;
 }
 
 export interface MatchWithDiscipline extends Match {
@@ -128,8 +136,16 @@ export interface MyEntryRow {
     name: string;
     date: string;
     region: string | null;
+    /** Mínimo de disparos por entry de la disciplina (ver Match.min_shots). */
+    min_shots: number | null;
     disciplines: { code: string; name: string; scoring_type?: string } | null;
   } | null;
+  /**
+   * Log del arma usada en este entry (PK = match_entry_id, así que la
+   * relación es 1:1). NULL si el tirador no registró su arma para ese
+   * match. Embeddido por PostgREST cuando el select lo pide.
+   */
+  match_firearm_log: { rounds_fired: number } | null;
 }
 
 /**

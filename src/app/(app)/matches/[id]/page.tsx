@@ -117,13 +117,16 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
           </p>
         </div>
 
-        {isImporter && (
+        {(isImporter || isAdmin) && (
           <div className="w-full sm:w-auto sm:max-w-2xl sm:flex-1 sm:basis-auto">
             <MatchActionsBar
               matchId={match.id}
               currentRegion={match.region}
               currentClubCode={parsedClub.clubCode}
+              currentMinShots={match.min_shots}
               clubs={clubs}
+              isImporter={isImporter}
+              isAdmin={isAdmin}
               from={validFrom ?? undefined}
             />
           </div>

@@ -12,6 +12,7 @@ export const AUDIT_ACTION = {
   MATCH_IMPORT: "match.import",
   MATCH_DELETE: "match.delete",
   MATCH_UPDATE_CLUB: "match.update_club",
+  MATCH_UPDATE_MIN_SHOTS: "match.update_min_shots",
   SHOOTER_CLAIM: "shooter.claim",
   SHOOTER_UNCLAIM: "shooter.unclaim",
   FIREARM_CREATE: "firearm.create",
