@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/seketman/hitfactor/compare/v1.12.3...v1.13.0) (2026-05-27)
+
+
+### Features
+
+* **firearms:** short QR codes for smaller printable stickers ([#71](https://github.com/seketman/hitfactor/issues/71)) ([0a9bec6](https://github.com/seketman/hitfactor/commit/0a9bec6865f542bcab853a9f475f4f6b272cb9ab))
+
 ## [1.12.3](https://github.com/seketman/hitfactor/compare/v1.12.2...v1.12.3) (2026-05-27)
 
 
