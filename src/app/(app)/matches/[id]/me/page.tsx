@@ -19,6 +19,7 @@ import {
 } from "@/lib/db/firearms";
 import { listMyAmmo } from "@/lib/db/ammo";
 import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
+import { BackLink } from "@/components/BackLink";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import type { MyMatchSummary } from "@/lib/db/types";
 import { buildClubLookup, getClubCode, getClubName } from "@/lib/clubs";
@@ -53,7 +54,7 @@ export default async function PersonalMatchPage({
   if (!match) {
     return (
       <PageContainer>
-        <BackToDashboard />
+        <BackLink fallbackHref="/dashboard" />
         <Alert tone="warning" title="Match no encontrado">
           El torneo que estás buscando no existe o fue eliminado.
         </Alert>
@@ -64,7 +65,7 @@ export default async function PersonalMatchPage({
   if (myShooters.length === 0) {
     return (
       <PageContainer>
-        <BackToDashboard />
+        <BackLink fallbackHref="/dashboard" />
         <Alert tone="warning" title="Asociá una participación a tu cuenta">
           Para ver tu detalle del match, primero buscá tu nombre en el ranking
           público y hacé click en “Soy yo”.{" "}
@@ -87,7 +88,7 @@ export default async function PersonalMatchPage({
   if (myEntries.length === 0) {
     return (
       <PageContainer>
-        <BackToDashboard />
+        <BackLink fallbackHref="/dashboard" />
         <Alert tone="warning" title="No participaste de este match">
           Ninguna de tus identidades aparece en el ranking de este torneo.{" "}
           <Link href={`/matches/${id}`} className="underline hover:text-fg">
@@ -127,7 +128,7 @@ export default async function PersonalMatchPage({
 
   return (
     <PageContainer>
-      <BackToDashboard />
+      <BackLink fallbackHref="/dashboard" />
 
       <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -512,17 +513,6 @@ function DivisionSelector({
         );
       })}
     </div>
-  );
-}
-
-function BackToDashboard() {
-  return (
-    <Link
-      href="/dashboard"
-      className="mb-4 inline-block text-sm text-fg-muted hover:text-accent"
-    >
-      ← Volver a mis estadísticas
-    </Link>
   );
 }
 

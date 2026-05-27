@@ -29,6 +29,7 @@ import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 import { isHitsBasedDiscipline } from "@/lib/disciplines";
 import { isInternalAppPath } from "@/lib/redirects";
+import { BackLink } from "@/components/BackLink";
 import { toggleEntryAbsent } from "./actions";
 
 interface PageProps {
@@ -84,21 +85,14 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   }
   const sortedDivisions = Array.from(byDivision.keys()).sort();
 
-  // Link de volver: prioriza la ruta de origen (?from=...) cuando es una
-  // ruta interna válida — así devolvemos al usuario exactamente a la vista
-  // que estaba mirando (matches, dashboard consolidado, o por disciplina).
-  // Fallback: /matches, que es la grilla principal.
+  // El back lo maneja el browser history (ver `BackLink`). El `?from=`
+  // sigue siendo útil aparte para que `MatchActionsBar` (eliminar match,
+  // editar club) redirija al destino correcto post-acción.
   const validFrom = isInternalAppPath(from) ? from : null;
-  const backHref = validFrom ?? "/matches";
 
   return (
     <PageContainer>
-      <Link
-        href={backHref}
-        className="mb-4 inline-block text-sm text-fg-muted hover:text-accent"
-      >
-        ← Volver a matches
-      </Link>
+      <BackLink fallbackHref="/matches" />
 
       {error && (
         <Alert tone="danger" className="mb-6">

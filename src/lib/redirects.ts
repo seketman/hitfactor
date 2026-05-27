@@ -26,7 +26,8 @@ export function redirectWithError(path: string, message: string): never {
  * Rutas aceptadas:
  *  - `/matches`, `/matches/{uuid}` (incluye sub-rutas como `/me`)
  *  - `/dashboard`, `/dashboard/{discipline_code}`
- *  - `/firearms`, `/firearms/{uuid}`
+ *  - `/firearms`, `/firearms/{uuid}` (incluye sub-rutas como `/qr`)
+ *  - `/ammo`, `/ammo/{uuid}`
  *  - `/activity`
  *  - `/about`
  *
@@ -44,6 +45,8 @@ export function isInternalAppPath(
     /^\/dashboard(\/[a-z_]+)?$/.test(value) ||
     /^\/firearms$/.test(value) ||
     /^\/firearms\/[A-Za-z0-9-]+(\/[a-z]+)?$/.test(value) ||
+    /^\/ammo$/.test(value) ||
+    /^\/ammo\/[A-Za-z0-9-]+$/.test(value) ||
     /^\/activity$/.test(value) ||
     /^\/about$/.test(value)
   );
