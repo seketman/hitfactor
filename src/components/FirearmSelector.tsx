@@ -116,6 +116,18 @@ function FirearmForm({
   const canSuggest =
     !isClearing && suggestedRounds !== null && !current;
 
+  // Habilitar el submit solo cuando hay algo concreto que guardar:
+  //  - Si NO hay log: el usuario tuvo que elegir un arma. La munición y los
+  //    tiros pueden seguir en sus defaults (suggested) — son significativos
+  //    junto a un arma. Sin arma seleccionada el submit no haría nada útil.
+  //  - Si SÍ hay log: el submit tiene sentido cuando algún campo difiere
+  //    del valor guardado (incluye "blanquear el arma" = delete del log).
+  const hasChanges = current
+    ? firearmId !== current.firearm_id ||
+      ammoId !== (current.ammunition_type_id ?? "") ||
+      rounds !== String(current.rounds_fired)
+    : firearmId !== "";
+
   return (
     <form action={setMatchFirearm} className="space-y-3">
       <input type="hidden" name="match_entry_id" value={matchEntryId} />
@@ -182,7 +194,11 @@ function FirearmForm({
       )}
 
       <div className="flex justify-end">
-        <SubmitButton isUpdate={!!current} isClearing={isClearing} />
+        <SubmitButton
+          isUpdate={!!current}
+          isClearing={isClearing}
+          disabled={!hasChanges}
+        />
       </div>
     </form>
   );
@@ -191,9 +207,11 @@ function FirearmForm({
 function SubmitButton({
   isUpdate,
   isClearing,
+  disabled,
 }: {
   isUpdate: boolean;
   isClearing: boolean;
+  disabled: boolean;
 }) {
   const { pending } = useFormStatus();
 
@@ -204,7 +222,7 @@ function SubmitButton({
     <Button
       type="submit"
       variant="secondary"
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
     >
       {pending ? (
