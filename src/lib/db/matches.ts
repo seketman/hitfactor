@@ -10,7 +10,7 @@ import type {
 } from "./types";
 
 const MATCH_BASE_SELECT =
-  "id, name, date, region, imported_at, imported_by_user_id, source_filename, disciplines(code, name, scoring_type)";
+  "id, name, date, region, imported_at, imported_by_user_id, source_filename, min_shots, disciplines(code, name, scoring_type)";
 
 /**
  * Versión paginada para `/matches`. Pide un rango (offset/limit) y trae el
@@ -130,7 +130,12 @@ export async function listEntriesByShooters(
   const { data } = await supabase
     .from("match_entries")
     .select(
-      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, divisions(code, name), matches(id, name, date, region, disciplines(code, name, scoring_type))",
+      // Embed `match_firearm_log(rounds_fired)`: la FK es UNIQUE (es la PK
+      // de match_firearm_log), así que PostgREST devuelve un objeto
+      // (no array). Si el tirador no registró su arma, viene null.
+      // `matches.min_shots` se usa con `rounds_fired` para calcular
+      // disparos extra (issue #75).
+      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, divisions(code, name), matches(id, name, date, region, min_shots, disciplines(code, name, scoring_type)), match_firearm_log(rounds_fired)",
     )
     .in("shooter_id", shooterIds)
     .order("matches(date)", { ascending: false });

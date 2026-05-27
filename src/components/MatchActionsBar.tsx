@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/Select";
 import {
   deleteMatch,
   updateMatchClub,
+  updateMatchMinShots,
 } from "@/app/(app)/matches/[id]/actions";
 import type { Club } from "@/lib/db/types";
 
@@ -18,7 +19,17 @@ interface MatchActionsBarProps {
   currentRegion: string | null;
   /** Code del club detectado en el region actual, null si no se mapeó al catálogo. */
   currentClubCode: string | null;
+  /**
+   * Disparos mínimos actuales del match. Null si nunca se completó
+   * (admin/importer lo carga desde el form acá). FBI viene seteado en 45
+   * por el importer.
+   */
+  currentMinShots: number | null;
   clubs: Club[];
+  /** True si el usuario actual es el importador del match. */
+  isImporter: boolean;
+  /** True si el usuario actual es admin del sitio. */
+  isAdmin: boolean;
   /**
    * Ruta desde donde llegó el usuario al detalle (ej "/matches" o
    * "/dashboard"). Se pasa a la action de delete para que devuelva al
@@ -42,22 +53,43 @@ export function MatchActionsBar({
   matchId,
   currentRegion,
   currentClubCode,
+  currentMinShots,
   clubs,
+  isImporter,
+  isAdmin,
   from,
 }: MatchActionsBarProps) {
-  const [editing, setEditing] = useState(false);
+  // Tres estados mutuamente excluyentes: "reposo", "editando club",
+  // "editando min_shots". Lo modelamos como un mode único en lugar de dos
+  // booleanos para que abrir uno cierre el otro automáticamente.
+  const [mode, setMode] = useState<"idle" | "club" | "minShots">("idle");
 
-  if (editing) {
+  if (mode === "club") {
     return (
       <ClubForm
         matchId={matchId}
         currentRegion={currentRegion}
         currentClubCode={currentClubCode}
+        currentMinShots={currentMinShots}
         clubs={clubs}
-        onCancel={() => setEditing(false)}
+        isImporter={isImporter}
+        isAdmin={isAdmin}
+        onCancel={() => setMode("idle")}
       />
     );
   }
+
+  if (mode === "minShots") {
+    return (
+      <MinShotsForm
+        matchId={matchId}
+        currentMinShots={currentMinShots}
+        onCancel={() => setMode("idle")}
+      />
+    );
+  }
+
+  const canEditMinShots = isImporter || isAdmin;
 
   return (
     // justify-end recuesta los botones contra el borde derecho del header,
@@ -65,10 +97,24 @@ export function MatchActionsBar({
     // el estado de edición (allá los empuja el Select que ocupa flex-1).
     // Sin esto, en reposo flotan a la izquierda y se sienten desconectados.
     <div className="flex flex-wrap items-center justify-end gap-2">
-      <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
-        {currentRegion ? "Editar club" : "Asignar club"}
-      </Button>
-      <DeleteButton matchId={matchId} from={from} />
+      {isImporter && (
+        <Button variant="ghost" size="sm" onClick={() => setMode("club")}>
+          {currentRegion ? "Editar club" : "Asignar club"}
+        </Button>
+      )}
+      {canEditMinShots && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setMode("minShots")}
+          title="Disparos mínimos del match (para medir eficiencia de munición)"
+        >
+          {currentMinShots != null
+            ? `Mínimo: ${currentMinShots}`
+            : "Definir mínimo"}
+        </Button>
+      )}
+      {isImporter && <DeleteButton matchId={matchId} from={from} />}
     </div>
   );
 }
@@ -248,6 +294,55 @@ function ClubForm({
  * `ghost`: al lado del Guardar naranja sólido, ghost queda como texto sin
  * peso visual; secondary lo balancea sin competir.
  */
+/**
+ * Form de "disparos mínimos" del match (issue #75). Input numérico simple.
+ * Vacío limpia el campo (NULL); admin puede usarlo para resetear un valor
+ * mal cargado. Server action valida que el usuario sea importer o admin.
+ */
+function MinShotsForm({
+  matchId,
+  currentMinShots,
+  onCancel,
+}: {
+  matchId: string;
+  currentMinShots: number | null;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState<string>(
+    currentMinShots != null ? String(currentMinShots) : "",
+  );
+
+  // El hint va FUERA del Input y debajo de toda la fila (no como prop) para
+  // que el `items-end` del flex alinee los botones con el bottom del input,
+  // no con el bottom del hint. Sin esto, los botones quedan empujados ~20px
+  // hacia abajo respecto del input — visible como desalineamiento.
+  return (
+    <form action={updateMatchMinShots} className="w-full space-y-2">
+      <input type="hidden" name="match_id" value={matchId} />
+
+      <div className="space-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-3 sm:space-y-0">
+        <div className="min-w-0 sm:flex-1 sm:min-w-[220px]">
+          <Input
+            label="Mínimo de disparos"
+            name="min_shots"
+            type="number"
+            min={1}
+            step={1}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Ej. 90"
+          />
+        </div>
+        <FormButtons onCancel={onCancel} />
+      </div>
+
+      <p className="text-xs text-fg-subtle">
+        Por entry según las reglas. Dejá vacío para borrar el valor.
+      </p>
+    </form>
+  );
+}
+
 function FormButtons({ onCancel }: { onCancel: () => void }) {
   const { pending } = useFormStatus();
   return (

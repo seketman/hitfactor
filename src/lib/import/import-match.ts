@@ -34,11 +34,26 @@ export class ImportError extends Error {
  * Asume que `supabase` está autenticado como el usuario que está importando.
  * El RLS valida que `imported_by_user_id = auth.uid()`.
  */
+/**
+ * Opciones del flujo de import. Hoy solo lleva `minShots` (disparos
+ * mínimos del match — ver issue #75). Si en el futuro hay más metadata
+ * "del importador" que no viene en el archivo, sumar acá.
+ */
+export interface ImportOptions {
+  /**
+   * Disparos mínimos por entry. Solo se aplica cuando se inserta un match
+   * nuevo. Si la disciplina es FBI se ignora y se fuerza a 45. Si no
+   * viene y no es FBI, queda NULL y el admin lo completa después.
+   */
+  minShots?: number | null;
+}
+
 export async function importParsedMatch(
   supabase: TypedSupabaseClient,
   parsed: ParsedMatch,
   importerUserId: string,
   filename: string,
+  options: ImportOptions = {},
 ): Promise<ImportResult> {
   // Resolver disciplina (id, code, name) y divisiones
   const { data: discipline, error: discErr } = await supabase
@@ -96,6 +111,7 @@ export async function importParsedMatch(
     divisionByCode,
     importerUserId,
     filename,
+    options,
   );
 }
 
@@ -116,6 +132,7 @@ async function importMatchOverall(
   divisionByCode: Map<string, number>,
   importerUserId: string,
   filename: string,
+  options: ImportOptions,
 ): Promise<ImportResult> {
   // Pre-check: ¿el usuario ya importó un match equivalente?
   //
@@ -178,6 +195,13 @@ async function importMatchOverall(
   // No es un re-upload nuestro. Insertamos. Si pega contra la unique
   // constraint, es porque otro usuario ya lo importó con esa (region) —
   // reportamos error claro.
+  //
+  // `min_shots`: FBI siempre 45 (regla fija de la disciplina, ignoramos
+  // lo que venga del form). Resto usa el valor del form (puede ser null
+  // si el importer no lo completó — admin lo edita después).
+  const minShots =
+    discipline.code === "tiro_fbi" ? 45 : (options.minShots ?? null);
+
   const { data: matchRow, error: matchErr } = await supabase
     .from("matches")
     .insert({
@@ -188,6 +212,7 @@ async function importMatchOverall(
       source_type: parsed.source,
       source_filename: filename,
       imported_by_user_id: importerUserId,
+      min_shots: minShots,
     })
     .select("id")
     .single();

@@ -65,6 +65,59 @@ export interface CadenceStats {
 }
 
 /**
+ * Stats de eficiencia de munición del tirador (issue #75). Solo computa
+ * sobre entries con ambos datos: `matches.min_shots` poblado y el
+ * `match_firearm_log.rounds_fired` cargado. Si no hay entries elegibles,
+ * el cálculo devuelve null (no se renderiza KPI con cero/cero).
+ */
+export interface AmmoEfficiencyStats {
+  /** Cantidad de entries que contribuyeron al cálculo. */
+  matchCount: number;
+  /** Promedio de disparos extra por entry (rounds_fired - min_shots). */
+  avgExtras: number;
+  /** Suma total de disparos extra acumulados. */
+  totalExtras: number;
+  /**
+   * Suma total de los `min_shots` de los entries contabilizados. Sirve
+   * de denominador para colorear el KPI agregado: el tier (% extras
+   * respecto al mínimo) usa `totalExtras / totalMinShots`, así normaliza
+   * entre disciplinas con mínimos muy distintos (FBI 45 vs IPSC ~150).
+   */
+  totalMinShots: number;
+}
+
+/**
+ * Tier visual de "disparos extra" en función del % sobre el mínimo.
+ * Decidimos con el usuario:
+ *   - 0 disparos extra → "perfect" (verde, vale la pena celebrarlo).
+ *   - (0%, 5%]         → "neutral" (1-2 disparos en 45 es ruido normal).
+ *   - (5%, 15%]        → "warning" (amber — vale la pena mirar).
+ *   - > 15%            → "danger"  (rojo — algo claramente fuera de lo
+ *                        habitual, muchas fallas o muchos repasos).
+ *
+ * Lo computamos en % y no en absoluto para que un IPSC de 150 disparos
+ * con +7 extras (4.6%) no aparezca peor que un FBI con +3 (6.6%).
+ *
+ * Negativos (rounds_fired < min_shots, físicamente raro pero posible
+ * cuando un tirador subreporta) caen en "neutral" — no son una eficiencia
+ * mejor que cero ni un error: son dato del usuario y los respetamos sin
+ * pintarlos.
+ */
+export type AmmoExtrasTier = "perfect" | "neutral" | "warning" | "danger";
+
+export function getAmmoExtrasTier(
+  extras: number,
+  minShots: number,
+): AmmoExtrasTier {
+  if (extras === 0) return "perfect";
+  if (extras < 0 || minShots <= 0) return "neutral";
+  const pct = (extras / minShots) * 100;
+  if (pct <= 5) return "neutral";
+  if (pct <= 15) return "warning";
+  return "danger";
+}
+
+/**
  * KPIs agregados cross-matches a nivel de stage. Computados sobre
  * stage_results no-DQ del usuario. Null si no hay datos suficientes.
  */
@@ -131,6 +184,11 @@ export interface ShooterStats {
   trajectorySlope: number | null;
   /** Cadencia reciente. Null si no hay matches. */
   cadence: CadenceStats | null;
+  /**
+   * Eficiencia de munición agregada (issue #75). Null si ninguno de los
+   * entries en scope tiene los dos datos requeridos (`min_shots` + `rounds_fired`).
+   */
+  ammoEfficiency: AmmoEfficiencyStats | null;
   /**
    * KPIs por stage agregados sobre el historial. Null si no hay stage_results
    * (típico cuando los matches importados son solo overall sin stages).
@@ -245,6 +303,10 @@ export function computeShooterStats(
   const now = options.now ?? new Date();
   const cadence = computeCadence(points, now);
   const stageStats = computeStageStats(options.stageResults);
+  // Eficiencia se computa sobre los entries crudos (no los timeline points
+  // dedup-ed): un tirador que corrió Pistola y PCC del mismo FBI gastó
+  // munición en ambas, así que ambos entries cuentan.
+  const ammoEfficiency = computeAmmoEfficiency(entries);
 
   // `byDiscipline` cuenta torneos únicos por disciplina → usa el set deduped.
   // `byDivision` muestra el desglose por división → usa todos los entries
@@ -301,6 +363,7 @@ export function computeShooterStats(
     trajectorySlope,
     cadence,
     stageStats,
+    ammoEfficiency,
     topDiscipline: byDiscipline[0] ?? null,
     topDivision: byDivision[0] ?? null,
     byDiscipline,
@@ -311,6 +374,45 @@ export function computeShooterStats(
 // ----------------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------------
+
+/**
+ * Eficiencia de munición (issue #75). Pure function: dado el array de
+ * entries del tirador, devuelve el promedio y total de disparos extra
+ * sobre los matches con datos completos (`min_shots` poblado y
+ * `rounds_fired` cargado).
+ *
+ * Decisiones:
+ *  - **No dedup por match**: si el tirador corrió Pistola y PCC del mismo
+ *    FBI, gastó munición en ambas entries; cuentan las dos.
+ *  - **No filtramos DQ/ausentes**: si el tirador registró disparos reales
+ *    los respetamos. Un DQ con armas registradas sigue siendo data válida
+ *    de consumo.
+ *  - **Null para N=0**: preferible esconder el tile que mostrar "0 / 0 / —".
+ *    El umbral mínimo es 1 entry — incluso un solo dato es informativo
+ *    aunque la UI puede agregarle un "(n=1)" para señalar muestra chica.
+ */
+export function computeAmmoEfficiency(
+  entries: MyEntryRow[],
+): AmmoEfficiencyStats | null {
+  let totalExtras = 0;
+  let totalMinShots = 0;
+  let count = 0;
+  for (const e of entries) {
+    const minShots = e.matches?.min_shots;
+    const roundsFired = e.match_firearm_log?.rounds_fired;
+    if (minShots == null || roundsFired == null) continue;
+    totalExtras += roundsFired - minShots;
+    totalMinShots += minShots;
+    count += 1;
+  }
+  if (count === 0) return null;
+  return {
+    matchCount: count,
+    totalExtras,
+    totalMinShots,
+    avgExtras: totalExtras / count,
+  };
+}
 
 /**
  * Reduce una lista de puntos a uno por match. Política:

@@ -21,6 +21,10 @@ import { listMyAmmo } from "@/lib/db/ammo";
 import { estimateRoundsFired } from "@/lib/firearms/estimate-rounds";
 import { BackLink } from "@/components/BackLink";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
+import {
+  getAmmoExtrasTier,
+  type AmmoExtrasTier,
+} from "@/lib/stats/shooter-stats";
 import type { MyMatchSummary } from "@/lib/db/types";
 import { buildClubLookup, getClubCode, getClubName } from "@/lib/clubs";
 import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
@@ -175,6 +179,11 @@ export default async function PersonalMatchPage({
         ammo={myAmmo}
         current={currentFirearmLog}
         suggestedRounds={suggestedRounds}
+      />
+
+      <AmmoEfficiencyCard
+        minShots={match.min_shots}
+        roundsFired={currentFirearmLog?.rounds_fired ?? null}
       />
 
       <section>
@@ -469,6 +478,65 @@ function FbiStagesTable({
           ))}
         </TBody>
       </Table>
+    </Card>
+  );
+}
+
+/**
+ * Card de "eficiencia de munición" del entry (issue #75). Calcula los
+ * disparos extra: `rounds_fired - min_shots`. 0 = perfecto, +N = N tiros
+ * gastados por encima del mínimo (fallas, repasos de blanco, warmup
+ * extra). Negativos serían "menos disparos que el mínimo" — físicamente
+ * imposible si se completó el match, pero posible si el tirador registró
+ * menos balas que las que tiró; mostramos el número igual sin tono de
+ * alarma especial (es dato del usuario).
+ *
+ * Solo se renderiza si tenemos ambos: el match con `min_shots` poblado y
+ * el log del arma con `rounds_fired`. Si falta cualquiera, no devolvemos
+ * nada (es preferible no mostrar que mostrar un placeholder confuso).
+ */
+// Tier → color de texto. Misma escala que HistoryTable y StatsOverview —
+// si tocás los thresholds, mantenelos en `getAmmoExtrasTier` para que
+// todos los surfaces queden coherentes.
+const EXTRAS_TIER_CLASS: Record<AmmoExtrasTier, string> = {
+  perfect: "text-success",
+  neutral: "",
+  warning: "text-accent",
+  danger: "text-danger",
+};
+
+function AmmoEfficiencyCard({
+  minShots,
+  roundsFired,
+}: {
+  minShots: number | null;
+  roundsFired: number | null;
+}) {
+  if (minShots == null || roundsFired == null) return null;
+  const extras = roundsFired - minShots;
+  const tier = getAmmoExtrasTier(extras, minShots);
+  return (
+    <Card className="mb-8 p-5">
+      <div className="flex items-baseline justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
+            Disparos extra
+          </p>
+          <p
+            className={cn(
+              "mt-1 font-mono text-2xl font-semibold tabular-nums",
+              EXTRAS_TIER_CLASS[tier],
+            )}
+          >
+            {extras > 0 ? `+${extras}` : extras}
+          </p>
+        </div>
+        <p className="text-right text-sm text-fg-muted">
+          <span className="font-mono">{minShots}</span> mín
+          <span className="mx-1.5 text-fg-subtle">/</span>
+          <span className="font-mono">{roundsFired}</span> usados
+        </p>
+      </div>
     </Card>
   );
 }

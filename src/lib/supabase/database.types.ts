@@ -432,6 +432,7 @@ export type Database = {
           import_notes: string | null
           imported_at: string
           imported_by_user_id: string
+          min_shots: number | null
           name: string
           region: string | null
           source_filename: string | null
@@ -446,6 +447,7 @@ export type Database = {
           import_notes?: string | null
           imported_at?: string
           imported_by_user_id: string
+          min_shots?: number | null
           name: string
           region?: string | null
           source_filename?: string | null
@@ -460,6 +462,7 @@ export type Database = {
           import_notes?: string | null
           imported_at?: string
           imported_by_user_id?: string
+          min_shots?: number | null
           name?: string
           region?: string | null
           source_filename?: string | null

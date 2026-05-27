@@ -71,6 +71,22 @@ export function describeAuditEntry(row: AuditLogRow): AuditDescription {
       };
     }
 
+    case "match.update_min_shots": {
+      const beforeRaw = (obj(m.before) ?? {}).min_shots;
+      const afterRaw = (obj(m.after) ?? {}).min_shots;
+      const before =
+        typeof beforeRaw === "number" ? String(beforeRaw) : "vacío";
+      const after =
+        typeof afterRaw === "number" ? String(afterRaw) : "vacío";
+      return {
+        summary: `Cambiaste el mínimo de disparos de "${s(m.match_name) ?? "un match"}"`,
+        detail: `${before} → ${after}`,
+        link: row.entity_id
+          ? { href: `/matches/${row.entity_id}`, label: "Ver match" }
+          : undefined,
+      };
+    }
+
     case "shooter.claim": {
       const name = s(m.shooter_full_name) ?? "un tirador";
       const matchName = s(m.match_name);
