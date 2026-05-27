@@ -47,7 +47,15 @@ interface SectionMeta {
 }
 
 const TITLE_DATE_RE = /-\s*(\d{4}-\d{2}-\d{2})\s*$/;
-const STAGE_NUMBER_RE = /Stage\s+(\d+)/i;
+// Acepta las mismas variantes que stripStageSuffix (en/es): "Stage 1",
+// "Ejercicio 2", "Etapa 3", "Stand 4", "Ej. 5", "St. 6", "Match 1". Si
+// el título usa una variante en español y este regex solo reconocía
+// "Stage", el número quedaba null y el stage se filtraba silenciosamente
+// en attachStagesToMatch (el banner "se agregaron stages" igual aparecía
+// porque resolveMatchForStage había encontrado el match — pero ningún
+// stage_result terminaba en la DB).
+const STAGE_NUMBER_RE =
+  /(?:Stage|Ejercicio|Ej\.?|Stand|St\.?|Etapa|Match)\s+(\d+)/i;
 
 /**
  * Mapa de título de sección IPSC (tal como aparece tras "Match Results - "

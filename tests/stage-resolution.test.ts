@@ -112,4 +112,51 @@ describe("findBestPrefixMatch", () => {
       null,
     );
   });
+
+  // ---------------------------------------------------------------------------
+  // Reverse prefix: caso "el usuario renombró el match con un sufijo"
+  // ---------------------------------------------------------------------------
+
+  it("reverse: matchea cuando el title limpio es prefijo del match (rename)", () => {
+    // El archivo tiene "Final Curso - Ejercicio 1 - 2025-07-06", el match en
+    // DB está renombrado a "Final Curso 2025-06". El stage limpio es
+    // "Final Curso", prefijo del nombre del match.
+    const candidates = [{ id: "renamed", name: "Final Curso 2025-06" }];
+    const found = findBestPrefixMatch(
+      "Final Curso - Ejercicio 1",
+      candidates,
+    );
+    expect(found?.id).toBe("renamed");
+  });
+
+  it("reverse: devuelve null cuando hay múltiples candidatos (ambiguo)", () => {
+    // Dos matches del mismo día que ambos empiezan con "Final Curso" — no
+    // hay forma segura de saber a cuál pertenecen los stages.
+    const candidates = [
+      { id: "a", name: "Final Curso 2025-06" },
+      { id: "b", name: "Final Curso 2024-12" },
+    ];
+    expect(findBestPrefixMatch("Final Curso - Ejercicio 1", candidates)).toBe(
+      null,
+    );
+  });
+
+  it("forward gana sobre reverse cuando ambos podrían matchear", () => {
+    // El forward es la convención de PractiScore y va primero. Si hay un
+    // match cuyo nombre es prefijo limpio del title, usamos ese aunque
+    // exista otro con sufijo agregado.
+    const candidates = [
+      { id: "renamed", name: "Final Curso 2025-06" },
+      { id: "exact", name: "Final Curso" },
+    ];
+    expect(
+      findBestPrefixMatch("Final Curso - Ejercicio 1", candidates)?.id,
+    ).toBe("exact");
+  });
+
+  it("reverse: respeta separadores (no matchea palabras pegadas)", () => {
+    // "Final" no es un prefijo "limpio" de "Finalisimo" — falta el separador.
+    const candidates = [{ id: "1", name: "Finalisimo 2025" }];
+    expect(findBestPrefixMatch("Final - Stage 1", candidates)).toBe(null);
+  });
 });
