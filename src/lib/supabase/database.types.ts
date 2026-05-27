@@ -25,10 +25,10 @@ export type Database = {
           name: string
           notes: string | null
           owner_user_id: string
-          power_factor: string | null
-          power_factor_measured: number | null
           powder: string | null
           powder_charge_grains: number | null
+          power_factor: string | null
+          power_factor_measured: number | null
           type: string
           updated_at: string
         }
@@ -42,10 +42,10 @@ export type Database = {
           name: string
           notes?: string | null
           owner_user_id: string
-          power_factor?: string | null
-          power_factor_measured?: number | null
           powder?: string | null
           powder_charge_grains?: number | null
+          power_factor?: string | null
+          power_factor_measured?: number | null
           type: string
           updated_at?: string
         }
@@ -59,10 +59,10 @@ export type Database = {
           name?: string
           notes?: string | null
           owner_user_id?: string
-          power_factor?: string | null
-          power_factor_measured?: number | null
           powder?: string | null
           powder_charge_grains?: number | null
+          power_factor?: string | null
+          power_factor_measured?: number | null
           type?: string
           updated_at?: string
         }
@@ -208,45 +208,6 @@ export type Database = {
         }
         Relationships: []
       }
-      firearms: {
-        Row: {
-          brand: string | null
-          caliber: string | null
-          created_at: string
-          id: string
-          model: string | null
-          name: string
-          notes: string | null
-          owner_user_id: string
-          qr_code: string
-          updated_at: string
-        }
-        Insert: {
-          brand?: string | null
-          caliber?: string | null
-          created_at?: string
-          id?: string
-          model?: string | null
-          name: string
-          notes?: string | null
-          owner_user_id: string
-          qr_code?: string
-          updated_at?: string
-        }
-        Update: {
-          brand?: string | null
-          caliber?: string | null
-          created_at?: string
-          id?: string
-          model?: string | null
-          name?: string
-          notes?: string | null
-          owner_user_id?: string
-          qr_code?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       firearm_usage_log: {
         Row: {
           ammunition_type_id: string | null
@@ -294,6 +255,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      firearms: {
+        Row: {
+          brand: string | null
+          caliber: string | null
+          created_at: string
+          id: string
+          model: string | null
+          name: string
+          notes: string | null
+          owner_user_id: string
+          qr_code: string
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          caliber?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          name: string
+          notes?: string | null
+          owner_user_id: string
+          qr_code?: string
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          caliber?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          name?: string
+          notes?: string | null
+          owner_user_id?: string
+          qr_code?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       match_entries: {
         Row: {
@@ -645,6 +645,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      gen_firearm_qr_code: { Args: never; Returns: string }
       merge_duplicate_shooters: {
         Args: never
         Returns: {
@@ -662,10 +663,7 @@ export type Database = {
           name: string
         }[]
       }
-      resolve_firearm_qr_code: {
-        Args: { p_code: string }
-        Returns: string
-      }
+      resolve_firearm_qr_code: { Args: { p_code: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
