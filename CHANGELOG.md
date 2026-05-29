@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.0](https://github.com/seketman/hitfactor/compare/v1.15.0...v1.16.0) (2026-05-29)
+
+
+### Features
+
+* **seo:** indexación, previews y descubribilidad de la landing (Nivel 1) ([#82](https://github.com/seketman/hitfactor/issues/82)) ([b69df87](https://github.com/seketman/hitfactor/commit/b69df87c19871797d72e95bbf0849799fe030717))
+
 ## [1.15.0](https://github.com/seketman/hitfactor/compare/v1.14.0...v1.15.0) (2026-05-29)
 
 
