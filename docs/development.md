@@ -21,7 +21,18 @@ Variables esperadas en `.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
+
+### `NEXT_PUBLIC_SITE_URL`
+
+URL absoluta del sitio. Es la fuente de verdad para toda la metadata SEO:
+canonical, sitemap, robots, Open Graph y JSON-LD. Si no está definida, el
+default en local es `http://localhost:3000`.
+
+En Vercel se setea por environment (Production / Preview / Development) con el
+dominio real de cada uno — así el canonical y los previews apuntan al host
+correcto en cada deploy.
 
 ## Levantar la DB
 

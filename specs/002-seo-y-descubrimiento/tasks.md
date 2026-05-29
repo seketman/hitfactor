@@ -27,17 +27,17 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
 
 **Purpose**: Variable de entorno y helper compartido del que dependen todas las user stories. Bloquea US1/US2/US3.
 
-- [ ] **T001** [P] Documentar la nueva variable `NEXT_PUBLIC_SITE_URL` en `docs/development.md`:
+- [X] **T001** [P] Documentar la nueva variable `NEXT_PUBLIC_SITE_URL` en `docs/development.md`:
   - Sección "Variables de entorno": agregar `NEXT_PUBLIC_SITE_URL` con descripción ("URL absoluta del sitio, usada para metadata SEO, canonical, sitemap, OG. Default en local: `http://localhost:3000`.").
   - Mencionar que en Vercel se setea por environment (Production / Preview / Development).
 
-- [ ] **T002** [P] Crear `tests/seo-site-url.test.ts`:
+- [X] **T002** [P] Crear `tests/seo-site-url.test.ts`:
   - `getSiteUrl()` con `NEXT_PUBLIC_SITE_URL` definida → retorna ese valor (trimmed, sin trailing slash).
   - `getSiteUrl()` sin la var → retorna `http://localhost:3000`.
   - `getSiteUrl()` con valor con trailing slash → strip-ea el slash.
   - `absoluteUrl("/foo")` → retorna `${siteUrl}/foo` correctamente sin doble slash.
 
-- [ ] **T003** Implementar `src/lib/seo/site-url.ts`:
+- [X] **T003** Implementar `src/lib/seo/site-url.ts`:
   - Export `getSiteUrl(): string` que lee `process.env.NEXT_PUBLIC_SITE_URL`, normaliza (trim, sin trailing slash), fallback a `http://localhost:3000`.
   - Export `absoluteUrl(path: string): string` que concatena el site URL con un path relativo, garantizando un solo `/`.
   - Verificar que T002 PASA.
@@ -62,12 +62,12 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
 
 ### Implementation for User Story 1
 
-- [ ] **T005** [US1] Modificar `src/app/layout.tsx` para agregar `metadataBase` global:
+- [X] **T005** [US1] Modificar `src/app/layout.tsx` para agregar `metadataBase` global:
   - `export const metadata: Metadata = { metadataBase: new URL(getSiteUrl()), ... }`
   - Esto hace que todos los `og:image` relativos se resuelvan a URLs absolutas automáticamente.
   - El `lang="es"` ya existe — verificar y dejar.
 
-- [ ] **T006** [US1] Modificar `src/app/page.tsx` (la landing) extendiendo el `metadata` export existente:
+- [X] **T006** [US1] Modificar `src/app/page.tsx` (la landing) extendiendo el `metadata` export existente:
   - `title`: ya existe (`"HitFactor — Tu historial de tiro deportivo"`); verificar que el formato matchea FR-001.
   - `description`: ya existe; revisar que respete Principios III (sin jerga) y VI (sin promesas de recomendación).
   - Agregar `keywords` (opcional, low signal pero gratuito): *"tiro deportivo", "IPSC", "Tiro FBI", "Steel Challenge", "historial torneos", "Argentina"*.
@@ -75,11 +75,11 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
   - Agregar `alternates: { canonical: "/" }` (Next resuelve absoluto via `metadataBase`).
   - Agregar `robots: { index: true, follow: true }` explícito.
 
-- [ ] **T007** [US1] Crear un componente `<JsonLd />` server-rendered (o inline) en `src/components/seo/JsonLd.tsx`:
+- [X] **T007** [US1] Crear un componente `<JsonLd />` server-rendered (o inline) en `src/components/seo/JsonLd.tsx`:
   - Recibe un objeto JS, lo serializa con `JSON.stringify`, lo renderea dentro de `<script type="application/ld+json">`.
   - Cuidado con XSS: no inyectar input del usuario; solo objetos definidos en código.
 
-- [ ] **T008** [US1] En `src/app/page.tsx`, incluir `<JsonLd />` con schema `WebApplication`:
+- [X] **T008** [US1] En `src/app/page.tsx`, incluir `<JsonLd />` con schema `WebApplication`:
   ```ts
   {
     "@context": "https://schema.org",
@@ -94,7 +94,7 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
   }
   ```
 
-- [ ] **T009** [US1] **Validación**: correr `npm run build` + `npm start` localmente, abrir `http://localhost:3000/`, `view-source:` y verificar manualmente que están todos los tags. Correr Lighthouse en la categoría SEO:
+- [X] **T009** [US1] **Validación**: correr `npm run build` + `npm start` localmente, abrir `http://localhost:3000/`, `view-source:` y verificar manualmente que están todos los tags. Correr Lighthouse en la categoría SEO:
   ```bash
   npx --yes lighthouse http://localhost:3000/ --only-categories=seo --quiet --chrome-flags="--headless"
   ```
@@ -112,14 +112,14 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
 
 ### Implementation for User Story 2
 
-- [ ] **T010** [US2] Crear `src/app/opengraph-image.tsx`:
+- [X] **T010** [US2] Crear `src/app/opengraph-image.tsx`:
   - Usar `ImageResponse` de `next/og`.
   - Tamaño: 1200×630.
   - Contenido: fondo (degradé sutil del bg al surface en dark, idem en light), diana ámbar centrada (motivo del logo), wordmark "HitFactor" en Geist Sans bold, tagline *"Tu historial de tiro deportivo"*.
   - Usar la paleta de la constitución (ámbar `#d97706` para el accent).
   - Export `runtime = "nodejs"` o `"edge"` según lo que el resto del proyecto use.
 
-- [ ] **T011** [US2] Modificar el `metadata` export de `src/app/page.tsx` agregando `openGraph` y `twitter`:
+- [X] **T011** [US2] Modificar el `metadata` export de `src/app/page.tsx` agregando `openGraph` y `twitter`:
   ```ts
   openGraph: {
     title: "HitFactor — Tu historial de tiro deportivo",
@@ -154,7 +154,7 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
 
 ### Implementation for User Story 3
 
-- [ ] **T014** [P] [US3] Crear `src/app/robots.ts`:
+- [X] **T014** [P] [US3] Crear `src/app/robots.ts`:
   ```ts
   import type { MetadataRoute } from "next";
   import { absoluteUrl } from "@/lib/seo/site-url";
@@ -172,7 +172,7 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
   }
   ```
 
-- [ ] **T015** [P] [US3] Crear `src/app/sitemap.ts`:
+- [X] **T015** [P] [US3] Crear `src/app/sitemap.ts`:
   ```ts
   import type { MetadataRoute } from "next";
   import { absoluteUrl } from "@/lib/seo/site-url";
@@ -187,7 +187,7 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
   }
   ```
 
-- [ ] **T016** [P] [US3] Crear `src/app/manifest.ts`:
+- [X] **T016** [P] [US3] Crear `src/app/manifest.ts`:
   ```ts
   import type { MetadataRoute } from "next";
 
@@ -208,19 +208,19 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
   }
   ```
 
-- [ ] **T017** [P] [US3] Crear `src/app/apple-icon.tsx` usando `ImageResponse`:
+- [X] **T017** [P] [US3] Crear `src/app/apple-icon.tsx` usando `ImageResponse`:
   - Tamaño 180×180.
   - Misma diana ámbar del logo (sin wordmark).
   - Fondo `#0c0c10` (consistente con `src/app/icon.svg` actual).
 
-- [ ] **T018** [US3] Agregar `metadata.robots: { index: false, follow: false }` en las páginas que renderean HTML transitorio si aplican. Verificar el catálogo:
+- [X] **T018** [US3] Agregar `metadata.robots: { index: false, follow: false }` en las páginas que renderean HTML transitorio si aplican. Verificar el catálogo:
   - `/auth/callback/route.ts` → route handler, NO renderea → no aplica.
   - `/auth/confirm/route.ts` → route handler, NO renderea → no aplica.
   - `/auth/signout/route.ts` → route handler, NO renderea → no aplica.
   - `/q/[code]/route.ts` → route handler, NO renderea → no aplica.
   - Si en el futuro alguno empieza a renderear HTML transitorio, agregar `noindex` ahí.
 
-- [ ] **T019** [US3] **Validación con curl**:
+- [X] **T019** [US3] **Validación con curl**:
   ```bash
   curl -I https://<site>/robots.txt
   curl -I https://<site>/sitemap.xml
@@ -237,7 +237,7 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
 
 **Purpose**: Verificación final y submit a buscadores.
 
-- [ ] **T020** Medir bundle size delta:
+- [X] **T020** Medir bundle size delta:
   ```bash
   npm run build  # antes
   # ... aplicar cambios ...
@@ -254,13 +254,13 @@ Web app (Next.js App Router). Endpoints especiales bajo `src/app/`, lógica comp
 - [ ] **T022** **Submit a Bing Webmaster Tools** (manual, fuera del PR):
   - Bing tiene un import directo desde Search Console — usarlo si está disponible para ahorrar pasos.
 
-- [ ] **T023** **Code review focalizado** en Principios III y VI de la constitución:
+- [X] **T023** **Code review focalizado** en Principios III y VI de la constitución:
   - Toda prosa expuesta a buscadores (description, keywords, OG title/description, manifest description) usa español plano.
   - Ninguna descripción promete recomendación / coaching.
 
-- [ ] **T024** Correr `npm test` completo — todos los tests existentes deben seguir pasando + el nuevo `seo-site-url.test.ts` pasa.
+- [X] **T024** Correr `npm test` completo — todos los tests existentes deben seguir pasando + el nuevo `seo-site-url.test.ts` pasa.
 
-- [ ] **T025** Correr `npm run build` y verificar 0 errores de TypeScript.
+- [X] **T025** Correr `npm run build` y verificar 0 errores de TypeScript.
 
 - [ ] **T026** Verificar Conventional Commits en cada commit (`feat(seo): ...`, `feat(metadata): ...`, `chore(env): ...`).
 

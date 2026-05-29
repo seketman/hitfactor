@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { getSiteUrl } from "@/lib/seo/site-url";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,6 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // metadataBase hace que todas las URLs relativas de metadata (og:image,
+  // canonical, etc.) se resuelvan a URLs absolutas automáticamente.
+  metadataBase: new URL(getSiteUrl()),
   title: "HitFactor",
   description: "Tu historial de matches y stages de tiro deportivo.",
 };
