@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.15.0](https://github.com/seketman/hitfactor/compare/v1.14.0...v1.15.0) (2026-05-29)
+
+
+### Features
+
+* **specs:** SEO Level 1 discoverability spec ([#80](https://github.com/seketman/hitfactor/issues/80)) ([73a5ee8](https://github.com/seketman/hitfactor/commit/73a5ee8264ef44263a9b9065a6490204dffc5215))
+
 ## [1.14.0](https://github.com/seketman/hitfactor/compare/v1.13.1...v1.14.0) (2026-05-27)
 
 
