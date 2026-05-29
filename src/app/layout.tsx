@@ -20,6 +20,8 @@ export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: "HitFactor",
   description: "Tu historial de matches y stages de tiro deportivo.",
+  // Verificación de propiedad en Google Search Console.
+  verification: { google: "3gnfzDn0WL6Gj0br1QOHIKMvNc3FGRYsFYKbNiHREHU" },
 };
 
 export default function RootLayout({
