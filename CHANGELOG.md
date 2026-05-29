@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/seketman/hitfactor/compare/v1.13.1...v1.14.0) (2026-05-27)
+
+
+### Features
+
+* **matches:** ammo efficiency per match + aggregated KPIs ([#76](https://github.com/seketman/hitfactor/issues/76)) ([e67a1f6](https://github.com/seketman/hitfactor/commit/e67a1f646ff9ade5265d52f92ea8e04e6277a983)), closes [#75](https://github.com/seketman/hitfactor/issues/75)
+
 ## [1.13.1](https://github.com/seketman/hitfactor/compare/v1.13.0...v1.13.1) (2026-05-27)
 
 
