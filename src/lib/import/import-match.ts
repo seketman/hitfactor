@@ -101,6 +101,7 @@ export async function importParsedMatch(
       divisionByCode,
       importerUserId,
       filename,
+      options,
     );
   }
 
@@ -161,6 +162,16 @@ async function importMatchOverall(
   );
 
   if (existingForUser) {
+    // Idem importStages: si el form trae min_shots y el match aún no lo
+    // tiene, lo seteamos. No pisamos un valor existente — para editarlo
+    // está el botón "Editar mínimo" de la página del match.
+    await maybeApplyMinShots(
+      supabase,
+      existingForUser.id,
+      existingForUser.min_shots,
+      options.minShots,
+    );
+
     const upsertedEntries = await upsertMatchEntries(
       supabase,
       parsed,
@@ -274,6 +285,7 @@ async function importStages(
   divisionByCode: Map<string, number>,
   importerUserId: string,
   _filename: string,
+  options: ImportOptions,
 ): Promise<ImportResult> {
   // Resolver el match al que pertenece este stage:
   // 1) Limpiamos sufijos conocidos del título del stage ("Stage N",
@@ -306,6 +318,11 @@ async function importStages(
   }
   const matchId = matchRow.id;
   const matchName = matchRow.name;
+
+  // Si el form trae min_shots y el match todavía no lo tiene, lo aplicamos
+  // ahora. Cubre el caso del usuario que omite min_shots en el primer
+  // upload (overall) y lo completa en alguno posterior (stage import).
+  await maybeApplyMinShots(supabase, matchId, matchRow.min_shots, options.minShots);
 
   // Si el archivo trae entries (en stages-only de WinMSS, son las DQs que
   // aparecen en la página "Disqualified Shooters" al final del PDF), las
@@ -449,55 +466,84 @@ async function attachStagesToMatch(
     stagesCount = newStageRows.length;
   }
 
-  // -- 2. Resolución bulk de shooters (1-2 round-trips en lugar de N).
-  const allParsedShooters = stagesWithNumber.flatMap((s) =>
-    s.results.map((r) => r.shooter),
-  );
-  const shooterCache = await resolveShootersBulk(supabase, allParsedShooters);
-
-  // -- 3. Resolución bulk de match_entries: 1 SELECT trae todos los
-  //       entries del match. Construimos dos índices locales para resolver
-  //       el lookup (shooter, division) en O(1) sin más round-trips.
+  // -- 2. Resolución bulk de match_entries POR NOMBRE + DIVISIÓN.
+  //
+  //       Antes resolvíamos shooterId vía `resolveShootersBulk` y después
+  //       lookupeábamos match_entry por (shooter_id, division). Pero la
+  //       cache de shooters dedup-ea por `(fullName, memberNumber)` y los
+  //       archivos de stages de PractiScore NO traen número de socio. Si
+  //       un tirador competía en dos divisiones del mismo match con
+  //       variantes de nombre que `stripNameSuffixes` colapsa (ej.
+  //       "CELIZ, Martin PCC" / "CELIZ, Martin" → ambos a "CELIZ, Martin"),
+  //       ambos parsed stage results recibían el MISMO shooterId. El
+  //       fallback "1 entry única" mandaba ambos al mismo match_entry_id
+  //       y el upsert pegaba con `ON CONFLICT DO UPDATE command cannot
+  //       affect row a second time`.
+  //
+  //       Fix: lookupear el match_entry directamente por (nombre
+  //       normalizado, división). Eso elimina el shooterId como
+  //       intermediario y garantiza que cada parsed stage result va al
+  //       match_entry de su división correcta.
   const { data: allEntriesData } = await supabase
     .from("match_entries")
     .select("id, shooter_id, division_id")
     .eq("match_id", matchId);
-  const entryByShooterDiv = new Map<string, string>();
-  const entriesByShooter = new Map<string, string[]>();
-  for (const e of allEntriesData ?? []) {
-    const shooterId = e.shooter_id as string;
-    const entryId = e.id as string;
-    entryByShooterDiv.set(`${shooterId}|${e.division_id}`, entryId);
-    const arr = entriesByShooter.get(shooterId) ?? [];
-    arr.push(entryId);
-    entriesByShooter.set(shooterId, arr);
+
+  const shooterIdsInMatch = [
+    ...new Set((allEntriesData ?? []).map((e) => e.shooter_id as string)),
+  ];
+  const shooterNameById = new Map<string, string>();
+  if (shooterIdsInMatch.length > 0) {
+    const { data: shootersData } = await supabase
+      .from("shooters")
+      .select("id, full_name")
+      .in("id", shooterIdsInMatch);
+    for (const s of shootersData ?? []) {
+      shooterNameById.set(s.id as string, s.full_name as string);
+    }
   }
 
-  // -- 4. Loop sin round-trips: armamos un único batch con TODOS los
+  // Índice principal: (nombre normalizado, division_id) → match_entry_id.
+  const entryByNameDiv = new Map<string, string>();
+  // Fallback: (nombre normalizado) → match_entry_id[]. Usado cuando la
+  // división del archivo de stages no matchea la del overall (caso TFABA
+  // WinMSS: "PISTOLA" en overall sale como "PRODUCTION" en stages).
+  const entriesByName = new Map<string, string[]>();
+  for (const e of allEntriesData ?? []) {
+    const fullName = shooterNameById.get(e.shooter_id as string);
+    if (!fullName) continue;
+    const normName = normalizeNameForMatch(fullName);
+    const entryId = e.id as string;
+    entryByNameDiv.set(`${normName}|${e.division_id}`, entryId);
+    const arr = entriesByName.get(normName) ?? [];
+    arr.push(entryId);
+    entriesByName.set(normName, arr);
+  }
+
+  // -- 3. Loop sin round-trips: armamos un único batch con TODOS los
   //       stage_results y hacemos un solo upsert al final.
   const stageResultRows: ReturnType<typeof mapStageResultToRow>[] = [];
   for (const stage of stagesWithNumber) {
     const stageId = stageIdByNumber.get(stage.stageNumber);
     if (!stageId) continue; // no debería pasar tras paso 1
     for (const result of stage.results) {
-      const shooterId = shooterCache.get(shooterCacheKey(result.shooter));
-      if (!shooterId) continue; // safety: no debería pasar tras paso 2
       const divisionId = requireDivision(divisionByCode, result.divisionCode);
+      const normName = normalizeNameForMatch(result.shooter.fullName);
 
-      let entryId = entryByShooterDiv.get(`${shooterId}|${divisionId}`);
+      let entryId = entryByNameDiv.get(`${normName}|${divisionId}`);
       if (!entryId) {
         // Fallback: el tirador no aparece en esa división. Pasa cuando el
-        // PDF de stages usa un nombre de división distinto al del overall
-        // para los mismos tiradores (caso WinMSS de TFABA: "PISTOLA" en el
-        // overall sale como "PRODUCTION" en el stages PDF). Si el tirador
-        // tiene exactamente UNA entry en el match (en otra división), la
-        // usamos. Si tiene varias, skipeamos con warning.
-        const entries = entriesByShooter.get(shooterId) ?? [];
+        // archivo de stages usa un nombre de división distinto al del
+        // overall para los mismos tiradores (caso WinMSS de TFABA:
+        // "PISTOLA" en el overall sale como "PRODUCTION" en el stages
+        // PDF). Si el tirador tiene exactamente UNA entry en el match
+        // (en otra división), la usamos. Si tiene varias, skipeamos.
+        const entries = entriesByName.get(normName) ?? [];
         if (entries.length === 1) {
           entryId = entries[0]!;
         } else if (entries.length > 1) {
           console.warn(
-            `[stage-attach] tirador con ${entries.length} entries en el match (división ${result.divisionCode}): no se puede resolver sin ambigüedad`,
+            `[stage-attach] tirador "${result.shooter.fullName}" con ${entries.length} entries en el match (división ${result.divisionCode}): no se puede resolver sin ambigüedad`,
           );
           continue;
         } else {
@@ -531,6 +577,42 @@ async function attachStagesToMatch(
 /** Clave de cache para deduplicar tiradores dentro del mismo import. */
 function shooterCacheKey(s: ParsedShooter): string {
   return `${s.fullName.trim().toLowerCase()}|${s.memberNumber ?? ""}`;
+}
+
+/**
+ * Aplica `min_shots` a un match existente sólo si el match todavía no lo
+ * tiene seteado en DB y el usuario lo proveyó en el form. Esto permite
+ * "completarlo después" del primer import (caso típico: el usuario sube
+ * primero el overall sin min_shots, después lo agrega al subir un stage).
+ *
+ * No pisa un valor existente. Si el usuario quiere cambiar un min_shots
+ * ya seteado, debe usar el botón "Editar mínimo" de la página del match
+ * (que además queda registrado en el audit log con before/after).
+ */
+async function maybeApplyMinShots(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+  currentMinShots: number | null,
+  optionsMinShots: number | null | undefined,
+): Promise<void> {
+  if (optionsMinShots == null) return;
+  if (currentMinShots != null) return;
+  await supabase
+    .from("matches")
+    .update({ min_shots: optionsMinShots })
+    .eq("id", matchId);
+}
+
+/**
+ * Normaliza un nombre para matchear un parsed stage result contra un
+ * `shooters.full_name` ya en DB. Lowercase + collapse de whitespace +
+ * trim. No strip-ea acentos: dos apellidos que difieren por una tilde
+ * son personas distintas. Tampoco strip-ea sufijos: el parser ya corrió
+ * `stripNameSuffixes` antes de que llegue acá, así que ambos lados
+ * (archivo y DB) tienen el mismo nombre canónico.
+ */
+function normalizeNameForMatch(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 /**
@@ -803,6 +885,13 @@ interface MatchLookupRow {
   id: string;
   name: string;
   imported_by_user_id: string;
+  /**
+   * Estado actual del `min_shots` del match en DB. Lo usamos en re-uploads
+   * y stage imports para decidir si aplicar el valor que vino en el form:
+   * solo lo seteamos cuando todavía es null, así no pisamos un valor que
+   * el usuario haya corregido a mano desde la página del match.
+   */
+  min_shots: number | null;
 }
 
 /**
@@ -822,7 +911,7 @@ async function resolveMatchForStage(
   // 1) Match exacto.
   const { data: exact } = await supabase
     .from("matches")
-    .select("id, name, imported_by_user_id")
+    .select("id, name, imported_by_user_id, min_shots")
     .eq("discipline_id", disciplineId)
     .eq("name", cleanName)
     .eq("date", parsed.date)
@@ -832,7 +921,7 @@ async function resolveMatchForStage(
   // 2) Fallback: matches del mismo día y disciplina, buscamos prefijo.
   const { data: sameDay } = await supabase
     .from("matches")
-    .select("id, name, imported_by_user_id")
+    .select("id, name, imported_by_user_id, min_shots")
     .eq("discipline_id", disciplineId)
     .eq("date", parsed.date);
 
@@ -923,7 +1012,7 @@ async function findUserMatch(
 ): Promise<MatchLookupRow | null> {
   const { data } = await supabase
     .from("matches")
-    .select("id, name, imported_by_user_id, imported_at")
+    .select("id, name, imported_by_user_id, min_shots, imported_at")
     .eq("discipline_id", disciplineId)
     .eq("name", name)
     .eq("date", date)

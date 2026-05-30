@@ -507,6 +507,167 @@ describe("importParsedMatch — Stage results", () => {
     );
     expect(mollea).toBeDefined();
   });
+
+  it("aplica min_shots del form en stage import si el match todavía no lo tiene (y no pisa un valor existente)", async () => {
+    // Bug: el usuario sube el overall sin completar min_shots, después
+    // sube un stage y completa min_shots=116 en el form, pero el valor
+    // se ignora silenciosamente (`importStages` ni siquiera recibía
+    // options). El usuario tiene que corregirlo a mano en /matches/[id].
+    //
+    // Fix: aplicamos el min_shots del form en stage imports también, pero
+    // solo si el match aún no tiene uno seteado (preserva ediciones
+    // manuales desde la página del match).
+    const matchFixture = parsePractiscoreHtml(
+      read("tp-escopeta-2026-02-20-match.html"),
+    );
+    const stageFixture = parsePractiscoreHtml(
+      read("tp-escopeta-2026-02-20-stage1.html"),
+    );
+
+    const fakeFresh = buildSupabase();
+
+    // 1. Overall sin min_shots.
+    await importParsedMatch(fakeFresh.asClient(), matchFixture, USER_ID, "m.html");
+    const created = fakeFresh.tables.matches.rows[0]!;
+    expect(created.min_shots).toBeNull();
+
+    // 2. Stage con min_shots=116 → el match se actualiza.
+    await importParsedMatch(
+      fakeFresh.asClient(),
+      stageFixture,
+      USER_ID,
+      "s1.html",
+      { minShots: 116 },
+    );
+    expect(fakeFresh.tables.matches.rows[0]!.min_shots).toBe(116);
+
+    // 3. Otro stage con min_shots=200 → el match queda en 116 (no se pisa).
+    await importParsedMatch(
+      fakeFresh.asClient(),
+      stageFixture,
+      USER_ID,
+      "s1-reupload.html",
+      { minShots: 200 },
+    );
+    expect(fakeFresh.tables.matches.rows[0]!.min_shots).toBe(116);
+  });
+
+  it("stage import con mismo nombre en dos divisiones no duplica match_entry_id en el batch (bug PCC suffix)", async () => {
+    // Bug raíz reproducido (caso real del 3° Ranking Social 2026-05-30):
+    // Martin Celiz compite en PCC Optics como "CELIZ, Martin PCC" (sin nº
+    // de socio) y en Production como "CELIZ, Martin" (con nº 2430). El
+    // parser strip-ea el sufijo "PCC" así que ambas variantes llegan al
+    // importer con el mismo `fullName`. El overall crea 2 match_entries
+    // (cache keys distintas por el nº). Pero los archivos de stages de
+    // PractiScore NO traen nº de socio, así que ambas filas comparten
+    // `cacheKey` y `resolveShootersBulk` las colapsa a UN mismo shooterId.
+    // El fallback "1 entry única" mandaba ambas al mismo match_entry_id
+    // → `ON CONFLICT DO UPDATE command cannot affect row a second time`.
+    //
+    // Después del fix: el lookup pasa por (nombre normalizado, división)
+    // sin shooterId como intermediario, así que cada parsed stage result
+    // va al match_entry correcto.
+    const fakeFresh = buildSupabase();
+
+    const overall = {
+      discipline: "ipsc" as const,
+      source: "practiscore_match_html" as const,
+      name: "Test Two Divs",
+      date: "2026-05-30",
+      region: null,
+      stages: [],
+      generatedBy: null,
+      matchEntries: [
+        // PCC Optics: sin nº (en el archivo real era "CELIZ, Martin PCC",
+        // el parser ya strip-eó "PCC" antes de llegar acá).
+        {
+          shooter: { fullName: "CELIZ, Martin", memberNumber: null, region: null },
+          divisionCode: "PCCO",
+          classification: "U",
+          powerFactor: "Min" as const,
+          category: null,
+          place: 1, matchPoints: 500, matchPercentage: 100,
+          totalTimeSeconds: null, hits: null, isDq: false, isAbsent: false,
+        },
+        // Production: mismo tirador, con nº de socio
+        {
+          shooter: { fullName: "CELIZ, Martin", memberNumber: "2430", region: null },
+          divisionCode: "P",
+          classification: "U",
+          powerFactor: "Min" as const,
+          category: null,
+          place: 1, matchPoints: 450, matchPercentage: 95,
+          totalTimeSeconds: null, hits: null, isDq: false, isAbsent: false,
+        },
+      ],
+    };
+    await importParsedMatch(fakeFresh.asClient(), overall, USER_ID, "overall.html");
+    expect(fakeFresh.tables.match_entries.rows).toHaveLength(2);
+
+    // Stage: ambas filas SIN nº (como un stage real de PractiScore)
+    const stageImport = {
+      discipline: "ipsc" as const,
+      source: "practiscore_stage_html" as const,
+      name: "Test Two Divs - Stage 6",
+      date: "2026-05-30",
+      region: null,
+      matchEntries: [],
+      generatedBy: null,
+      stages: [
+        {
+          stageNumber: 6,
+          name: "Test Two Divs - Stage 6",
+          results: [
+            {
+              shooter: { fullName: "CELIZ, Martin", memberNumber: null, region: null },
+              divisionCode: "PCCO",
+              classification: "U",
+              powerFactor: "Min" as const,
+              points: 58, penalties: 0, timeSeconds: 10.77, hitFactor: 5.39,
+              stagePoints: 60, stagePercentage: 100, place: 1, hits: null,
+              isDq: false,
+            },
+            {
+              shooter: { fullName: "CELIZ, Martin", memberNumber: null, region: null },
+              divisionCode: "P",
+              classification: "U",
+              powerFactor: "Min" as const,
+              points: 56, penalties: 0, timeSeconds: 12.49, hitFactor: 4.48,
+              stagePoints: 57.88, stagePercentage: 96.47, place: 2, hits: null,
+              isDq: false,
+            },
+          ],
+        },
+      ],
+    };
+
+    const result = await importParsedMatch(
+      fakeFresh.asClient(),
+      stageImport,
+      USER_ID,
+      "stage.html",
+    );
+
+    // Dos stage_results, uno por cada match_entry de la división correcta.
+    expect(result.insertedStageResults).toBe(2);
+    expect(fakeFresh.tables.stage_results.rows).toHaveLength(2);
+
+    const entryIds = new Set(
+      fakeFresh.tables.stage_results.rows.map((r) => r.match_entry_id),
+    );
+    expect(entryIds.size).toBe(2);
+
+    const pccoEntry = fakeFresh.tables.match_entries.rows.find(
+      (e) => e.division_id === 14,
+    );
+    const pEntry = fakeFresh.tables.match_entries.rows.find(
+      (e) => e.division_id === 11,
+    );
+    expect(pccoEntry).toBeDefined();
+    expect(pEntry).toBeDefined();
+    expect(entryIds.has(pccoEntry!.id)).toBe(true);
+    expect(entryIds.has(pEntry!.id)).toBe(true);
+  });
 });
 
 describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match existente", () => {
