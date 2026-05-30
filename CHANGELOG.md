@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.1](https://github.com/seketman/hitfactor/compare/v1.16.0...v1.16.1) (2026-05-30)
+
+
+### Bug Fixes
+
+* **import:** stage attach collision + min_shots silently ignored ([#85](https://github.com/seketman/hitfactor/issues/85)) ([9d10850](https://github.com/seketman/hitfactor/commit/9d10850803968c0670c54bad21c44dd2750212bb))
+
 ## [1.16.0](https://github.com/seketman/hitfactor/compare/v1.15.0...v1.16.0) (2026-05-29)
 
 
