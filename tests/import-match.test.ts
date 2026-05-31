@@ -128,6 +128,102 @@ describe("importParsedMatch — Match overall", () => {
     });
   });
 
+  it("bloquea cross-user cuando otro usuario importó el mismo torneo con region 'compatible' (una nula)", async () => {
+    // Bug raíz reproducido (caso real del 3° Ranking Social 2026-05-30):
+    // un usuario importó el match desde un PDF WinMSS que no tiene
+    // columna region → region quedó null. Otro usuario subió después
+    // el mismo torneo desde un HTML PractiScore que sí tiene region
+    // → region "ARG-TFALP". La unique constraint (discipline, name,
+    // date, region) con NULLS NOT DISTINCT no agarró la colisión y
+    // ambos imports entraron como matches distintos.
+    //
+    // Nueva guarda a nivel app: si encontramos otro match del mismo
+    // (discipline, name, date) y las regions son compatibles (una
+    // nula, ambas nulas o iguales), rechazamos con error accionable.
+    fake.seed("matches", [
+      {
+        id: "match-otro",
+        discipline_id: 1,
+        name: "TP ESCOPETA 20/02/26 TFALP",
+        date: "2026-02-20",
+        region: null, // otro usuario importó con region null (caso WinMSS PDF)
+        imported_by_user_id: OTHER_USER,
+        imported_at: "2026-02-21T10:00:00Z",
+        source_type: "winmss_pdf",
+        min_shots: null,
+      },
+    ]);
+
+    const parsed = parsePractiscoreHtml(
+      read("tp-escopeta-2026-02-20-match.html"),
+    );
+    // El parser extrae region del HTML — sanity check para que el caso
+    // tenga sentido (region en archivo != region en DB).
+    expect(parsed.region).toBeTruthy();
+
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "html.html"),
+    ).rejects.toMatchObject({
+      code: "MATCH_ALREADY_EXISTS_BY_OTHER",
+    });
+
+    // El match original sigue siendo el único — no entró duplicado.
+    expect(fake.tables.matches.rows).toHaveLength(1);
+  });
+
+  it("permite cross-user cuando ambos imports tienen regions NO nulas distintas (dos torneos legítimamente distintos)", async () => {
+    // Caso raro pero legítimo: dos clubes corriendo un torneo con el
+    // mismo nombre + misma fecha, pero en clubes distintos. La guarda
+    // NO debe disparar acá — son dos matches reales y separados.
+    fake.seed("matches", [
+      {
+        id: "match-otra-region",
+        discipline_id: 1,
+        name: "TP ESCOPETA 20/02/26 TFALP",
+        date: "2026-02-20",
+        region: "ARG-OTRACLUB", // otra region concreta
+        imported_by_user_id: OTHER_USER,
+        imported_at: "2026-02-21T10:00:00Z",
+        source_type: "practiscore_match_html",
+        min_shots: null,
+      },
+    ]);
+
+    const parsed = parsePractiscoreHtml(
+      read("tp-escopeta-2026-02-20-match.html"),
+    );
+    expect(parsed.region).toBe("ARG-TFALP");
+
+    const result = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "html.html",
+    );
+
+    // No bloqueó: insertó un segundo match.
+    expect(result.existedAlready).toBe(false);
+    expect(fake.tables.matches.rows).toHaveLength(2);
+  });
+
+  it("la guarda cross-user no afecta re-uploads del mismo usuario", async () => {
+    // El path existente de re-upload (mismo usuario) se chequea ANTES
+    // que la guarda cross-user, así que sigue funcionando idéntico.
+    const parsed = parsePractiscoreHtml(
+      read("tp-escopeta-2026-02-20-match.html"),
+    );
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "f.html");
+
+    const result = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "f.html",
+    );
+    expect(result.existedAlready).toBe(true);
+    expect(fake.tables.matches.rows).toHaveLength(1);
+  });
+
   it("no duplica shooters cuando el mismo nombre aparece en múltiples divisiones (race fix)", async () => {
     // Reproducimos el caso FBI: un mismo tirador aparece varias veces en el
     // CSV (típicamente una por cada disciplina). Antes del fix, Promise.all
@@ -792,10 +888,14 @@ describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match exis
     };
 
     // USER_ID no debería poder agregarle stages al match ajeno.
+    // Después de la guarda cross-user pre-INSERT, el código devuelto es
+    // MATCH_ALREADY_EXISTS_BY_OTHER (más específico). El antiguo
+    // MATCH_ALREADY_EXISTS sigue existiendo como fallback si una race
+    // entre dos imports simultáneos llega hasta el INSERT.
     await expect(
       importParsedMatch(fake.asClient(), parsed, USER_ID, "s.csv"),
     ).rejects.toMatchObject({
-      code: "MATCH_ALREADY_EXISTS",
+      code: "MATCH_ALREADY_EXISTS_BY_OTHER",
     });
   });
 });
