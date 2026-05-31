@@ -446,6 +446,22 @@ describe("parseWinmssText — overall", () => {
     expect(parsed.matchEntries[0]?.divisionCode).toBe("O");
   });
 
+  it("mapea 'PCC IRON' (WinMSS clásico) → PCC", () => {
+    // Bug reproducido: el match TFABA 3er Social PCC 30 MAY 26 (WinMSS
+    // clásico, no ESS) incluía secciones "PCC IRON -- Overall Match
+    // Results" y "PCC OPTIC -- Overall Match Results". El map sólo tenía
+    // entradas para la variante ESS ("PC IRON" / "PC OPTICS"), así que
+    // la sección "PCC IRON" se descartaba silenciosamente y sólo entraba
+    // PCCO. El fix agrega "PCC IRON" → "PCC".
+    const pccIronPage = overallClassicPage.replace(
+      "SG CLASSIC -- Overall Match Results",
+      "PCC IRON -- Overall Match Results",
+    );
+    const parsed = parseWinmssText(pages(pccIronPage));
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PCC");
+    expect(parsed.matchEntries.length).toBe(3);
+  });
+
   it("mapea PISTOLA → PIS (división TFABA genérica)", () => {
     const parsed = parseWinmssText(pages(overallPistolaPage));
     expect(parsed.matchEntries[0]?.divisionCode).toBe("PIS");
