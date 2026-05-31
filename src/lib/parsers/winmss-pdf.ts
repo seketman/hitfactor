@@ -100,6 +100,12 @@ const DIVISION_NAME_TO_CODE: Record<string, string> = {
   PRODUCTION: "P",
   "PRODUCTION OPTICS": "PO",
   PCC: "PCC",
+  // WinMSS clásico distingue PCC sin óptica como "PCC IRON". El header
+  // crudo es "PCC IRON -- Overall Match Results"; mapea al mismo code
+  // que la sección PCC genérica (iron sights). Caso real: TFABA 3er
+  // Social PCC 30 MAY 26 — sin esta entrada la sección se descartaba
+  // silenciosamente y solo entraba PCCO.
+  "PCC IRON": "PCC",
   "PCC OPTIC": "PCCO",
   "PCC OPTICS": "PCCO",
   "CARRY OPTICS": "CO",
