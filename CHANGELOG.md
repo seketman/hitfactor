@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.2](https://github.com/seketman/hitfactor/compare/v1.16.1...v1.16.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* **parsers:** map "PCC IRON" division in WinMSS clásico to PCC ([#87](https://github.com/seketman/hitfactor/issues/87)) ([ad46bf6](https://github.com/seketman/hitfactor/commit/ad46bf6bc0ba2fde8336937fd0fee5521b07a0a8))
+
 ## [1.16.1](https://github.com/seketman/hitfactor/compare/v1.16.0...v1.16.1) (2026-05-30)
 
 
