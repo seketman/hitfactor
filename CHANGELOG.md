@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.3](https://github.com/seketman/hitfactor/compare/v1.16.2...v1.16.3) (2026-05-31)
+
+
+### Bug Fixes
+
+* **import:** block cross-user duplicates with compatible regions ([#89](https://github.com/seketman/hitfactor/issues/89)) ([064197a](https://github.com/seketman/hitfactor/commit/064197a3950d36d72cef1973ca0feb517c5458be))
+
 ## [1.16.2](https://github.com/seketman/hitfactor/compare/v1.16.1...v1.16.2) (2026-05-31)
 
 
