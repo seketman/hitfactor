@@ -203,9 +203,43 @@ async function importMatchOverall(
     };
   }
 
-  // No es un re-upload nuestro. Insertamos. Si pega contra la unique
-  // constraint, es porque otro usuario ya lo importó con esa (region) —
-  // reportamos error claro.
+  // No es un re-upload nuestro. Antes de insertar, chequeamos si OTRO
+  // usuario ya importó el mismo match — la unique constraint a nivel DB
+  // es (discipline, name, date, region) con NULLS NOT DISTINCT, así que
+  // si ambos imports tienen distinta region (caso típico: uno HTML de
+  // PractiScore que extrae "ARG-TFALP" de las filas y otro PDF de
+  // WinMSS donde la region cae a null) se cuelan los dos como matches
+  // distintos. Defendemos a nivel app: si encontramos uno con regions
+  // "compatibles" (una nula, ambas nulas o iguales), rechazamos con un
+  // error accionable que invita a marcarse "Soy yo" en el match
+  // existente. Si las regions son explícitamente distintas (ambas no
+  // nulas, valores distintos), asumimos torneos legítimamente
+  // distintos (dos clubes con el mismo nombre en el mismo día — raro
+  // pero posible) y dejamos pasar.
+  const otherUserMatch = await findAnyMatchByDiscNameDate(
+    supabase,
+    discipline.id,
+    parsed.name,
+    parsed.date,
+  );
+  if (
+    otherUserMatch &&
+    otherUserMatch.imported_by_user_id !== importerUserId
+  ) {
+    const regionsCompatible =
+      otherUserMatch.region == null ||
+      parsed.region == null ||
+      otherUserMatch.region === parsed.region;
+    if (regionsCompatible) {
+      throw new ImportError(
+        'Este match ya fue importado por otra persona. Buscalo en la página de Matches y marcate con "Soy yo" en vez de volver a subirlo.',
+        "MATCH_ALREADY_EXISTS_BY_OTHER",
+      );
+    }
+  }
+
+  // Insertamos. Si igual pega contra la unique constraint (race entre
+  // dos imports concurrentes con misma region), reportamos error claro.
   //
   // `min_shots`: FBI siempre 45 (regla fija de la disciplina, ignoramos
   // lo que venga del form). Resto usa el valor del form (puede ser null
@@ -1003,6 +1037,40 @@ export function findBestPrefixMatch<T extends { name: string }>(
  * elegimos el más antiguo — asumiendo que ese fue el "original" y que
  * los más nuevos son ramas erróneas a limpiar.
  */
+/**
+ * Busca un match de CUALQUIER usuario por (discipline, name, date),
+ * ignorando region. Sirve para detectar duplicados cross-user que la
+ * unique constraint a nivel DB no agarra (region distinta entre dos
+ * imports del mismo torneo real — típicamente HTML vs PDF, ver Issue
+ * #88 / PR #89). Si hay más de uno (legacy state), devuelve el más
+ * antiguo asumiendo que ese es el "original".
+ */
+async function findAnyMatchByDiscNameDate(
+  supabase: TypedSupabaseClient,
+  disciplineId: number,
+  name: string,
+  date: string,
+): Promise<{
+  id: string;
+  imported_by_user_id: string;
+  region: string | null;
+} | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select("id, imported_by_user_id, region, imported_at")
+    .eq("discipline_id", disciplineId)
+    .eq("name", name)
+    .eq("date", date)
+    .order("imported_at", { ascending: true })
+    .limit(1);
+  const rows = data as Array<{
+    id: string;
+    imported_by_user_id: string;
+    region: string | null;
+  }> | null;
+  return rows && rows.length > 0 ? rows[0]! : null;
+}
+
 async function findUserMatch(
   supabase: TypedSupabaseClient,
   disciplineId: number,
