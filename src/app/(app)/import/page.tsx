@@ -16,6 +16,13 @@ export default async function ImportPage({
 }: {
   searchParams: Promise<{
     error?: string;
+    /**
+     * Nombre del archivo que el usuario intentó subir en el intento que
+     * terminó en error. La server action lo agrega a la URL via
+     * `redirectImportError` para que el form remontado pueda mostrar
+     * "Último intento: X" como contexto al usuario.
+     */
+    lastFile?: string;
     ok?: string;
     matchId?: string;
     name?: string;
@@ -170,6 +177,7 @@ export default async function ImportPage({
       <ImportForm
         key={resultKey(params)}
         hasPreviousResult={params.ok === "1" || Boolean(params.error)}
+        lastFile={params.error ? params.lastFile ?? null : null}
       />
 
       <details className="mt-6 text-sm text-fg-muted">
