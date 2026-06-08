@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.4](https://github.com/seketman/hitfactor/compare/v1.16.3...v1.16.4) (2026-06-08)
+
+
+### Bug Fixes
+
+* **import:** polish file picker UX in the import form ([#93](https://github.com/seketman/hitfactor/issues/93)) ([6caaf4f](https://github.com/seketman/hitfactor/commit/6caaf4f46911ec0e704960fa3563ada96fa38f6e))
+
 ## [1.16.3](https://github.com/seketman/hitfactor/compare/v1.16.2...v1.16.3) (2026-05-31)
 
 
