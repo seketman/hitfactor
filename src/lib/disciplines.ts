@@ -23,6 +23,14 @@ const TIME_BASED: Set<string> = new Set([DISCIPLINE.STEEL, DISCIPLINE.COMBAT]);
 
 const HITS_BASED: Set<string> = new Set([DISCIPLINE.FBI]);
 
+// Disciplinas cuyo scoring contempla penalties por stage (mike, no-shoot,
+// procedural en IPSC; time-plus penalties en Combat Solutions). Steel y
+// FBI no usan el concepto de penalty per-stage.
+const PENALTY_TRACKING: Set<string> = new Set([
+  DISCIPLINE.IPSC,
+  DISCIPLINE.COMBAT,
+]);
+
 /**
  * True si la disciplina puntúa por tiempo total (Steel Challenge / Combat
  * Solutions). Acepta el code suelto, o el objeto `disciplines` embebido que
@@ -60,4 +68,22 @@ export function isHitsBasedDiscipline(
   if (input == null) return false;
   const code = typeof input === "string" ? input : input.code;
   return !!code && HITS_BASED.has(code);
+}
+
+/**
+ * True si la disciplina trackea penalties por stage en su scoring (IPSC,
+ * Combat Solutions). Sirve para que la UI distinga "no aplica a esta
+ * disciplina" (FBI/Steel) de "sin datos de penalties en el historial"
+ * (IPSC/Combat pero el archivo importado no traía la columna cargada).
+ */
+export function isPenaltyTrackingDiscipline(
+  input:
+    | string
+    | { code?: string | null }
+    | null
+    | undefined,
+): boolean {
+  if (input == null) return false;
+  const code = typeof input === "string" ? input : input.code;
+  return !!code && PENALTY_TRACKING.has(code);
 }

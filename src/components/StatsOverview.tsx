@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { PerformanceChart } from "@/components/PerformanceChart";
 import { cn, formatPercent, formatDate } from "@/lib/utils";
+import { isPenaltyTrackingDiscipline } from "@/lib/disciplines";
 import {
   getAmmoExtrasTier,
   type AmmoEfficiencyStats,
@@ -194,12 +195,12 @@ export function StatsOverview({
         <CadenceCard cadence={stats.cadence} />
       </div>
 
-      {/* Por stage: KPIs cross-matches a nivel de stage (top 3, ganados,
+      {/* Por stage: KPIs cross-matches a nivel de stage (podios, ganados,
           penalties, mejor %). Aparece solo cuando hay stage_results. */}
       {stats.stageStats && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
-            label="Tasa de podios"
+            label="Podios por stage"
             value={`${stats.stageStats.podiumRate.toFixed(0)}%`}
             hint={`stages top 3 · ${stats.stageStats.scoredStages} contabilizados`}
           />
@@ -208,7 +209,12 @@ export function StatsOverview({
             value={`${stats.stageStats.winRate.toFixed(0)}%`}
             hint="stages con #1"
           />
-          <PenaltyRateCard rate={stats.stageStats.penaltyRate} />
+          <PenaltyRateCard
+            rate={stats.stageStats.penaltyRate}
+            tracksPenalties={stats.byDiscipline.some((d) =>
+              isPenaltyTrackingDiscipline(d.code),
+            )}
+          />
           <KpiCard
             label="Mejor stage %"
             value={formatPercent(stats.stageStats.bestStagePercentage)}
@@ -331,16 +337,22 @@ function PercentileCard({
   if (avg === null) {
     return (
       <KpiCard
-        label="Percentil promedio"
+        label="% superado en división"
         value="—"
         hint="Sin datos de tamaño de división"
       />
     );
   }
+  // `avgPercentile` viene como place/total × 100 (menor = mejor: place=1
+  // produce el percentil más bajo). Lo invertimos para mostrarlo como
+  // "% de la división que superás" — convención positiva (mayor = mejor)
+  // que evita la ambigüedad de "Top 71%" sonando como mediocre o como
+  // élite según se interprete.
+  const surpassedAvg = 100 - avg;
   return (
     <KpiCard
-      label="Percentil promedio"
-      value={`Top ${avg.toFixed(0)}%`}
+      label="% superado en división"
+      value={`${surpassedAvg.toFixed(0)}%`}
       hint={
         best ? (
           <Link
@@ -348,10 +360,10 @@ function PercentileCard({
             className="hover:text-accent"
             title={best.matchName}
           >
-            mejor: top {best.value.toFixed(0)}% ({formatDate(best.date)})
+            mejor: {(100 - best.value).toFixed(0)}% ({formatDate(best.date)})
           </Link>
         ) : (
-          "menor = mejor"
+          "mayor = mejor"
         )
       }
     />
@@ -489,13 +501,26 @@ function SlopeHitsCard({ slope }: { slope: number | null }) {
   );
 }
 
-function PenaltyRateCard({ rate }: { rate: number | null }) {
+function PenaltyRateCard({
+  rate,
+  tracksPenalties,
+}: {
+  rate: number | null;
+  tracksPenalties: boolean;
+}) {
   if (rate === null) {
+    // Distinguimos "no aplica" (FBI/Steel) de "aplica pero el archivo
+    // importado no traía la columna `Pen`" (IPSC/Combat sin datos).
+    // Mismo display "—" pero hint preciso para no engañar al usuario.
     return (
       <KpiCard
         label="Tasa de penalties"
         value="—"
-        hint="no aplica a esta disciplina"
+        hint={
+          tracksPenalties
+            ? "sin datos de penalties en el historial"
+            : "no aplica a esta disciplina"
+        }
       />
     );
   }
