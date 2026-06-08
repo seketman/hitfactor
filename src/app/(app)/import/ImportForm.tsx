@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, Loader2 } from "lucide-react";
+import { CalendarClock, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -15,6 +15,12 @@ const INITIAL_STATE: ImportFormState = { status: "idle" };
 interface ImportFormProps {
   /** True si en esta vista ya estamos mostrando el resultado de un import previo. */
   hasPreviousResult?: boolean;
+  /**
+   * Nombre del archivo que el usuario intentó subir en el intento anterior
+   * que terminó en error. Se muestra como hint para que tenga contexto
+   * de qué falló y pueda re-elegirlo. Null en flujos OK / primer uso.
+   */
+  lastFile?: string | null;
 }
 
 /**
@@ -30,7 +36,7 @@ interface ImportFormProps {
  * `ParsedMatch` ya parseado viaja en el estado, así no hay que volver a
  * subir ni a parsear el archivo.
  */
-export function ImportForm({ hasPreviousResult }: ImportFormProps) {
+export function ImportForm({ hasPreviousResult, lastFile }: ImportFormProps) {
   const [state, formAction, pending] = useActionState(
     importHtml,
     INITIAL_STATE,
@@ -44,6 +50,7 @@ export function ImportForm({ hasPreviousResult }: ImportFormProps) {
         ) : (
           <UploadBody
             hasPreviousResult={!!hasPreviousResult}
+            lastFile={lastFile ?? null}
             pending={pending}
           />
         )}
@@ -62,18 +69,22 @@ export function ImportForm({ hasPreviousResult }: ImportFormProps) {
  */
 function UploadBody({
   hasPreviousResult,
+  lastFile,
   pending,
 }: {
   hasPreviousResult: boolean;
+  lastFile: string | null;
   pending: boolean;
 }) {
-  const [filename, setFilename] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const buttonLabel = pending
-    ? "Importando..."
-    : hasPreviousResult
-      ? "Importar otro archivo"
-      : "Importar";
+  const pickerLabel = hasPreviousResult ? "Elegir otro archivo" : "Elegir archivo";
+
+  function clearFile() {
+    setFile(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }
 
   return (
     <fieldset disabled={pending} className="space-y-6 disabled:opacity-60">
@@ -90,17 +101,18 @@ function UploadBody({
 
         <label
           className={cn(
-            "flex items-center gap-3 rounded-md border border-border bg-surface-2 p-1 pr-3",
+            "flex items-center gap-3 rounded-md border border-border bg-surface-2 p-1 pr-1",
             pending ? "cursor-not-allowed" : "cursor-pointer",
           )}
         >
           <input
+            ref={inputRef}
             type="file"
             name="file"
             accept=".html,.htm,.csv,.pdf"
             required
             aria-busy={pending}
-            onChange={(e) => setFilename(e.target.files?.[0]?.name ?? null)}
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             className="sr-only"
           />
           <span
@@ -109,17 +121,49 @@ function UploadBody({
               !pending && "hover:bg-accent-strong",
             )}
           >
-            Elegir archivo
+            {pickerLabel}
           </span>
           <span
             className={cn(
-              "truncate text-sm",
-              filename ? "text-fg" : "text-fg-subtle",
+              "flex-1 truncate text-sm",
+              file ? "text-fg" : "text-fg-subtle",
             )}
           >
-            {filename ?? "Ningún archivo seleccionado"}
+            {file
+              ? `${file.name} · ${formatBytes(file.size)}`
+              : "Ningún archivo seleccionado"}
           </span>
+          {file && !pending && (
+            <button
+              type="button"
+              onClick={(e) => {
+                // Evita que el click se propague al <label> y abra el picker.
+                e.preventDefault();
+                e.stopPropagation();
+                clearFile();
+              }}
+              aria-label="Quitar archivo seleccionado"
+              title="Quitar archivo"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-fg-subtle hover:bg-surface hover:text-fg"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          )}
         </label>
+
+        {/*
+          Hint cuando el intento anterior falló: le decimos al user qué
+          archivo intentó subir antes para que tenga contexto al re-elegirlo.
+          Solo aparece si NO hay un archivo recién seleccionado (en ese caso
+          el filename de arriba ya es la info relevante).
+        */}
+        {lastFile && !file && (
+          <p className="mt-1.5 text-xs text-fg-subtle">
+            Último intento:{" "}
+            <span className="font-mono text-fg-muted">{lastFile}</span>.
+            Volvé a elegirlo para reintentar.
+          </p>
+        )}
       </div>
 
       {/*
@@ -139,14 +183,19 @@ function UploadBody({
         hint="Opcional. Tiro FBI se asigna en 45 automáticamente. Para IPSC, Steel Challenge y Combat Solutions ingresá el mínimo de disparos por entry. Se usa para mostrar 'disparos extra' en el detalle y promediar la eficiencia del tirador."
       />
 
-      <Button type="submit" className="w-full" aria-busy={pending}>
+      <Button
+        type="submit"
+        className="w-full"
+        aria-busy={pending}
+        disabled={!file}
+      >
         {pending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            {buttonLabel}
+            Importando...
           </>
         ) : (
-          buttonLabel
+          "Importar"
         )}
       </Button>
 
@@ -241,4 +290,13 @@ function NeedsDateBody({
       </div>
     </fieldset>
   );
+}
+
+/** Formatea bytes a "12 B" / "3.4 KB" / "1.2 MB" para mostrar al usuario. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
 }

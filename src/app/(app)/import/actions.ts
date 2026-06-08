@@ -77,7 +77,7 @@ export async function importHtml(
   const isPdf = /\.pdf$/i.test(filename);
   const isText = /\.(html?|csv)$/i.test(filename);
   if (!isPdf && !isText) {
-    redirectWithError("/import", "Solo se aceptan archivos HTML, CSV o PDF");
+    redirectImportError("Solo se aceptan archivos HTML, CSV o PDF", filename);
   }
 
   // `min_shots`: opcional en el form. Si está vacío o no parsea como int
@@ -103,12 +103,15 @@ export async function importHtml(
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Error parseando el archivo";
-    redirectWithError("/import", msg);
+    redirectImportError(msg, filename);
   }
   const tParse = Date.now() - tParseStart;
 
   if (!parsed.name) {
-    redirectWithError("/import", "El archivo no parece ser un reporte válido.");
+    redirectImportError(
+      "El archivo no parece ser un reporte válido.",
+      filename,
+    );
   }
 
   // Los rankings PDF de la FAT no traen fecha. Si el parser no la pudo
@@ -127,7 +130,10 @@ export async function importHtml(
         minShots,
       };
     }
-    redirectWithError("/import", "El archivo no parece ser un reporte válido.");
+    redirectImportError(
+      "El archivo no parece ser un reporte válido.",
+      filename,
+    );
   }
 
   const result = await runImport(supabase, user.id, parsed, filename, {
@@ -202,12 +208,23 @@ async function runImport(
     result = await importParsedMatch(supabase, parsed, userId, filename, options);
   } catch (e) {
     if (e instanceof ImportError) {
-      redirectWithError("/import", e.message);
+      redirectImportError(e.message, filename);
     }
     throw e;
   }
   await logImport(supabase, userId, result);
   return result;
+}
+
+/**
+ * Variante de `redirectWithError` específica del flow de import: además
+ * del mensaje, incluye en la URL el `lastFile` que el usuario intentó
+ * subir, para que el form remontado tras el error muestre "Último
+ * intento: X" como contexto y el usuario sepa qué re-elegir.
+ */
+function redirectImportError(message: string, lastFile: string): never {
+  const params = new URLSearchParams({ error: message, lastFile });
+  redirect(`/import?${params.toString()}`);
 }
 
 /**
