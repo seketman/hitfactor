@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.5](https://github.com/seketman/hitfactor/compare/v1.16.4...v1.16.5) (2026-06-08)
+
+
+### Bug Fixes
+
+* **dashboard:** aclarar etiquetas y semántica de KPIs del historial ([#95](https://github.com/seketman/hitfactor/issues/95)) ([79d5dcd](https://github.com/seketman/hitfactor/commit/79d5dcdbf9784df892dbebe85a3bc92f5e017515))
+
 ## [1.16.4](https://github.com/seketman/hitfactor/compare/v1.16.3...v1.16.4) (2026-06-08)
 
 
