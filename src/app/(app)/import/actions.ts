@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { parseFile, parsePdf } from "@/lib/parsers";
+import { parseFile, parsePdf, parsePdfBatch } from "@/lib/parsers";
 import type { ParsedMatch } from "@/lib/types/match";
 import { redirectWithError } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
@@ -68,37 +68,77 @@ export async function importHtml(
   const startedAt = new Date();
   const t0 = Date.now();
 
-  const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
+  // Multi-file: el input acepta `multiple`, principalmente para Steel
+  // Challenge donde cada stage viene en su propio PDF. El path de un solo
+  // archivo (HTML/CSV/PDF) sigue funcionando idéntico.
+  const rawFiles = formData.getAll("file");
+  const files = rawFiles.filter(
+    (f): f is File => f instanceof File && f.size > 0,
+  );
+  if (files.length === 0) {
     redirectWithError("/import", "Elegí un archivo");
   }
 
-  const filename = file.name;
-  const isPdf = /\.pdf$/i.test(filename);
-  const isText = /\.(html?|csv)$/i.test(filename);
-  if (!isPdf && !isText) {
-    redirectImportError("Solo se aceptan archivos HTML, CSV o PDF", filename);
+  // Para reportes y errores: nombre del primer archivo si hay uno solo,
+  // o un resumen "N archivos" si son varios.
+  const filename =
+    files.length === 1
+      ? files[0]!.name
+      : `${files.length} archivos (${files[0]!.name}, …)`;
+
+  // Validación de extensiones — todos los archivos deben respetar el set
+  // soportado. Si son varios, exigimos que todos sean PDF (es el único
+  // formato que admite multi-file hoy: Steel Challenge).
+  for (const f of files) {
+    const isPdfFile = /\.pdf$/i.test(f.name);
+    const isTextFile = /\.(html?|csv)$/i.test(f.name);
+    if (!isPdfFile && !isTextFile) {
+      redirectImportError(
+        "Solo se aceptan archivos HTML, CSV o PDF",
+        filename,
+      );
+    }
+  }
+  const allPdfs = files.every((f) => /\.pdf$/i.test(f.name));
+  if (files.length > 1 && !allPdfs) {
+    redirectImportError(
+      "Para subir varios archivos a la vez todos tienen que ser PDFs " +
+        "(es el formato multi-archivo soportado, típicamente Steel Challenge).",
+      filename,
+    );
   }
 
   // `min_shots`: opcional en el form. Si está vacío o no parsea como int
   // positivo, queda null (el importer aplica 45 si es FBI; resto queda null).
   const minShots = parseMinShotsField(formData.get("min_shots"));
 
+  const totalSize = files.reduce((acc, f) => acc + f.size, 0);
   console.log(
-    `[import] start ${startedAt.toISOString()} file=${filename} size=${file.size}b`,
+    `[import] start ${startedAt.toISOString()} files=${files.length} ` +
+      `first=${files[0]!.name} totalSize=${totalSize}b`,
   );
 
   const { supabase, user } = await requireUser();
 
-  // PDFs van como binario; HTML/CSV como texto.
+  // PDFs van como binario (single o batch); HTML/CSV como texto (single only).
   let parsed: ParsedMatch;
   const tParseStart = Date.now();
   try {
-    if (isPdf) {
-      const buffer = new Uint8Array(await file.arrayBuffer());
-      parsed = await parsePdf(buffer, filename);
+    if (allPdfs && files.length > 1) {
+      const buffers = await Promise.all(
+        files.map(async (f) => ({
+          data: new Uint8Array(await f.arrayBuffer()),
+          filename: f.name,
+        })),
+      );
+      parsed = await parsePdfBatch(buffers);
+    } else if (allPdfs) {
+      const f = files[0]!;
+      const buffer = new Uint8Array(await f.arrayBuffer());
+      parsed = await parsePdf(buffer, f.name);
     } else {
-      const content = await file.text();
+      // HTML / CSV: un solo archivo, se procesa como texto.
+      const content = await files[0]!.text();
       parsed = parseFile(content);
     }
   } catch (e) {

@@ -76,13 +76,18 @@ function UploadBody({
   lastFile: string | null;
   pending: boolean;
 }) {
-  const [file, setFile] = useState<File | null>(null);
+  // `multiple` para soportar Steel Challenge (un PDF por stage). Para el
+  // resto de los formatos un solo archivo alcanza — el server action
+  // distingue por cantidad y branchea al parser correspondiente.
+  const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const pickerLabel = hasPreviousResult ? "Elegir otro archivo" : "Elegir archivo";
+  const pickerLabel = hasPreviousResult ? "Elegir otros archivos" : "Elegir archivos";
+  const hasFiles = files.length > 0;
+  const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
 
-  function clearFile() {
-    setFile(null);
+  function clearFiles() {
+    setFiles([]);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -90,11 +95,11 @@ function UploadBody({
     <fieldset disabled={pending} className="space-y-6 disabled:opacity-60">
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
-          <span>Archivo a importar</span>
+          <span>Archivos a importar</span>
           {pending && (
             <span className="inline-flex items-center gap-1 text-accent normal-case tracking-normal">
               <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-              Procesando archivo…
+              Procesando archivo{files.length === 1 ? "" : "s"}…
             </span>
           )}
         </div>
@@ -110,9 +115,10 @@ function UploadBody({
             type="file"
             name="file"
             accept=".html,.htm,.csv,.pdf"
+            multiple
             required
             aria-busy={pending}
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             className="sr-only"
           />
           <span
@@ -126,24 +132,26 @@ function UploadBody({
           <span
             className={cn(
               "flex-1 truncate text-sm",
-              file ? "text-fg" : "text-fg-subtle",
+              hasFiles ? "text-fg" : "text-fg-subtle",
             )}
           >
-            {file
-              ? `${file.name} · ${formatBytes(file.size)}`
-              : "Ningún archivo seleccionado"}
+            {files.length === 0 && "Ningún archivo seleccionado"}
+            {files.length === 1 &&
+              `${files[0]!.name} · ${formatBytes(files[0]!.size)}`}
+            {files.length > 1 &&
+              `${files.length} archivos · ${formatBytes(totalBytes)}`}
           </span>
-          {file && !pending && (
+          {hasFiles && !pending && (
             <button
               type="button"
               onClick={(e) => {
                 // Evita que el click se propague al <label> y abra el picker.
                 e.preventDefault();
                 e.stopPropagation();
-                clearFile();
+                clearFiles();
               }}
-              aria-label="Quitar archivo seleccionado"
-              title="Quitar archivo"
+              aria-label="Quitar archivos seleccionados"
+              title="Quitar archivos"
               className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-fg-subtle hover:bg-surface hover:text-fg"
             >
               <X className="h-4 w-4" aria-hidden />
@@ -152,12 +160,27 @@ function UploadBody({
         </label>
 
         {/*
-          Hint cuando el intento anterior falló: le decimos al user qué
-          archivo intentó subir antes para que tenga contexto al re-elegirlo.
-          Solo aparece si NO hay un archivo recién seleccionado (en ese caso
-          el filename de arriba ya es la info relevante).
+          Si el usuario eligió varios archivos, mostramos la lista compacta
+          debajo del label para que pueda chequear que están los que quiso.
+          No agregamos un ✕ por archivo: si se equivocó, vuelve a elegir.
         */}
-        {lastFile && !file && (
+        {files.length > 1 && (
+          <ul className="mt-2 space-y-0.5 text-xs text-fg-subtle">
+            {files.map((f, i) => (
+              <li key={`${f.name}-${i}`} className="truncate">
+                · {f.name} <span className="text-fg-muted">({formatBytes(f.size)})</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/*
+          Hint cuando el intento anterior falló: le decimos al user qué
+          archivo (o resumen "N archivos") intentó subir antes para que
+          tenga contexto al re-elegir. Solo aparece si NO hay archivos
+          recién seleccionados.
+        */}
+        {lastFile && !hasFiles && (
           <p className="mt-1.5 text-xs text-fg-subtle">
             Último intento:{" "}
             <span className="font-mono text-fg-muted">{lastFile}</span>.
@@ -187,7 +210,7 @@ function UploadBody({
         type="submit"
         className="w-full"
         aria-busy={pending}
-        disabled={!file}
+        disabled={!hasFiles}
       >
         {pending ? (
           <>

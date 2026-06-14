@@ -27,7 +27,7 @@ import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { claimShooter } from "@/lib/actions/claim";
 import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
-import { isHitsBasedDiscipline } from "@/lib/disciplines";
+import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import { isInternalAppPath } from "@/lib/redirects";
 import { BackLink } from "@/components/BackLink";
 import { toggleEntryAbsent } from "./actions";
@@ -75,6 +75,11 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   // Tiro FBI rankea por impactos antes que por puntos — agregamos columna
   // Impactos y bajamos el énfasis visual de Puntos en la tabla.
   const isHitsBased = isHitsBasedDiscipline(match.disciplines);
+  // Steel Challenge / Combat Solutions puntúan por tiempo: no usan
+  // match_points (la columna queda en 0 para todos los entries) y el
+  // ranking primario es total_time_seconds. Cambiamos la columna PUNTOS
+  // por TIEMPO en esos casos así el usuario ve la métrica que importa.
+  const isTimeBased = isTimeBasedDiscipline(match.disciplines);
 
   // Agrupar por división
   const byDivision = new Map<string, MatchEntryWithRelations[]>();
@@ -171,7 +176,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                     {isHitsBased && (
                       <TH className="text-right">Impactos</TH>
                     )}
-                    <TH className="text-right">Puntos</TH>
+                    <TH className="text-right">
+                      {isTimeBased ? "Tiempo" : "Puntos"}
+                    </TH>
                     <TH className="text-right">%</TH>
                     <TH className="w-28"></TH>
                   </TR>
@@ -256,7 +263,11 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                         >
                           {e.is_dq || e.is_absent
                             ? "—"
-                            : formatNumber(e.match_points, 2)}
+                            : isTimeBased
+                              ? e.total_time_seconds != null
+                                ? `${formatNumber(e.total_time_seconds, 2)}s`
+                                : "—"
+                              : formatNumber(e.match_points, 2)}
                         </TD>
                         <TD
                           className={cn(
