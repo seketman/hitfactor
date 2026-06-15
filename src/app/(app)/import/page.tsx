@@ -57,8 +57,9 @@ export default async function ImportPage({
         <p className="mt-1 text-sm text-fg-muted">
           Subí un archivo HTML de PractiScore (IPSC / Steel Challenge), un CSV
           exportado de Google Sheets para Tiro FBI, un PDF WinMSS de
-          ipsc.org.ar (overall y stages por separado) o un PDF de ranking
-          oficial de la FAT.
+          ipsc.org.ar (overall y stages por separado), un PDF de ranking
+          oficial de la FAT, o los PDFs de Steel Challenge exportados desde
+          PractiScore iPhone (un archivo por stage, los subís todos juntos).
         </p>
       </header>
 
@@ -216,6 +217,14 @@ export default async function ImportPage({
             archivo (ej.: <code>resultados-apertura-fbi.pdf</code>). Como ese
             formato no incluye la fecha del torneo, te la vamos a pedir antes
             de terminar la importación.
+          </p>
+          <p>
+            <strong className="text-fg">PDFs de Steel Challenge</strong>{" "}
+            (PractiScore iPhone): un archivo por stage tipo &ldquo;Stage
+            Results - By Division&rdquo;. Subilos todos juntos en el mismo
+            import — el overall del match lo computamos sumando los tiempos
+            de los stages. Los PDFs &ldquo;Category Leaders&rdquo; se ignoran
+            (sus porcentajes son por categoría, no por división).
           </p>
         </div>
       </details>

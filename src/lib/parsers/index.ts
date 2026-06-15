@@ -4,6 +4,11 @@ import {
   isSteelChallengeFormat,
   parseSteelChallengeHtml,
 } from "./steel-challenge";
+import {
+  isSteelChallengePdfFormat,
+  parseSteelChallengePdfs,
+  type SteelPdfFile,
+} from "./steel-challenge-pdf";
 import { isFbiCsvFormat, parseFbiCsv } from "./fbi-csv";
 import { extractPdfPages } from "./pdf-extract";
 import { isWinmssFormat, parseWinmssText } from "./winmss-pdf";
@@ -32,11 +37,12 @@ export function parseHtml(html: string): ParsedMatch {
 }
 
 /**
- * Parsea un PDF (binario) y devuelve un ParsedMatch. Soportamos dos
- * formatos de PDF: los WinMSS de ipsc.org.ar y los rankings oficiales de
- * la FAT. Extraemos el texto una vez y elegimos el parser según el
- * contenido; el `filename` lo necesita el parser de la FAT (de ahí saca
- * la disciplina y el nombre del torneo).
+ * Parsea un PDF (binario) y devuelve un ParsedMatch. Soportamos tres
+ * formatos de PDF single-file: los WinMSS de ipsc.org.ar, los rankings
+ * oficiales de la FAT, y los reportes de Steel Challenge generados por
+ * PractiScore iPhone (Stage Results - By Division). Para Steel Challenge
+ * con múltiples stages el flow correcto es `parsePdfBatch` — un único
+ * PDF de Steel sirve para importar un solo stage.
  *
  * Async porque carga `unpdf` dinámicamente.
  */
@@ -44,23 +50,70 @@ export async function parsePdf(
   data: Uint8Array,
   filename: string,
 ): Promise<ParsedMatch> {
-  const pages = await extractPdfPages(data);
-  const fullText = pages.map((p) => p.text).join("\n");
+  return parsePdfBatch([{ data, filename }]);
+}
 
-  if (isWinmssFormat(fullText)) {
-    return parseWinmssText(pages);
+/**
+ * Versión multi-archivo de `parsePdf`. Pensada para Steel Challenge donde
+ * cada stage viene en su propio PDF y necesitamos los 3 (o N) para
+ * computar el overall del match. Para los formatos single-file (WinMSS,
+ * FAT), solo aceptamos un archivo — pasar más de uno tira error.
+ *
+ * Detección: extraemos texto de todos los archivos, concatenamos, y
+ * elegimos parser. Si el bundle es Steel → `parseSteelChallengePdfs`.
+ * Si es un único archivo no-Steel → fallback a WinMSS / FAT.
+ */
+export async function parsePdfBatch(
+  files: Array<{ data: Uint8Array; filename: string }>,
+): Promise<ParsedMatch> {
+  if (files.length === 0) {
+    throw new Error("No se recibió ningún archivo.");
   }
-  if (isFatPdfFormat(fullText)) {
-    return parseFatText(fullText, filename);
+
+  const filePages: SteelPdfFile[] = await Promise.all(
+    files.map(async (f) => ({
+      pages: await extractPdfPages(f.data),
+      filename: f.filename,
+    })),
+  );
+  const fullText = filePages
+    .flatMap((f) => f.pages.map((p) => p.text))
+    .join("\n");
+
+  if (isSteelChallengePdfFormat(fullText)) {
+    return parseSteelChallengePdfs(filePages);
+  }
+
+  if (files.length > 1) {
+    throw new Error(
+      "Solo Steel Challenge soporta múltiples PDFs en un mismo import. " +
+        "Subí los archivos uno por uno.",
+    );
+  }
+
+  // Fallback single-file: WinMSS o FAT.
+  const single = filePages[0]!;
+  const singleText = single.pages.map((p) => p.text).join("\n");
+  if (isWinmssFormat(singleText)) {
+    return parseWinmssText(single.pages);
+  }
+  if (isFatPdfFormat(singleText)) {
+    return parseFatText(singleText, single.filename);
   }
   throw new Error(
     "No reconocemos el formato de este PDF. Soportamos los PDFs WinMSS de " +
-      "ipsc.org.ar y los rankings oficiales en PDF de la FAT.",
+      "ipsc.org.ar, los rankings oficiales en PDF de la FAT, y los reportes " +
+      "de Steel Challenge generados por PractiScore iPhone.",
   );
 }
 
 export { parsePractiscoreHtml } from "./practiscore";
 export { parseSteelChallengeHtml, isSteelChallengeFormat } from "./steel-challenge";
+export {
+  parseSteelChallengePdfs,
+  isSteelChallengePdfFormat,
+  type SteelPdfFile,
+} from "./steel-challenge-pdf";
 export { parseFbiCsv, isFbiCsvFormat } from "./fbi-csv";
 export { parseWinmssText, isWinmssFormat } from "./winmss-pdf";
 export { parseFatText, isFatPdfFormat } from "./fat-pdf";

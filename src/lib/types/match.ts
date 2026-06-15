@@ -15,6 +15,7 @@ export type ParsedMatchSource =
   | "practiscore_combined_html"
   | "practiscore_stage_html"
   | "practiscore_steel_html"
+  | "practiscore_steel_pdf"
   | "practiscore_pdf"
   | "winmss_pdf"
   | "fbi_csv"
