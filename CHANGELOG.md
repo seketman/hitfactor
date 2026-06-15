@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.0](https://github.com/seketman/hitfactor/compare/v1.17.0...v1.18.0) (2026-06-15)
+
+
+### Features
+
+* **import:** add CLASSIC division to Tiro FBI ([#102](https://github.com/seketman/hitfactor/issues/102)) ([0a2d1c6](https://github.com/seketman/hitfactor/commit/0a2d1c602e16bd50e9de8313c59789990ec60270))
+
 ## [1.17.0](https://github.com/seketman/hitfactor/compare/v1.16.5...v1.17.0) (2026-06-15)
 
 
