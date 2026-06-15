@@ -66,6 +66,7 @@ const DIVISION_CODE: Record<string, string> = {
   revólver: "REV",
   minirifle: "MINI",
   pcc: "PCC",
+  classic: "CLASSIC",
 };
 
 /**

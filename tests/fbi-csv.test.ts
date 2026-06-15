@@ -52,6 +52,22 @@ describe("parseFbiCsv — Social 4", () => {
     expect(codes.has("PCC")).toBe(true);
   });
 
+  it("mapea Classic a CLASSIC (división extendida de TFALP)", () => {
+    // CSV sintético chico: 2 filas en Classic. Sin esta entrada el parser
+    // saltaba la división como "desconocida" y perdía los entries.
+    const csv = [
+      "Social X - 14/06/26",
+      "Tirador,Club,Categoría,Disciplina,Impactos,Puntos",
+      "Foo Bar,TFALP,,Classic,39,170",
+      "Baz Qux,TFALP,,Classic,37,150",
+    ].join("\n");
+    const result = parseFbiCsv(csv);
+    expect(result.matchEntries).toHaveLength(2);
+    expect(result.matchEntries.every((e) => e.divisionCode === "CLASSIC")).toBe(
+      true,
+    );
+  });
+
   it("preserva nombres con coma embebida (CSV con comillas)", () => {
     const names = parsed.matchEntries.map((e) => e.shooter.fullName);
     expect(names).toContain("Mariperisena, Matías");
