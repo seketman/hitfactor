@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.0](https://github.com/seketman/hitfactor/compare/v1.16.5...v1.17.0) (2026-06-15)
+
+
+### Features
+
+* **import:** support Steel Challenge PDFs from PractiScore iPhone ([#99](https://github.com/seketman/hitfactor/issues/99)) ([b63060e](https://github.com/seketman/hitfactor/commit/b63060e91b6778afb097a0b9b83b834b739a01b7))
+
 ## [1.16.5](https://github.com/seketman/hitfactor/compare/v1.16.4...v1.16.5) (2026-06-08)
 
 
