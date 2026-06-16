@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/seketman/hitfactor/compare/v1.18.1...v1.19.0) (2026-06-16)
+
+
+### Features
+
+* **observability:** enable Vercel Analytics + Speed Insights ([#108](https://github.com/seketman/hitfactor/issues/108)) ([82e3867](https://github.com/seketman/hitfactor/commit/82e3867d21faa6583a1ac2a15ce194c06bb92f9f))
+
 ## [1.18.1](https://github.com/seketman/hitfactor/compare/v1.18.0...v1.18.1) (2026-06-16)
 
 
