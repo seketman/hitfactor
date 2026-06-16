@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1](https://github.com/seketman/hitfactor/compare/v1.18.0...v1.18.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* **dashboard:** clean per-discipline KPI panel ([#106](https://github.com/seketman/hitfactor/issues/106)) ([9e66ebd](https://github.com/seketman/hitfactor/commit/9e66ebd742361b2b7eabdfac63007ae3d8dbae7a))
+
 ## [1.18.0](https://github.com/seketman/hitfactor/compare/v1.17.0...v1.18.0) (2026-06-15)
 
 
