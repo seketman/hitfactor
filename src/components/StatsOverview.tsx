@@ -196,32 +196,44 @@ export function StatsOverview({
       </div>
 
       {/* Por stage: KPIs cross-matches a nivel de stage (podios, ganados,
-          penalties, mejor %). Aparece solo cuando hay stage_results. */}
-      {stats.stageStats && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            label="Podios por stage"
-            value={`${stats.stageStats.podiumRate.toFixed(0)}%`}
-            hint={`stages top 3 · ${stats.stageStats.scoredStages} contabilizados`}
-          />
-          <KpiCard
-            label="Stages ganados"
-            value={`${stats.stageStats.winRate.toFixed(0)}%`}
-            hint="stages con #1"
-          />
-          <PenaltyRateCard
-            rate={stats.stageStats.penaltyRate}
-            tracksPenalties={stats.byDiscipline.some((d) =>
-              isPenaltyTrackingDiscipline(d.code),
+          penalties opcional, mejor %). Aparece solo cuando hay
+          stage_results. La card de penalties la rendereamos solo en
+          disciplinas que realmente las trackean (IPSC, Combat) — esconderla
+          en FBI/Steel evita el ruido del "no aplica" que confundía al user.
+          El grid usa N columnas en lg según cuántas cards van: si son 3
+          (sin penalties) las cards se reparten parejas en la fila sin dejar
+          hueco a la derecha. */}
+      {stats.stageStats && (() => {
+        const showPenalties = stats.byDiscipline.some((d) =>
+          isPenaltyTrackingDiscipline(d.code),
+        );
+        const gridLg = showPenalties ? "lg:grid-cols-4" : "lg:grid-cols-3";
+        return (
+          <div className={cn("grid gap-3 sm:grid-cols-2", gridLg)}>
+            <KpiCard
+              label="Podios por stage"
+              value={`${stats.stageStats!.podiumRate.toFixed(0)}%`}
+              hint={`stages top 3 · ${stats.stageStats!.scoredStages} contabilizados`}
+            />
+            <KpiCard
+              label="Stages ganados"
+              value={`${stats.stageStats!.winRate.toFixed(0)}%`}
+              hint="stages con #1"
+            />
+            {showPenalties && (
+              <PenaltyRateCard
+                rate={stats.stageStats!.penaltyRate}
+                tracksPenalties={true}
+              />
             )}
-          />
-          <KpiCard
-            label="Mejor stage %"
-            value={formatPercent(stats.stageStats.bestStagePercentage)}
-            hint="máximo % de stage"
-          />
-        </div>
-      )}
+            <KpiCard
+              label="Mejor stage %"
+              value={formatPercent(stats.stageStats!.bestStagePercentage)}
+              hint="máximo % de stage"
+            />
+          </div>
+        );
+      })()}
 
       {/*
         Eficiencia de munición (issue #75): promedio y acumulado de disparos
@@ -236,28 +248,73 @@ export function StatsOverview({
         </div>
       )}
 
-      {/* Chart de evolución del Match % */}
-      <Card className="px-5 py-4">
-        <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-          Evolución del %
-        </p>
-        {stats.timeline.length >= 2 ? (
-          <PerformanceChart points={stats.timeline} mode="percentage" />
-        ) : (
-          <p className="mt-3 text-sm text-fg-subtle">
-            Necesitás al menos 2 torneos para ver la evolución.
-          </p>
-        )}
-      </Card>
+      {/*
+        Charts de evolución. El orden + colapsabilidad depende de la métrica
+        primaria:
+          - primary = %: chart de % visible, chart de impactos (si hay datos
+            FBI mezclados) visible debajo como dimensión extra.
+          - primary = hits (FBI-only): chart de impactos visible, chart de %
+            colapsado dentro de <details> — para un user FBI el puntaje es
+            secundario y mostrarlo siempre desplegado agrega ruido.
+      */}
+      {showHitsAsPrimary ? (
+        <>
+          <Card className="px-5 py-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
+              Evolución de impactos
+            </p>
+            {stats.timeline.length >= 2 ? (
+              <PerformanceChart points={stats.timeline} mode="hits" />
+            ) : (
+              <p className="mt-3 text-sm text-fg-subtle">
+                Necesitás al menos 2 torneos para ver la evolución.
+              </p>
+            )}
+          </Card>
+          <Card className="px-5 py-4">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
+                <span className="transition-transform group-open:rotate-90" aria-hidden>
+                  ▸
+                </span>
+                Ver también: evolución del %
+              </summary>
+              <div className="mt-3">
+                {stats.timeline.length >= 2 ? (
+                  <PerformanceChart points={stats.timeline} mode="percentage" />
+                ) : (
+                  <p className="text-sm text-fg-subtle">
+                    Necesitás al menos 2 torneos para ver la evolución.
+                  </p>
+                )}
+              </div>
+            </details>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Card className="px-5 py-4">
+            <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
+              Evolución del %
+            </p>
+            {stats.timeline.length >= 2 ? (
+              <PerformanceChart points={stats.timeline} mode="percentage" />
+            ) : (
+              <p className="mt-3 text-sm text-fg-subtle">
+                Necesitás al menos 2 torneos para ver la evolución.
+              </p>
+            )}
+          </Card>
 
-      {/* Chart de evolución de impactos (Tiro FBI) */}
-      {hasHits && (
-        <Card className="px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Evolución de impactos
-          </p>
-          <PerformanceChart points={stats.timeline} mode="hits" />
-        </Card>
+          {hasHits && (
+            <Card className="px-5 py-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
+                Evolución de impactos
+              </p>
+              <PerformanceChart points={stats.timeline} mode="hits" />
+            </Card>
+          )}
+        </>
       )}
 
       {stats.byDiscipline.length > 1 && (
