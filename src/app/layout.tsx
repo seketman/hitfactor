@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { getSiteUrl } from "@/lib/seo/site-url";
 import "./globals.css";
@@ -42,6 +44,14 @@ export default function RootLayout({
     >
       <body className="bg-bg text-fg min-h-full flex flex-col">
         <ThemeProvider>{children}</ThemeProvider>
+        {/*
+          Analytics + Speed Insights de Vercel. Cookieless, GDPR-friendly,
+          dashboards en vercel.com/<project>/analytics. Tier free de Hobby
+          alcanza para nuestro volumen actual (decenas de usuarios). Si lo
+          excedemos, se mueve a Pro o se quita sin tocar código en la app.
+        */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
