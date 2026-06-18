@@ -29,7 +29,8 @@ import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import { isInternalAppPath } from "@/lib/redirects";
-import { canEditEntry, canEditMatch } from "@/lib/permissions";
+import { canEditMatch } from "@/lib/permissions";
+import { canToggleEntryAbsent } from "@/lib/matches/entry-status";
 import { BackLink } from "@/components/BackLink";
 import { toggleEntryAbsent } from "./actions";
 
@@ -221,27 +222,18 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                       !!shooter &&
                       shooter.linked_user_id === null &&
                       isClaimCandidate(shooter, claimAliases);
-                    // Toggle de ausencia: la RLS (0008) habilita tres autores
-                    // y acá replicamos esa lógica para mostrar el botón solo
-                    // cuando el flip va a funcionar.
-                    //
-                    // Además gateamos por score: solo tiene sentido marcar
-                    // ausente a alguien con todo en cero. Si tiene puntos o %
-                    // > 0, claramente disparó al menos un tiro y NO puede ser
-                    // un ausente (forzando esa marca distorsionaría la verdad
-                    // del registro). El botón "Sí asistió" sí aparece sobre
-                    // entries ya marcadas como ausentes, para poder revertir.
-                    const isLikelyAbsent =
-                      e.match_points === 0 && e.match_percentage === 0;
-                    const canToggleAbsent =
-                      !e.is_dq &&
-                      (e.is_absent || isLikelyAbsent) &&
-                      canEditEntry({
+                    // Toggle de ausencia: la regla (no-DQ, en cero o ya
+                    // ausente, y editable) vive en `canToggleEntryAbsent`, que
+                    // espeja la validación del server action y la RLS 0008.
+                    const canToggleAbsent = canToggleEntryAbsent({
+                      entry: e,
+                      edit: {
                         userId,
                         isAdmin,
                         importedByUserId: match.imported_by_user_id,
                         isSelf: isMine,
-                      });
+                      },
+                    });
                     return (
                       <TR
                         key={e.id}

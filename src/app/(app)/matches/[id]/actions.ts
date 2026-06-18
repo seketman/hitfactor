@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import { getProfile } from "@/lib/db/profiles";
 import { canEditEntry, canEditMatch } from "@/lib/permissions";
+import { isLikelyAbsent } from "@/lib/matches/entry-status";
 
 export async function deleteMatch(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
@@ -269,10 +270,7 @@ export async function toggleEntryAbsent(formData: FormData) {
   // server-side por si alguien arma el POST a mano. La acción inversa
   // (quitar ausente) siempre se permite — útil para corregir un marcado
   // erróneo aunque el entry "ya tenga datos" por cualquier razón.
-  if (
-    nextValue === true &&
-    (entry.match_points > 0 || entry.match_percentage > 0)
-  ) {
+  if (nextValue === true && !isLikelyAbsent(entry)) {
     redirectWithError(
       `/matches/${matchId}`,
       "No se puede marcar ausente: el entry tiene puntaje o porcentaje > 0",
