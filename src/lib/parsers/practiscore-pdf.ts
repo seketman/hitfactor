@@ -336,6 +336,17 @@ function extractStageName(text: string): string | null {
   return m[1]!.replace(/^Stage\s+\d+\s+/i, "").trim() || null;
 }
 
+/**
+ * Normaliza la columna Region/club: colapsa espacios repetidos y saca los
+ * espacios alrededor del guion que PractiScore mete en algunas planillas
+ * ("NECOCHEA -ARG" → "NECOCHEA-ARG"), preservando los espacios internos del
+ * nombre ("MAR DEL PLATA-ARG"). Devuelve `null` si queda vacío.
+ */
+function normalizeRegion(raw: string): string | null {
+  const clean = raw.trim().replace(/\s+/g, " ").replace(/\s*-\s*/g, "-");
+  return clean || null;
+}
+
 const PF_SPLIT_RE = /^(.*?)\s+(Maj|Min)\b\s*(.*)$/;
 
 function parsePowerFactor(token: string): PowerFactor {
@@ -390,10 +401,13 @@ function parseOverallRows(
     const powerFactor = parsePowerFactor(split[2]!);
     const tail = split[3]!;
 
-    // MatchPts + Match% al final (con region opcional después del %).
-    const score = /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%\s*([A-Za-z][A-Za-z-]*)?\s*$/.exec(
-      tail,
-    );
+    // MatchPts + Match%. Ancla SOLO en el par numérico `pts pct%`: lo que
+    // queda antes es la categoría y lo que queda después es la region. La
+    // region puede ser multi-palabra ("NECOCHEA -ARG", "MAR DEL PLATA-ARG"),
+    // así que NO la capturamos como token único anclado a `$` — eso hacía
+    // fallar el match entero y mandaba la fila al branch sin-puntaje, donde
+    // pts/pct=0 la marcaban como Ausente por error.
+    const score = /(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)%/.exec(tail);
     let matchPoints = 0;
     let matchPercentage = 0;
     let region: string | null = null;
@@ -401,14 +415,11 @@ function parseOverallRows(
     if (score) {
       matchPoints = parseFloat(score[1]!);
       matchPercentage = parseFloat(score[2]!);
-      region = score[3] ?? null;
-      // Lo que queda entre la PF y el puntaje es la categoría (puede estar
-      // vacío o partido en otras líneas — best-effort).
+      region = normalizeRegion(tail.slice(score.index + score[0]!.length));
       category = tail.slice(0, score.index).trim() || null;
     } else {
-      // Sin puntaje: DQ o región suelta. La región es el último token.
-      const tokens = tail.trim().split(/\s+/).filter(Boolean);
-      region = tokens.length > 0 ? tokens[tokens.length - 1]! : null;
+      // Sin puntaje: DQ o ausente real. Lo que sobra del tail es la region.
+      region = normalizeRegion(tail);
     }
 
     out.push({
