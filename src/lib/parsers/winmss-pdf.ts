@@ -5,6 +5,7 @@ import type {
   ParsedStage,
   ParsedStageResult,
 } from "../types/match";
+import { resolveDivisionCode } from "./division-registry";
 import { extractClubFromTitle, stripNameSuffixes } from "./shared";
 
 /**
@@ -79,50 +80,10 @@ const ENGLISH_MONTHS: Record<string, number> = {
   dec: 12,
 };
 
-/**
- * Mapea el nombre de la sección que aparece en el PDF (división) al
- * `code` de la tabla `divisions` de IPSC.
- *
- * Las variantes "SG <X>" (Shotgun) reusan los códigos genéricos de
- * pistola — el usuario explícitamente pidió no separar por arma porque
- * conceptualmente son las mismas divisiones.
- *
- * Si aparece una división que no está acá, la sección se ignora con un
- * warning y el resto del archivo sigue importándose.
- */
-const DIVISION_NAME_TO_CODE: Record<string, string> = {
-  OPEN: "O",
-  "SG OPEN": "O",
-  STANDARD: "S",
-  "SG STANDARD": "S",
-  "STANDARD MANUAL": "SM",
-  "SG STANDARD MANUAL": "SM",
-  PRODUCTION: "P",
-  "PRODUCTION OPTICS": "PO",
-  PCC: "PCC",
-  // WinMSS clásico distingue PCC sin óptica como "PCC IRON". El header
-  // crudo es "PCC IRON -- Overall Match Results"; mapea al mismo code
-  // que la sección PCC genérica (iron sights). Caso real: TFABA 3er
-  // Social PCC 30 MAY 26 — sin esta entrada la sección se descartaba
-  // silenciosamente y solo entraba PCCO.
-  "PCC IRON": "PCC",
-  "PCC OPTIC": "PCCO",
-  "PCC OPTICS": "PCCO",
-  "CARRY OPTICS": "CO",
-  // ESS llama "OPTICS" a Carry Optics. Ambas mapean al mismo code.
-  OPTICS: "CO",
-  REVOLVER: "R",
-  CLASSIC: "CL",
-  "SG CLASSIC": "CL",
-  MODIFIED: "MS",
-  // TFABA-specific: sección genérica de pistola (no se subdivide en
-  // eventos sociales). Ver migración 0013.
-  PISTOLA: "PIS",
-  // ESS usa "PC IRON" (Pistol Caliber sin óptica) y "PC OPTICS"
-  // (con óptica). Equivalentes a PCC y PCCO respectivamente.
-  "PC IRON": "PCC",
-  "PC OPTICS": "PCCO",
-};
+// El mapeo nombre-de-sección → `code` de división IPSC vive en el registry
+// compartido (`division-registry.ts`). Incluye las variantes "SG <X>"
+// (Shotgun, mismos códigos genéricos) y las de ESS ("OPTICS", "PC IRON",
+// "PC OPTICS"). Si una sección no se reconoce, se ignora con warning.
 
 // Tokens cortos uppercase que aparecen como columnas de metadata en las
 // filas de overall (Cat, Reg, Cls, Tag, ICS). Usamos sets explícitos en
@@ -379,15 +340,10 @@ function parsePage(
     .trim()
     .replace(/\s+/g, " ")
     .toUpperCase();
-  // Probamos lookup con el texto tal como vino, y también sin espacios.
-  // Ej.: en algunos PDFs `pdfjs` rompe la palabra "PISTOLA" en dos items
-  // ("P" + "ISTOLA") por kerning, y nuestra reconstrucción posicional los
-  // junta con un espacio. Sacar espacios cubre ese caso sin afectar
-  // divisiones legítimamente multi-palabra (que matchean en el primer
-  // lookup).
-  const divisionCode =
-    DIVISION_NAME_TO_CODE[divisionRaw] ??
-    DIVISION_NAME_TO_CODE[divisionRaw.replace(/\s+/g, "")];
+  // `resolveDivisionCode` ya prueba el texto tal como vino y su variante sin
+  // espacios — cubre el caso de `pdfjs` rompiendo "PISTOLA" en "P" + "ISTOLA"
+  // por kerning que la reconstrucción posicional junta con un espacio.
+  const divisionCode = resolveDivisionCode(DISCIPLINE.IPSC, divisionRaw);
   if (!divisionCode) {
     // División desconocida: ignoramos esta página silenciosamente. El
     // resto del PDF sigue siendo válido.
@@ -848,9 +804,7 @@ function parseDqPageRows(text: string): ParsedMatchEntry[] {
       divLen--
     ) {
       const divCandidate = tokens.slice(0, divLen).join(" ").toUpperCase();
-      const code =
-        DIVISION_NAME_TO_CODE[divCandidate] ??
-        DIVISION_NAME_TO_CODE[divCandidate.replace(/\s+/g, "")];
+      const code = resolveDivisionCode(DISCIPLINE.IPSC, divCandidate);
       if (code) {
         divisionCode = code;
         apellido = tokens.slice(divLen).join(" ");

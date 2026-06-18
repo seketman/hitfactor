@@ -1,5 +1,6 @@
 import { parse } from "node-html-parser";
 import { DISCIPLINE } from "../disciplines";
+import { resolveDivisionCode } from "./division-registry";
 import type {
   ParsedMatch,
   ParsedMatchEntry,
@@ -58,41 +59,18 @@ const STAGE_NUMBER_RE =
   /(?:Stage|Ejercicio|Ej\.?|Stand|St\.?|Etapa|Match)\s+(\d+)/i;
 
 /**
- * Mapa de título de sección IPSC (tal como aparece tras "Match Results - "
- * o "Stage Results - ", normalizado a MAYÚSCULAS sin espacios sobrantes)
- * al `code` de la tabla `divisions`.
+ * Resuelve el `code` de la división desde el título de sección IPSC (tal como
+ * aparece tras "Match Results - " o "Stage Results - ") vía el registry
+ * compartido (`division-registry.ts`).
  *
- * Usamos esto en lugar de la columna `Div` de cada fila porque PractiScore
- * le deja al organizador definir los códigos cortos en la config del match
- * — y no son estables entre matches. Vimos archivos con `C` para Classic,
- * `P` para Pcc y `P` para Pistola en el mismo torneo; el título de la
- * sección sí es texto humano fijo y mapea bien a las divisiones de la DB.
+ * Usamos el título y no la columna `Div` de cada fila porque PractiScore le
+ * deja al organizador definir los códigos cortos en la config del match — y no
+ * son estables entre matches. Vimos archivos con `C` para Classic, `P` para
+ * Pcc y `P` para Pistola en el mismo torneo; el título de la sección sí es
+ * texto humano fijo y mapea bien a las divisiones de la DB.
  */
-const DIVISION_CODE_BY_TITLE: Record<string, string> = {
-  OPEN: "O",
-  PRODUCTION: "P",
-  "PRODUCTION OPTICS": "PO",
-  STANDARD: "S",
-  "STANDARD MANUAL": "SM",
-  "CARRY OPTICS": "CO",
-  REVOLVER: "R",
-  CLASSIC: "CL",
-  MODIFIED: "MS",
-  "MODIFIED SHOTGUN": "MS",
-  PCC: "PCC",
-  "PCC OPTIC": "PCCO",
-  "PCC OPTICS": "PCCO",
-  PISTOLA: "PIS",
-};
-
 function divisionCodeFromTitle(title: string): string | null {
-  const norm = title
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .trim();
-  return DIVISION_CODE_BY_TITLE[norm] ?? null;
+  return resolveDivisionCode(DISCIPLINE.IPSC, title);
 }
 
 export function parsePractiscoreHtml(html: string): ParsedMatch {
