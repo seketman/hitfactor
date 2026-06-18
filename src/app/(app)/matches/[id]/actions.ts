@@ -6,6 +6,7 @@ import { redirectWithError, safeBackPath } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import { getProfile } from "@/lib/db/profiles";
+import { canEditEntry, canEditMatch } from "@/lib/permissions";
 
 export async function deleteMatch(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
@@ -165,10 +166,13 @@ export async function updateMatchMinShots(formData: FormData) {
   }
 
   const profile = await getProfile(supabase, user.id);
-  const isImporter = matchBefore.imported_by_user_id === user.id;
-  const isAdmin = profile?.is_admin === true;
+  const allowed = canEditMatch({
+    userId: user.id,
+    isAdmin: profile?.is_admin === true,
+    importedByUserId: matchBefore.imported_by_user_id,
+  });
 
-  if (!isImporter && !isAdmin) {
+  if (!allowed) {
     redirectWithError(
       `/matches/${matchId}`,
       "Solo el importador o un admin pueden editar el mínimo de disparos",
@@ -243,11 +247,14 @@ export async function toggleEntryAbsent(formData: FormData) {
   }
 
   const profile = await getProfile(supabase, user.id);
-  const isImporter = entry.matches?.imported_by_user_id === user.id;
-  const isAdmin = profile?.is_admin === true;
-  const isSelf = entry.shooters?.linked_user_id === user.id;
+  const allowed = canEditEntry({
+    userId: user.id,
+    isAdmin: profile?.is_admin === true,
+    importedByUserId: entry.matches?.imported_by_user_id ?? null,
+    isSelf: entry.shooters?.linked_user_id === user.id,
+  });
 
-  if (!isImporter && !isAdmin && !isSelf) {
+  if (!allowed) {
     redirectWithError(
       `/matches/${matchId}`,
       "No tenés permiso para cambiar este resultado",

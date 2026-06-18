@@ -29,6 +29,7 @@ import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import { isInternalAppPath } from "@/lib/redirects";
+import { canEditEntry, canEditMatch } from "@/lib/permissions";
 import { BackLink } from "@/components/BackLink";
 import { toggleEntryAbsent } from "./actions";
 
@@ -68,6 +69,12 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const myShooterIds = new Set(myShooters.map((s) => s.id));
   const isImporter = match.imported_by_user_id === userId;
   const isAdmin = currentProfile?.is_admin === true;
+  // Regla centralizada (espeja la RLS): importador o admin. Ver lib/permissions.
+  const canEditThisMatch = canEditMatch({
+    userId,
+    isAdmin,
+    importedByUserId: match.imported_by_user_id,
+  });
   const parsedClub = parseRegion(match.region);
   const clubLookup = buildClubLookup(clubs);
   const clubLabel =
@@ -122,7 +129,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
           </p>
         </div>
 
-        {(isImporter || isAdmin) && (
+        {canEditThisMatch && (
           <div className="w-full sm:w-auto sm:max-w-2xl sm:flex-1 sm:basis-auto">
             <MatchActionsBar
               matchId={match.id}
@@ -229,7 +236,12 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                     const canToggleAbsent =
                       !e.is_dq &&
                       (e.is_absent || isLikelyAbsent) &&
-                      (isImporter || isAdmin || isMine);
+                      canEditEntry({
+                        userId,
+                        isAdmin,
+                        importedByUserId: match.imported_by_user_id,
+                        isSelf: isMine,
+                      });
                     return (
                       <TR
                         key={e.id}

@@ -1,5 +1,6 @@
 import type { TypedSupabaseClient } from "../supabase/types";
 import type { FeedbackRow, FeedbackType } from "./types";
+import { unwrap } from "./unwrap";
 
 /**
  * Mínimo de participaciones (match_entries) que necesita un usuario para
@@ -43,12 +44,15 @@ export async function listMyFeedback(
   userId: string,
   limit: number = 20,
 ): Promise<FeedbackRow[]> {
-  const { data } = await supabase
-    .from("feedback")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const data = unwrap(
+    await supabase
+      .from("feedback")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    "listMyFeedback",
+  );
 
   return (data as FeedbackRow[] | null) ?? [];
 }

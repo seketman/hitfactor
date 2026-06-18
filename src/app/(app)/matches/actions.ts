@@ -24,8 +24,8 @@ const ALLOWED_SIZES = [10, 20, 50, 100];
  */
 export async function saveMatchesPageSize(size: number): Promise<void> {
   if (!Number.isFinite(size) || !ALLOWED_SIZES.includes(size)) return;
-  const { supabase, user } = await requireUser();
-  await updateUiPrefs(supabase, user.id, { matchesPageSize: size });
+  const { supabase } = await requireUser();
+  await updateUiPrefs(supabase, { matchesPageSize: size });
 }
 
 /**
@@ -38,7 +38,7 @@ export async function saveMatchesPageSize(size: number): Promise<void> {
  * así que este flag solo importa mientras el usuario tiene 0 claims.
  */
 export async function dismissClaimSuggestions(): Promise<void> {
-  const { supabase, user } = await requireUser();
-  await updateUiPrefs(supabase, user.id, { claimSuggestionsDismissed: true });
+  const { supabase } = await requireUser();
+  await updateUiPrefs(supabase, { claimSuggestionsDismissed: true });
   revalidatePath("/matches");
 }

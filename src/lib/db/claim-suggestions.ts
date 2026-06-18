@@ -4,6 +4,7 @@ import {
   hasUsefulAliases,
   isClaimCandidate,
 } from "../import/match-claim";
+import { unwrap } from "./unwrap";
 
 /**
  * Sugerencia de claim presentada al usuario en el header de `/matches`
@@ -68,14 +69,17 @@ export async function findClaimSuggestions(
   // (incluye Levenshtein, no se puede en SQL sin pg_trgm), pero limitamos a
   // 1000 entries por las dudas — los más recientes alcanzan de sobra para
   // poblar el `limit` final.
-  const { data } = await supabase
-    .from("match_entries")
-    .select(
-      "place, shooters!inner(id, full_name, member_number, linked_user_id), divisions(code, name), matches!inner(id, name, date, disciplines(name))",
-    )
-    .is("shooters.linked_user_id", null)
-    .order("date", { foreignTable: "matches", ascending: false })
-    .limit(1000);
+  const data = unwrap(
+    await supabase
+      .from("match_entries")
+      .select(
+        "place, shooters!inner(id, full_name, member_number, linked_user_id), divisions(code, name), matches!inner(id, name, date, disciplines(name))",
+      )
+      .is("shooters.linked_user_id", null)
+      .order("date", { foreignTable: "matches", ascending: false })
+      .limit(1000),
+    "findClaimSuggestions",
+  );
 
   if (!data) return [];
 

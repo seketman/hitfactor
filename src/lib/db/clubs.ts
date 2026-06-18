@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { TypedSupabaseClient } from "../supabase/types";
 import type { Club } from "./types";
+import { unwrap } from "./unwrap";
 
 /**
  * Lista de clubs habilitados para autoselect en la UI de "Editar club".
@@ -14,10 +15,13 @@ import type { Club } from "./types";
  */
 export const listClubs = cache(
   async (supabase: TypedSupabaseClient): Promise<Club[]> => {
-    const { data } = await supabase
-      .from("clubs")
-      .select("code, name, country, zone")
-      .order("name", { ascending: true });
+    const data = unwrap(
+      await supabase
+        .from("clubs")
+        .select("code, name, country, zone")
+        .order("name", { ascending: true }),
+      "listClubs",
+    );
     return (data as Club[] | null) ?? [];
   },
 );

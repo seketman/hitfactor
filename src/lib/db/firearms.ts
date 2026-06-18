@@ -5,6 +5,7 @@ import type {
   FirearmUsageStats,
   MatchFirearmLog,
 } from "./types";
+import { unwrap } from "./unwrap";
 
 /**
  * Catálogo de armas y log de uso por match. Todas las queries son
@@ -15,11 +16,14 @@ export async function listMyFirearms(
   supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<Firearm[]> {
-  const { data } = await supabase
-    .from("firearms")
-    .select("*")
-    .eq("owner_user_id", userId)
-    .order("created_at", { ascending: true });
+  const data = unwrap(
+    await supabase
+      .from("firearms")
+      .select("*")
+      .eq("owner_user_id", userId)
+      .order("created_at", { ascending: true }),
+    "listMyFirearms",
+  );
   return (data as Firearm[] | null) ?? [];
 }
 
@@ -27,11 +31,14 @@ export async function getFirearmById(
   supabase: TypedSupabaseClient,
   firearmId: string,
 ): Promise<Firearm | null> {
-  const { data } = await supabase
-    .from("firearms")
-    .select("*")
-    .eq("id", firearmId)
-    .maybeSingle();
+  const data = unwrap(
+    await supabase
+      .from("firearms")
+      .select("*")
+      .eq("id", firearmId)
+      .maybeSingle(),
+    "getFirearmById",
+  );
   return (data as Firearm | null) ?? null;
 }
 
@@ -39,11 +46,14 @@ export async function getMatchFirearmLog(
   supabase: TypedSupabaseClient,
   matchEntryId: string,
 ): Promise<MatchFirearmLog | null> {
-  const { data } = await supabase
-    .from("match_firearm_log")
-    .select("*")
-    .eq("match_entry_id", matchEntryId)
-    .maybeSingle();
+  const data = unwrap(
+    await supabase
+      .from("match_firearm_log")
+      .select("*")
+      .eq("match_entry_id", matchEntryId)
+      .maybeSingle(),
+    "getMatchFirearmLog",
+  );
   return (data as MatchFirearmLog | null) ?? null;
 }
 
@@ -77,6 +87,9 @@ export async function listFirearmUsageStats(
       .in("firearm_id", firearmIds),
   ]);
 
+  const matchLogs = unwrap(matchLogsRes, "listFirearmUsageStats");
+  const usageLogs = unwrap(usageLogsRes, "listFirearmUsageStats");
+
   const byFirearm = new Map<
     string,
     {
@@ -100,7 +113,7 @@ export async function listFirearmUsageStats(
     if (!bucket.lastDate || date > bucket.lastDate) bucket.lastDate = date;
   };
 
-  for (const log of matchLogsRes.data ?? []) {
+  for (const log of matchLogs ?? []) {
     const bucket = byFirearm.get(log.firearm_id);
     if (!bucket) continue;
     bucket.matches += 1;
@@ -108,7 +121,7 @@ export async function listFirearmUsageStats(
     bump(bucket, log.match_entries?.matches?.date ?? null);
   }
 
-  for (const log of usageLogsRes.data ?? []) {
+  for (const log of usageLogs ?? []) {
     const bucket = byFirearm.get(log.firearm_id);
     if (!bucket) continue;
     bucket.sessions += 1;
@@ -141,13 +154,16 @@ export async function listFirearmUsageLog(
     FirearmUsageLog & { ammunition_types: { name: string } | null }
   >
 > {
-  const { data } = await supabase
-    .from("firearm_usage_log")
-    .select(
-      "id, firearm_id, ammunition_type_id, used_on, rounds_fired, notes, created_at, updated_at, ammunition_types(name)",
-    )
-    .eq("firearm_id", firearmId)
-    .order("used_on", { ascending: false });
+  const data = unwrap(
+    await supabase
+      .from("firearm_usage_log")
+      .select(
+        "id, firearm_id, ammunition_type_id, used_on, rounds_fired, notes, created_at, updated_at, ammunition_types(name)",
+      )
+      .eq("firearm_id", firearmId)
+      .order("used_on", { ascending: false }),
+    "listFirearmUsageLog",
+  );
   return (data ?? []) as Array<
     FirearmUsageLog & { ammunition_types: { name: string } | null }
   >;
@@ -173,12 +189,15 @@ export async function listFirearmHistory(
     ammoName: string | null;
   }>
 > {
-  const { data } = await supabase
-    .from("match_firearm_log")
-    .select(
-      "match_entry_id, rounds_fired, ammunition_types(name), match_entries(id, matches(id, name, date, disciplines(name)))",
-    )
-    .eq("firearm_id", firearmId);
+  const data = unwrap(
+    await supabase
+      .from("match_firearm_log")
+      .select(
+        "match_entry_id, rounds_fired, ammunition_types(name), match_entries(id, matches(id, name, date, disciplines(name)))",
+      )
+      .eq("firearm_id", firearmId),
+    "listFirearmHistory",
+  );
 
   const rows = data ?? [];
 

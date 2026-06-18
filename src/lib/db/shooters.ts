@@ -1,5 +1,6 @@
 import type { TypedSupabaseClient } from "../supabase/types";
 import type { Shooter } from "./types";
+import { unwrap } from "./unwrap";
 
 /**
  * Disciplinas en las que el usuario tiene al menos una participación, con el
@@ -15,9 +16,12 @@ export async function listMyDisciplines(
   supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<Array<{ code: string; name: string; count: number }>> {
-  const { data } = await supabase.rpc("my_discipline_counts", {
-    p_user_id: userId,
-  });
+  const data = unwrap(
+    await supabase.rpc("my_discipline_counts", {
+      p_user_id: userId,
+    }),
+    "listMyDisciplines",
+  );
 
   return (data ?? []).map((r) => ({
     code: r.code,
@@ -41,14 +45,15 @@ export async function countMyMatchEntries(
 ): Promise<number> {
   const shooters = await listMyShooters(supabase, userId);
   if (shooters.length === 0) return 0;
-  const { count } = await supabase
+  const res = await supabase
     .from("match_entries")
     .select("id", { count: "exact", head: true })
     .in(
       "shooter_id",
       shooters.map((s) => s.id),
     );
-  return count ?? 0;
+  unwrap(res, "countMyMatchEntries");
+  return res.count ?? 0;
 }
 
 /**
@@ -63,10 +68,13 @@ export async function listMyShooters(
   supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<Shooter[]> {
-  const { data } = await supabase
-    .from("shooters")
-    .select("id, full_name, member_number, region, linked_user_id")
-    .eq("linked_user_id", userId);
+  const data = unwrap(
+    await supabase
+      .from("shooters")
+      .select("id, full_name, member_number, region, linked_user_id")
+      .eq("linked_user_id", userId),
+    "listMyShooters",
+  );
   return (data as Shooter[] | null) ?? [];
 }
 
