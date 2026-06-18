@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.5](https://github.com/seketman/hitfactor/compare/v1.20.4...v1.20.5) (2026-06-18)
+
+
+### Refactors
+
+* Tier 2 structural cleanups ([#116](https://github.com/seketman/hitfactor/issues/116)–[#121](https://github.com/seketman/hitfactor/issues/121)) ([#135](https://github.com/seketman/hitfactor/issues/135)) ([106c039](https://github.com/seketman/hitfactor/commit/106c0396803eeb07b013e9855c2ebebeed51139c))
+
 ## [1.20.4](https://github.com/seketman/hitfactor/compare/v1.20.3...v1.20.4) (2026-06-18)
 
 
