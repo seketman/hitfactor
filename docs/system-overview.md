@@ -1,6 +1,6 @@
 # HitFactor — System Overview
 
-Snapshot del sistema HitFactor al 2026-05-29 (post-migración 0014). Este documento documenta el **estado actual** del sistema, no aspiraciones de producto.
+Snapshot del sistema HitFactor al 2026-06-18 (post-migración 0017). Este documento documenta el **estado actual** del sistema, no aspiraciones de producto.
 
 **Lectores típicos**:
 
@@ -271,8 +271,10 @@ src/
 │   ├── db/                     # Data-access (profiles, matches, firearms,
 │   │                           #  ammo, shooters, clubs, audit, feedback,
 │   │                           #  claim-suggestions)
-│   ├── parsers/                # winmss-pdf, fat-pdf, fbi-csv, practiscore,
-│   │                           #  steel-challenge, shared, pdf-extract, index
+│   ├── parsers/                # winmss-pdf, practiscore-pdf, fat-pdf,
+│   │                           #  fbi-csv, practiscore, steel-challenge,
+│   │                           #  steel-challenge-pdf, shared, pdf-extract,
+│   │                           #  index
 │   ├── import/                 # import-match, match-claim
 │   ├── stats/                  # shooter-stats
 │   ├── audit/                  # log-action, render
@@ -394,10 +396,12 @@ Vitest en `environment: "node"`, alias `@` → `src`. Patterns: `tests/**/*.test
 | Test | Cubre |
 |---|---|
 | `winmss-pdf.test.ts` | Extracción de PDF WinMSS / ESS |
+| `practiscore-pdf.test.ts` | PDF de PractiScore (IPSC) — detección, filas overall/stage, DQ, inferencia de número de stage |
 | `fat-pdf.test.ts` | PDFs de FAT (Federación Argentina de Tiro) |
 | `fbi-csv.test.ts` | CSV propio de Tiro FBI |
 | `practiscore.test.ts` | HTML de PractiScore (IPSC) |
 | `steel-challenge.test.ts` | HTML de Steel Challenge |
+| `steel-challenge-pdf.test.ts` | PDFs de Steel Challenge (PractiScore iPhone) |
 | `parsers-shared.test.ts` | Utilidades transversales de parsers |
 | `audit-render.test.ts` | Render de entradas del audit log |
 | `shooter-stats.test.ts` | Cómputo de estadísticas del tirador |
@@ -821,6 +825,9 @@ RLS habilitada en todas las tablas del schema `public`. Salvo nota, la lectura p
 - **0012_firearm_qr_codes.sql** — Agrega `firearms.qr_code` (unique), función `gen_firearm_qr_code()`, backfill con retry on collision, trigger BEFORE INSERT `firearms_assign_qr_code_trg`, y RPC público `resolve_firearm_qr_code(text)` con SECURITY DEFINER.
 - **0013_firearm_qr_code_default.sql** — Drop del trigger `firearms_assign_qr_code_trg` y reemplazo por `DEFAULT public.gen_firearm_qr_code()` a nivel columna (para que `supabase gen_types` lo vea como opcional en `Insert`).
 - **0014_match_min_shots.sql** — Agrega `matches.min_shots int CHECK (min_shots IS NULL OR > 0)`, backfill a 45 para todos los matches `tiro_fbi`, y la policy `matches_update_admin` (admins pueden UPDATE de cualquier match).
+- **0015_steel_pdf_source.sql** — Amplía el CHECK `matches.source_type` para incluir `'practiscore_steel_pdf'` (reportes PDF de Steel Challenge generados por PractiScore iPhone).
+- **0016_fbi_classic_division.sql** — Agrega la división `CLASSIC` a Tiro FBI (TFALP corre torneos FBI con esa división además de Pistola/Revólver/Minirifle/PCC).
+- **0017_ipsc_classic_manual_division.sql** — Agrega la división `CM` (Classic Manual) a IPSC, usada por los torneos de escopeta exportados desde PractiScore (distinta de `CL` Classic).
 
 ---
 
@@ -1101,16 +1108,18 @@ Tabla `clubs` con columnas `code` y `name`. Helpers en `src/lib/clubs.ts`.
 
 ### 8.1 Formatos soportados
 
-HitFactor acepta seis variantes de archivo, cada una con su propio parser dedicado bajo `src/lib/parsers/`. El punto de entrada es `parseFile(content)` para texto (HTML / CSV) o `parsePdf(data, filename)` para PDF (binario, async porque `unpdf` se carga dinámicamente). Cada parser devuelve la misma estructura `ParsedMatch { discipline, source, name, date, region, matchEntries, stages, generatedBy }` para que el importer downstream sea agnóstico del origen.
+HitFactor acepta ocho variantes de archivo, cada una con su propio parser dedicado bajo `src/lib/parsers/`. El punto de entrada es `parseFile(content)` para texto (HTML / CSV) o `parsePdf(data, filename)` para PDF (binario, async porque `unpdf` se carga dinámicamente). Cada parser devuelve la misma estructura `ParsedMatch { discipline, source, name, date, region, matchEntries, stages, generatedBy }` para que el importer downstream sea agnóstico del origen.
 
 | Formato | Origen | Disciplinas | Qué importa | Notas |
 |---|---|---|---|---|
 | PractiScore HTML (combined / by-division) | ipsc.org.ar exports | IPSC | Tiradores + match overall (un archivo único con `Match Results - Combined` o varias secciones `Match Results - X`) | `source = practiscore_combined_html` o `practiscore_match_html`. División se prefiere por título de sección, no por columna `Div` de la fila (el organizador la configura libremente en PractiScore). |
 | PractiScore Stage HTML | ipsc.org.ar exports | IPSC | Un único stage del torneo, particionado por división | `source = practiscore_stage_html`. Necesita que el match overall ya esté importado; se mergea al match existente vía `resolveMatchForStage`. |
 | WinMSS PDF (overall + stages) | ipsc.org.ar históricos | IPSC | Overall por división, stages por (división × stage), y la página de "Disqualified Shooters" | `source = winmss_pdf`. Soporta WinMSS clásico (español, decimales con coma) y la variante ESS / Electronic Scoring System (inglés, decimales con punto, headers `X - Results Overall` / `X - Results by Stage`). Overall y stages se suben como archivos separados; el segundo mergea contra el primero. |
+| PractiScore PDF (overall + stages) | App PractiScore (Android/iOS) | IPSC | Overall por división; stages (1 página por stage, con secciones por división) | `source = practiscore_pdf`. Footer `Generated by PractiScore`; headers `Match Results - X` / `Stage Results - X`; decimales en-US, `%` en Match%/Stage%; fecha ISO en el título; DQ con prefijo `(DQ)`. Overall y stages se suben por separado; el segundo mergea. Si el título de un stage no trae número (caso real "Campo 4B"), se infiere por orden de página, o stage anterior + 1; si ambos candidatos ya existen, aborta. |
 | Tiro FBI CSV | Google Sheets → Descargar como CSV | Tiro FBI | Match overall + 9 stages (1 Práctica que no suma + 8 que sí) | `source = fbi_csv`. Una fila por (tirador, disciplina); divisiones derivadas de la columna `Disciplina` (Pistola/Revólver/Minirifle/PCC). Ranking primario por impactos DESC, tiebreak por puntos DESC. `min_shots` se fuerza a 45 en DB. |
 | FAT PDF | Federación Argentina de Tiro - "Ranking Oficial" | FBI / IPSC / Steel / Combat (best-effort) | Sólo match overall: posición, nombre, impactos / puntos. **No** trae stages, club ni fecha | `source = fat_pdf`. La disciplina se infiere del **nombre del archivo** (ej. `resultados-apertura-fbi.pdf`); si no matchea exactamente una keyword conocida, se rechaza el import. La fecha falta — el flujo de import abre un segundo paso `needsDate`. |
 | Steel Challenge HTML | PractiScore | Steel Challenge | Match overall + stages embebidos como columnas en la misma tabla por división (1 archivo único) | `source = practiscore_steel_html`. Scoring time-based (menor tiempo = 100%), sin power factor ni hit factor. Columnas de stage se reconocen con el patrón `^\s*(\d+)\s*:\s*(.+?)\s*$` (ej. `1: Cancha 3`). |
+| Steel Challenge PDF (por stage) | PractiScore iPhone | Steel Challenge | Un stage por archivo (`Stage Results - By Division`); se suben los N PDFs juntos en un mismo import para computar el overall | `source = practiscore_steel_pdf`. Variante PDF del reporte de Steel Challenge; único formato que acepta múltiples PDFs en una sola subida (`parsePdfBatch`). |
 
 ### 8.2 Pipeline general
 
@@ -1330,7 +1339,7 @@ Otras acciones del dominio match conviven en `AUDIT_ACTION` pero **no** se emite
 
 | Tema | Ubicación |
 |---|---|
-| Schema de DB | `supabase/migrations/0001..0014_*.sql` |
+| Schema de DB | `supabase/migrations/0001..0017_*.sql` |
 | Disciplinas (constantes y helpers) | `src/lib/disciplines.ts` |
 | Stats del tirador | `src/lib/stats/shooter-stats.ts` |
 | Audit: vocabulario | `src/lib/audit/log-action.ts` |

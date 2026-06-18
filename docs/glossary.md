@@ -14,7 +14,7 @@ Términos del dominio de tiro deportivo y de la app, usados en specs, plans, có
 
 **Stage result** — El resultado de un tirador en un stage específico. En DB: `stage_results`. Un match_entry tiene N stage_results (uno por stage del match).
 
-**División** — Subcategoría de competidores dentro de un match. Las divisiones existen por disciplina: IPSC tiene Open, Production, PCC, etc.; Tiro FBI tiene PIS, REV, MINI, PCC; etc. En DB: `divisions`.
+**División** — Subcategoría de competidores dentro de un match. Las divisiones existen por disciplina: IPSC tiene Open, Production, PCC, Classic Manual (CM, escopeta), etc.; Tiro FBI tiene PIS, REV, MINI, PCC, Classic; etc. En DB: `divisions`.
 
 **Disciplina** — Rama del tiro deportivo. Las cuatro soportadas son **IPSC** (Tiro Práctico), **Steel Challenge**, **Combat Solutions** y **Tiro FBI**. Cada una tiene su scoring distinto.
 
@@ -110,6 +110,8 @@ Constantes en `src/lib/disciplines.ts`, deben coincidir 1:1 con `disciplines.cod
 | `practiscore_stage_html` | Stage individual de PractiScore | IPSC |
 | `practiscore_steel_html` | Steel Challenge HTML | Steel |
 | `winmss_pdf` | PDF de WinMSS / ESS | IPSC |
+| `practiscore_pdf` | PDF exportado por la app PractiScore | IPSC |
+| `practiscore_steel_pdf` | PDF de Steel Challenge (PractiScore iPhone) | Steel |
 | `fbi_csv` | CSV de Google Sheets (Tiro FBI) | FBI |
 | `fat_pdf` | PDF "Ranking Oficial" de la Federación Argentina de Tiro | FBI/IPSC/Steel/Combat (best-effort) |
 | `manual` | Reservado para cargas manuales — no usado actualmente | — |
