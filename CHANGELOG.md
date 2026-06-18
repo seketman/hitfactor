@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.0](https://github.com/seketman/hitfactor/compare/v1.19.0...v1.20.0) (2026-06-18)
+
+
+### Features
+
+* **import:** support PractiScore PDF exports (IPSC) ([#110](https://github.com/seketman/hitfactor/issues/110)) ([86c1226](https://github.com/seketman/hitfactor/commit/86c12264b415d6be567b7f7b9153b65ff92fcbb5))
+
 ## [1.19.0](https://github.com/seketman/hitfactor/compare/v1.18.1...v1.19.0) (2026-06-16)
 
 
