@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.4](https://github.com/seketman/hitfactor/compare/v1.20.3...v1.20.4) (2026-06-18)
+
+
+### Refactors
+
+* **parsers:** single source of truth for division name-&gt;code ([#114](https://github.com/seketman/hitfactor/issues/114)) ([#133](https://github.com/seketman/hitfactor/issues/133)) ([3fbe01e](https://github.com/seketman/hitfactor/commit/3fbe01e412be022dc8bf38e71802b27c0e9cc6d7))
+
 ## [1.20.3](https://github.com/seketman/hitfactor/compare/v1.20.2...v1.20.3) (2026-06-18)
 
 
