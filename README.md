@@ -4,10 +4,10 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](./LICENSE)
 
 App para tiradores deportivos: importás los resultados de tus torneos
-(PractiScore HTML para Tiro Práctico / Steel Challenge, CSV de Google Sheets
-para Tiro FBI, PDF de WinMSS para IPSC), seguís tu evolución match a match
-con KPIs y gráficos, y opcionalmente llevás el registro de las armas usadas
-y los tiros disparados.
+(PractiScore HTML y PDF para Tiro Práctico / Steel Challenge, CSV de Google
+Sheets para Tiro FBI, PDF de WinMSS y de la FAT para IPSC), seguís tu evolución
+match a match con KPIs y gráficos, y opcionalmente llevás el registro de las
+armas usadas y los tiros disparados.
 
 ## Quickstart
 
@@ -79,7 +79,7 @@ src/
 │   ├── db/             # capa de acceso a datos (matches, shooters, firearms, ...)
 │   ├── firearms/       # estimador de tiros por disciplina
 │   ├── import/         # lógica de importación + auto-claim
-│   ├── parsers/        # parsers de archivos externos (PractiScore, Steel, FBI CSV)
+│   ├── parsers/        # parsers de archivos externos (PractiScore HTML/PDF, WinMSS, FAT, Steel, FBI CSV)
 │   ├── stats/          # cómputo de KPIs (pure function, testeada)
 │   ├── supabase/       # clientes server / browser / middleware
 │   ├── types/          # tipos de dominio del parser
@@ -88,7 +88,7 @@ src/
 │   └── utils.ts        # cn, formatters
 └── proxy.ts            # refresh de sesión por request
 
-supabase/migrations/    # SQL del schema (numeradas 0001…0002)
+supabase/migrations/    # SQL del schema (numeradas 0001…0017)
 docs/                   # documentación funcional
 tests/                  # vitest + fixtures reales de PractiScore y FBI
 ```
