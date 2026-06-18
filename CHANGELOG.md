@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.1](https://github.com/seketman/hitfactor/compare/v1.20.0...v1.20.1) (2026-06-18)
+
+
+### Documentation
+
+* refresh import formats, divisions and migration list ([#112](https://github.com/seketman/hitfactor/issues/112)) ([df236b8](https://github.com/seketman/hitfactor/commit/df236b87d774d9a9a22774d5422eb1cd306c472c))
+
 ## [1.20.0](https://github.com/seketman/hitfactor/compare/v1.19.0...v1.20.0) (2026-06-18)
 
 
