@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.3](https://github.com/seketman/hitfactor/compare/v1.20.2...v1.20.3) (2026-06-18)
+
+
+### Bug Fixes
+
+* **db:** surface read errors, centralize match permissions, atomic ui_prefs ([#131](https://github.com/seketman/hitfactor/issues/131)) ([a9ee9ae](https://github.com/seketman/hitfactor/commit/a9ee9aea39249ab27df1437f11c686bb6cac8d79))
+
 ## [1.20.2](https://github.com/seketman/hitfactor/compare/v1.20.1...v1.20.2) (2026-06-18)
 
 
