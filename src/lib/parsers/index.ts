@@ -12,6 +12,10 @@ import {
 import { isFbiCsvFormat, parseFbiCsv } from "./fbi-csv";
 import { extractPdfPages } from "./pdf-extract";
 import { isWinmssFormat, parseWinmssText } from "./winmss-pdf";
+import {
+  isPractiscorePdfFormat,
+  parsePractiscorePdfText,
+} from "./practiscore-pdf";
 import { isFatPdfFormat, parseFatText } from "./fat-pdf";
 
 /**
@@ -91,9 +95,12 @@ export async function parsePdfBatch(
     );
   }
 
-  // Fallback single-file: WinMSS o FAT.
+  // Fallback single-file: PractiScore PDF, WinMSS o FAT.
   const single = filePages[0]!;
   const singleText = single.pages.map((p) => p.text).join("\n");
+  if (isPractiscorePdfFormat(singleText)) {
+    return parsePractiscorePdfText(single.pages);
+  }
   if (isWinmssFormat(singleText)) {
     return parseWinmssText(single.pages);
   }
@@ -101,9 +108,9 @@ export async function parsePdfBatch(
     return parseFatText(singleText, single.filename);
   }
   throw new Error(
-    "No reconocemos el formato de este PDF. Soportamos los PDFs WinMSS de " +
-      "ipsc.org.ar, los rankings oficiales en PDF de la FAT, y los reportes " +
-      "de Steel Challenge generados por PractiScore iPhone.",
+    "No reconocemos el formato de este PDF. Soportamos los PDFs de PractiScore, " +
+      "los WinMSS de ipsc.org.ar, los rankings oficiales en PDF de la FAT, y los " +
+      "reportes de Steel Challenge generados por PractiScore iPhone.",
   );
 }
 
@@ -116,4 +123,9 @@ export {
 } from "./steel-challenge-pdf";
 export { parseFbiCsv, isFbiCsvFormat } from "./fbi-csv";
 export { parseWinmssText, isWinmssFormat } from "./winmss-pdf";
+export {
+  parsePractiscorePdfText,
+  isPractiscorePdfFormat,
+  type PractiscorePdfPage,
+} from "./practiscore-pdf";
 export { parseFatText, isFatPdfFormat } from "./fat-pdf";
