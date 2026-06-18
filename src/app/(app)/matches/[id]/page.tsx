@@ -167,19 +167,36 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
               <span className="text-sm font-normal text-fg-subtle">({divCode})</span>
             </h2>
             <Card className="overflow-hidden">
-              <Table>
+              {/* Alineación uniforme entre divisiones SOLO en md+ (≥768px):
+                  `md:table-fixed` + anchos `md:w-*` idénticos en cada columna
+                  hacen que todas las tablas alineen sus columnas en lugar de
+                  ajustarse al largo de los nombres de cada división.
+
+                  Debajo de md el layout vuelve a `auto` (sin min-w, sin
+                  anchos fijos): el comportamiento original de móvil, donde las
+                  columnas se ajustan al viewport y NO se fuerza scroll
+                  horizontal. La alineación entre divisiones no se percibe en
+                  móvil porque las tablas se apilan y se scrollean por separado.
+
+                  `md:min-w-[44rem]` es el piso para que en tablet los anchos
+                  fijos no se compriman por debajo de lo legible. */}
+              <Table className="md:min-w-[44rem] md:table-fixed">
                 <THead>
                   <TR>
-                    <TH className="w-12">#</TH>
+                    {/* # crece solo en auto-layout (móvil) para contener el
+                        badge "Ausente"/"DQ"; en md+ (table-fixed) necesita el
+                        ancho explícito md:w-24 porque la columna no se ensancha
+                        sola — con w-12 el badge se desbordaba sobre el nombre. */}
+                    <TH className="w-12 md:w-24">#</TH>
                     <TH>Tirador</TH>
-                    <TH>Categoría</TH>
+                    <TH className="md:w-40">Categoría</TH>
                     {isHitsBased && (
-                      <TH className="text-right">Impactos</TH>
+                      <TH className="text-right md:w-24">Impactos</TH>
                     )}
-                    <TH className="text-right">
+                    <TH className="text-right md:w-28">
                       {isTimeBased ? "Tiempo" : "Puntos"}
                     </TH>
-                    <TH className="text-right">%</TH>
+                    <TH className="text-right md:w-20">%</TH>
                     <TH className="w-28"></TH>
                   </TR>
                 </THead>
