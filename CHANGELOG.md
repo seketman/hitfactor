@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.2](https://github.com/seketman/hitfactor/compare/v1.20.1...v1.20.2) (2026-06-18)
+
+
+### Bug Fixes
+
+* **import:** PractiScore PDF rows with multi-word region marked absent ([#129](https://github.com/seketman/hitfactor/issues/129)) ([aadb26f](https://github.com/seketman/hitfactor/commit/aadb26fd645b1d771054271e80de0d6d53ec21ea))
+
 ## [1.20.1](https://github.com/seketman/hitfactor/compare/v1.20.0...v1.20.1) (2026-06-18)
 
 
