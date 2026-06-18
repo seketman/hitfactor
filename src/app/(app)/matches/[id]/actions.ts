@@ -6,7 +6,9 @@ import { redirectWithError, safeBackPath } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import { getProfile } from "@/lib/db/profiles";
+import * as matchesDb from "@/lib/db/matches";
 import { canEditEntry, canEditMatch } from "@/lib/permissions";
+import { isLikelyAbsent } from "@/lib/matches/entry-status";
 
 export async function deleteMatch(formData: FormData) {
   const matchId = String(formData.get("match_id") ?? "");
@@ -23,15 +25,11 @@ export async function deleteMatch(formData: FormData) {
   const { supabase, user } = await requireUser();
 
   // Snapshot antes de borrar — sino perdemos el contexto para auditar.
-  const { data: matchSnapshot } = await supabase
-    .from("matches")
-    .select("name, date, region, disciplines(code, name)")
-    .eq("id", matchId)
-    .maybeSingle();
+  const matchSnapshot = await matchesDb.getMatchDeleteSnapshot(supabase, matchId);
 
-  const { error } = await supabase.from("matches").delete().eq("id", matchId);
+  const { error } = await matchesDb.deleteMatch(supabase, matchId);
   if (error) {
-    redirectWithError(`/matches/${matchId}`, "No se pudo borrar: " + error.message);
+    redirectWithError(`/matches/${matchId}`, "No se pudo borrar: " + error);
   }
 
   if (matchSnapshot) {
@@ -86,20 +84,17 @@ export async function updateMatchClub(formData: FormData) {
   const { supabase, user } = await requireUser();
 
   // Snapshot antes para registrar before/after.
-  const { data: matchBefore } = await supabase
-    .from("matches")
-    .select("name, region")
-    .eq("id", matchId)
-    .maybeSingle();
+  const matchBefore = await matchesDb.getMatchClubSnapshot(supabase, matchId);
 
-  const { error } = await supabase
-    .from("matches")
-    .update({ region })
-    .eq("id", matchId)
-    .eq("imported_by_user_id", user.id);
+  const { error } = await matchesDb.updateMatchClub(
+    supabase,
+    matchId,
+    user.id,
+    region,
+  );
 
   if (error) {
-    redirectWithError(`/matches/${matchId}`, "No se pudo actualizar el club: " + error.message);
+    redirectWithError(`/matches/${matchId}`, "No se pudo actualizar el club: " + error);
   }
 
   if (matchBefore) {
@@ -155,11 +150,7 @@ export async function updateMatchMinShots(formData: FormData) {
 
   const { supabase, user } = await requireUser();
 
-  const { data: matchBefore } = await supabase
-    .from("matches")
-    .select("name, min_shots, imported_by_user_id")
-    .eq("id", matchId)
-    .maybeSingle();
+  const matchBefore = await matchesDb.getMatchMinShotsSnapshot(supabase, matchId);
 
   if (!matchBefore) {
     redirectWithError(`/matches/${matchId}`, "Match no encontrado");
@@ -179,15 +170,16 @@ export async function updateMatchMinShots(formData: FormData) {
     );
   }
 
-  const { error } = await supabase
-    .from("matches")
-    .update({ min_shots: nextValue })
-    .eq("id", matchId);
+  const { error } = await matchesDb.updateMatchMinShots(
+    supabase,
+    matchId,
+    nextValue,
+  );
 
   if (error) {
     redirectWithError(
       `/matches/${matchId}`,
-      "No se pudo actualizar: " + error.message,
+      "No se pudo actualizar: " + error,
     );
   }
 
@@ -234,13 +226,7 @@ export async function toggleEntryAbsent(formData: FormData) {
   // Snapshot del entry + match + shooter ANTES del cambio. Lo usamos para:
   //   - validar permisos sin segunda query
   //   - alimentar el audit log con before/after
-  const { data: entry } = await supabase
-    .from("match_entries")
-    .select(
-      "id, match_id, shooter_id, is_absent, match_points, match_percentage, shooters(linked_user_id, full_name), matches(name, imported_by_user_id)",
-    )
-    .eq("id", entryId)
-    .maybeSingle();
+  const entry = await matchesDb.getEntryAbsentSnapshot(supabase, entryId);
 
   if (!entry || entry.match_id !== matchId) {
     redirectWithError(`/matches/${matchId}`, "Entry no encontrada");
@@ -269,25 +255,23 @@ export async function toggleEntryAbsent(formData: FormData) {
   // server-side por si alguien arma el POST a mano. La acción inversa
   // (quitar ausente) siempre se permite — útil para corregir un marcado
   // erróneo aunque el entry "ya tenga datos" por cualquier razón.
-  if (
-    nextValue === true &&
-    (entry.match_points > 0 || entry.match_percentage > 0)
-  ) {
+  if (nextValue === true && !isLikelyAbsent(entry)) {
     redirectWithError(
       `/matches/${matchId}`,
       "No se puede marcar ausente: el entry tiene puntaje o porcentaje > 0",
     );
   }
 
-  const { error } = await supabase
-    .from("match_entries")
-    .update({ is_absent: nextValue })
-    .eq("id", entryId);
+  const { error } = await matchesDb.updateEntryAbsent(
+    supabase,
+    entryId,
+    nextValue,
+  );
 
   if (error) {
     redirectWithError(
       `/matches/${matchId}`,
-      "No se pudo actualizar: " + error.message,
+      "No se pudo actualizar: " + error,
     );
   }
 

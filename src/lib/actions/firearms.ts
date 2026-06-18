@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { redirectWithError } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
+import { resolveFirearmAndAmmoNames } from "@/lib/audit/resolve-names";
+import * as firearmsDb from "@/lib/db/firearms";
+import { getMatchName } from "@/lib/db/matches";
 
 /**
  * Acciones para administrar el catálogo de armas del usuario y el log
@@ -45,20 +48,19 @@ export async function createFirearm(formData: FormData) {
     caliber: trimOrNull(formData.get("caliber")),
     notes: trimOrNull(formData.get("notes")),
   };
-  const { data: created, error } = await supabase
-    .from("firearms")
-    .insert(payload)
-    .select("id")
-    .single();
+  const { id: createdId, error } = await firearmsDb.createFirearm(
+    supabase,
+    payload,
+  );
 
   if (error) {
-    redirectWithError("/firearms", error.message);
+    redirectWithError("/firearms", error);
   }
 
   await logAction(supabase, user.id, {
     action: AUDIT_ACTION.FIREARM_CREATE,
     entityType: "firearm",
-    entityId: created?.id,
+    entityId: createdId ?? undefined,
     metadata: {
       name: payload.name,
       brand: payload.brand,
@@ -81,11 +83,7 @@ export async function updateFirearm(formData: FormData) {
   const { supabase, user } = await requireUser();
 
   // Snapshot antes del update para registrar before/after.
-  const { data: before } = await supabase
-    .from("firearms")
-    .select("name, brand, model, caliber, notes")
-    .eq("id", id)
-    .maybeSingle();
+  const before = await firearmsDb.getFirearmAuditSnapshot(supabase, id);
 
   const after = {
     name,
@@ -95,10 +93,10 @@ export async function updateFirearm(formData: FormData) {
     notes: trimOrNull(formData.get("notes")),
   };
 
-  const { error } = await supabase.from("firearms").update(after).eq("id", id);
+  const { error } = await firearmsDb.updateFirearm(supabase, id, after);
 
   if (error) {
-    redirectWithError("/firearms", error.message);
+    redirectWithError("/firearms", error);
   }
 
   await logAction(supabase, user.id, {
@@ -123,15 +121,11 @@ export async function deleteFirearm(formData: FormData) {
   const { supabase, user } = await requireUser();
 
   // Snapshot antes de borrar.
-  const { data: snapshot } = await supabase
-    .from("firearms")
-    .select("name, brand, model, caliber")
-    .eq("id", id)
-    .maybeSingle();
+  const snapshot = await firearmsDb.getFirearmDeleteSnapshot(supabase, id);
 
-  const { error } = await supabase.from("firearms").delete().eq("id", id);
+  const { error } = await firearmsDb.deleteFirearm(supabase, id);
   if (error) {
-    redirectWithError("/firearms", error.message);
+    redirectWithError("/firearms", error);
   }
 
   if (snapshot) {
@@ -191,43 +185,33 @@ export async function createFirearmUsage(formData: FormData) {
     notes,
   };
 
-  const { data: created, error } = await supabase
-    .from("firearm_usage_log")
-    .insert(payload)
-    .select("id")
-    .single();
+  const { id: createdId, error } = await firearmsDb.createFirearmUsage(
+    supabase,
+    payload,
+  );
 
   if (error) {
-    redirectWithError(errorTarget, error.message);
+    redirectWithError(errorTarget, error);
   }
 
   // Resolvemos nombres de arma + munición para alimentar el audit log
   // con algo legible — sino la pantalla `/activity` queda con solo IDs.
-  const [{ data: firearmRow }, { data: ammoRow }] = await Promise.all([
-    supabase
-      .from("firearms")
-      .select("name")
-      .eq("id", firearmId)
-      .maybeSingle(),
-    payload.ammunition_type_id
-      ? supabase
-          .from("ammunition_types")
-          .select("name")
-          .eq("id", payload.ammunition_type_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const { firearmName, ammoName } = await resolveFirearmAndAmmoNames(
+    supabase,
+    firearmId,
+    payload.ammunition_type_id,
+  );
 
   await logAction(supabase, user.id, {
     action: AUDIT_ACTION.FIREARM_USAGE_CREATE,
     entityType: "firearm_usage",
-    entityId: created?.id,
+    entityId: createdId ?? undefined,
     metadata: {
       firearm_id: firearmId,
-      firearm_name: firearmRow?.name ?? null,
+      firearm_name: firearmName,
       used_on: usedOn,
       rounds_fired: rounds,
-      ammunition_name: ammoRow?.name ?? null,
+      ammunition_name: ammoName,
     },
   });
 
@@ -242,21 +226,12 @@ export async function deleteFirearmUsage(formData: FormData) {
 
   const { supabase, user } = await requireUser();
 
-  const { data: snapshot } = await supabase
-    .from("firearm_usage_log")
-    .select(
-      "used_on, rounds_fired, firearms(name), ammunition_types(name)",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const snapshot = await firearmsDb.getFirearmUsageDeleteSnapshot(supabase, id);
 
-  const { error } = await supabase
-    .from("firearm_usage_log")
-    .delete()
-    .eq("id", id);
+  const { error } = await firearmsDb.deleteFirearmUsage(supabase, id);
 
   if (error) {
-    redirectWithError(`/firearms/${firearmId}`, error.message);
+    redirectWithError(`/firearms/${firearmId}`, error);
   }
 
   if (snapshot) {
@@ -300,33 +275,20 @@ export async function setMatchFirearm(formData: FormData) {
 
   // Snapshot del log actual + nombres de match/firearm para el audit log.
   // Hacemos las queries en paralelo, son chicas.
-  const [logRes, matchNameRes] = await Promise.all([
-    supabase
-      .from("match_firearm_log")
-      .select(
-        "firearm_id, rounds_fired, ammunition_type_id, firearms(name), ammunition_types(name)",
-      )
-      .eq("match_entry_id", matchEntryId)
-      .maybeSingle(),
-    matchId
-      ? supabase
-          .from("matches")
-          .select("name")
-          .eq("id", matchId)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+  const [logBefore, matchRow] = await Promise.all([
+    firearmsDb.getMatchFirearmAuditSnapshot(supabase, matchEntryId),
+    matchId ? getMatchName(supabase, matchId) : Promise.resolve(null),
   ]);
-  const logBefore = logRes.data;
-  const matchName = matchNameRes.data?.name;
+  const matchName = matchRow?.name;
 
   if (!firearmId) {
     // Limpiar el log para este match_entry
-    const { error } = await supabase
-      .from("match_firearm_log")
-      .delete()
-      .eq("match_entry_id", matchEntryId);
+    const { error } = await firearmsDb.deleteMatchFirearmLog(
+      supabase,
+      matchEntryId,
+    );
     if (error) {
-      redirectWithError(errorTarget, error.message);
+      redirectWithError(errorTarget, error);
     }
 
     // Solo loguear si efectivamente había un log antes.
@@ -352,32 +314,24 @@ export async function setMatchFirearm(formData: FormData) {
       redirectWithError(errorTarget, "Tiros disparados inválido");
     }
 
-    const { error } = await supabase.from("match_firearm_log").upsert(
-      {
-        match_entry_id: matchEntryId,
-        firearm_id: firearmId,
-        rounds_fired: rounds,
-        ammunition_type_id: ammunitionTypeId,
-        notes: trimOrNull(formData.get("notes")),
-      },
-      { onConflict: "match_entry_id" },
-    );
+    const { error } = await firearmsDb.upsertMatchFirearmLog(supabase, {
+      match_entry_id: matchEntryId,
+      firearm_id: firearmId,
+      rounds_fired: rounds,
+      ammunition_type_id: ammunitionTypeId,
+      notes: trimOrNull(formData.get("notes")),
+    });
     if (error) {
-      redirectWithError(errorTarget, error.message);
+      redirectWithError(errorTarget, error);
     }
 
     // Resolver nombres para el audit metadata. Si no hay ammo, evitamos
     // la query — la mayoría de los logs no van a tener munición asignada.
-    const [{ data: firearmRow }, { data: ammoRow }] = await Promise.all([
-      supabase.from("firearms").select("name").eq("id", firearmId).maybeSingle(),
-      ammunitionTypeId
-        ? supabase
-            .from("ammunition_types")
-            .select("name")
-            .eq("id", ammunitionTypeId)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-    ]);
+    const { firearmName, ammoName } = await resolveFirearmAndAmmoNames(
+      supabase,
+      firearmId,
+      ammunitionTypeId,
+    );
 
     await logAction(supabase, user.id, {
       action: AUDIT_ACTION.MATCH_FIREARM_SET,
@@ -397,10 +351,10 @@ export async function setMatchFirearm(formData: FormData) {
           : null,
         after: {
           firearm_id: firearmId,
-          firearm_name: firearmRow?.name,
+          firearm_name: firearmName ?? undefined,
           rounds_fired: rounds,
           ammunition_type_id: ammunitionTypeId,
-          ammunition_name: ammoRow?.name ?? null,
+          ammunition_name: ammoName,
         },
       },
     });

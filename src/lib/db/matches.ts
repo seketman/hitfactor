@@ -37,6 +37,150 @@ export async function listMatchesPage(
   };
 }
 
+/**
+ * Nombre de un match. Read de snapshot para audit metadata: ignora errores
+ * y devuelve `null` (no usa `unwrap`) para preservar la semántica original.
+ */
+export async function getMatchName(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{ name: string } | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select("name")
+    .eq("id", matchId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Snapshot de un match (con disciplina) para auditar su borrado. */
+export async function getMatchDeleteSnapshot(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{
+  name: string;
+  date: string;
+  region: string | null;
+  disciplines: { code: string; name: string } | null;
+} | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select("name, date, region, disciplines(code, name)")
+    .eq("id", matchId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Borra un match por id. */
+export async function deleteMatch(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("matches").delete().eq("id", matchId);
+  return { error: error?.message ?? null };
+}
+
+/** Snapshot (name + region) de un match para auditar el cambio de club. */
+export async function getMatchClubSnapshot(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{ name: string; region: string | null } | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select("name, region")
+    .eq("id", matchId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/**
+ * Actualiza `region` de un match. Solo afecta filas del importador
+ * (`imported_by_user_id`); RLS además lo enforce.
+ */
+export async function updateMatchClub(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+  userId: string,
+  region: string | null,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("matches")
+    .update({ region })
+    .eq("id", matchId)
+    .eq("imported_by_user_id", userId);
+  return { error: error?.message ?? null };
+}
+
+/** Snapshot (name + min_shots + importador) para validar/auditar min_shots. */
+export async function getMatchMinShotsSnapshot(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{
+  name: string;
+  min_shots: number | null;
+  imported_by_user_id: string | null;
+} | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select("name, min_shots, imported_by_user_id")
+    .eq("id", matchId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Actualiza `min_shots` de un match. */
+export async function updateMatchMinShots(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+  minShots: number | null,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("matches")
+    .update({ min_shots: minShots })
+    .eq("id", matchId);
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Snapshot de un match_entry (con shooter + match embebidos) para validar
+ * permisos y auditar el toggle de `is_absent`. Errores ignorados a propósito.
+ */
+export async function getEntryAbsentSnapshot(
+  supabase: TypedSupabaseClient,
+  entryId: string,
+): Promise<{
+  id: string;
+  match_id: string;
+  shooter_id: string;
+  is_absent: boolean;
+  match_points: number;
+  match_percentage: number;
+  shooters: { linked_user_id: string | null; full_name: string } | null;
+  matches: { name: string; imported_by_user_id: string | null } | null;
+} | null> {
+  const { data } = await supabase
+    .from("match_entries")
+    .select(
+      "id, match_id, shooter_id, is_absent, match_points, match_percentage, shooters(linked_user_id, full_name), matches(name, imported_by_user_id)",
+    )
+    .eq("id", entryId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Actualiza el flag `is_absent` de un match_entry. */
+export async function updateEntryAbsent(
+  supabase: TypedSupabaseClient,
+  entryId: string,
+  isAbsent: boolean,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("match_entries")
+    .update({ is_absent: isAbsent })
+    .eq("id", entryId);
+  return { error: error?.message ?? null };
+}
+
 /** Match con su disciplina embebida. */
 export async function getMatchById(
   supabase: TypedSupabaseClient,

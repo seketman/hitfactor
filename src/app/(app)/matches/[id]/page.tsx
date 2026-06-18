@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Alert } from "@/components/ui/Alert";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/Table";
+import { Table, THead, TBody, TR, TH } from "@/components/ui/Table";
 import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
@@ -16,22 +15,16 @@ import {
   listStagesByMatch,
 } from "@/lib/db/matches";
 import { buildClubLookup, getClubName, parseRegion } from "@/lib/clubs";
-import {
-  cn,
-  formatDate,
-  formatDateTime,
-  formatNumber,
-  formatPercent,
-} from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
-import { claimShooter } from "@/lib/actions/claim";
 import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
 import { isInternalAppPath } from "@/lib/redirects";
-import { canEditEntry, canEditMatch } from "@/lib/permissions";
+import { canEditMatch } from "@/lib/permissions";
+import { canToggleEntryAbsent } from "@/lib/matches/entry-status";
 import { BackLink } from "@/components/BackLink";
-import { toggleEntryAbsent } from "./actions";
+import { MatchRankingRow } from "@/components/matches/MatchRankingRow";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -221,146 +214,29 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                       !!shooter &&
                       shooter.linked_user_id === null &&
                       isClaimCandidate(shooter, claimAliases);
-                    // Toggle de ausencia: la RLS (0008) habilita tres autores
-                    // y acá replicamos esa lógica para mostrar el botón solo
-                    // cuando el flip va a funcionar.
-                    //
-                    // Además gateamos por score: solo tiene sentido marcar
-                    // ausente a alguien con todo en cero. Si tiene puntos o %
-                    // > 0, claramente disparó al menos un tiro y NO puede ser
-                    // un ausente (forzando esa marca distorsionaría la verdad
-                    // del registro). El botón "Sí asistió" sí aparece sobre
-                    // entries ya marcadas como ausentes, para poder revertir.
-                    const isLikelyAbsent =
-                      e.match_points === 0 && e.match_percentage === 0;
-                    const canToggleAbsent =
-                      !e.is_dq &&
-                      (e.is_absent || isLikelyAbsent) &&
-                      canEditEntry({
+                    // Toggle de ausencia: la regla (no-DQ, en cero o ya
+                    // ausente, y editable) vive en `canToggleEntryAbsent`, que
+                    // espeja la validación del server action y la RLS 0008.
+                    const canToggleAbsent = canToggleEntryAbsent({
+                      entry: e,
+                      edit: {
                         userId,
                         isAdmin,
                         importedByUserId: match.imported_by_user_id,
                         isSelf: isMine,
-                      });
+                      },
+                    });
                     return (
-                      <TR
+                      <MatchRankingRow
                         key={e.id}
-                        className={
-                          isMine
-                            ? "bg-accent-soft hover:bg-accent-soft"
-                            : undefined
-                        }
-                      >
-                        <TD className="text-fg-muted">
-                          {e.is_dq ? (
-                            <Badge tone="danger">DQ</Badge>
-                          ) : e.is_absent ? (
-                            <Badge tone="default">Ausente</Badge>
-                          ) : (
-                            e.place
-                          )}
-                        </TD>
-                        <TD>
-                          <div className="flex items-center gap-2 font-medium">
-                            {shooter?.full_name}
-                            {isMine && <Badge tone="accent">vos</Badge>}
-                          </div>
-                          {shooter?.member_number && (
-                            <div className="font-mono text-xs text-fg-subtle">
-                              #{shooter.member_number}
-                            </div>
-                          )}
-                        </TD>
-                        <TD className="text-fg-muted">
-                          {e.category ?? "—"}
-                          {e.power_factor && (
-                            <span className="ml-1 text-xs text-fg-subtle">
-                              ({e.power_factor})
-                            </span>
-                          )}
-                        </TD>
-                        {isHitsBased && (
-                          <TD className="text-right font-mono font-semibold text-fg">
-                            {e.is_dq || e.is_absent ? "—" : (e.hits ?? "—")}
-                          </TD>
-                        )}
-                        <TD
-                          className={cn(
-                            "text-right font-mono",
-                            isHitsBased && "text-fg-muted",
-                          )}
-                        >
-                          {e.is_dq || e.is_absent
-                            ? "—"
-                            : isTimeBased
-                              ? e.total_time_seconds != null
-                                ? `${formatNumber(e.total_time_seconds, 2)}s`
-                                : "—"
-                              : formatNumber(e.match_points, 2)}
-                        </TD>
-                        <TD
-                          className={cn(
-                            "text-right font-mono",
-                            isHitsBased && "text-fg-muted",
-                          )}
-                        >
-                          {e.is_dq || e.is_absent
-                            ? "—"
-                            : formatPercent(e.match_percentage)}
-                        </TD>
-                        <TD>
-                          <div className="flex flex-col items-start gap-1">
-                            {canClaim && (
-                              <form action={claimShooter}>
-                                <input
-                                  type="hidden"
-                                  name="shooter_id"
-                                  value={shooter!.id}
-                                />
-                                <input
-                                  type="hidden"
-                                  name="match_id"
-                                  value={match.id}
-                                />
-                                <Button type="submit" variant="secondary" size="sm">
-                                  Soy yo
-                                </Button>
-                              </form>
-                            )}
-                            {!canClaim &&
-                              shooter?.linked_user_id &&
-                              !isMine && (
-                                <span className="text-xs text-fg-subtle">
-                                  ya asociado
-                                </span>
-                              )}
-                            {canToggleAbsent && (
-                              <form action={toggleEntryAbsent}>
-                                <input
-                                  type="hidden"
-                                  name="match_id"
-                                  value={match.id}
-                                />
-                                <input
-                                  type="hidden"
-                                  name="entry_id"
-                                  value={e.id}
-                                />
-                                <Button
-                                  type="submit"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-xs"
-                                >
-                                  {e.is_absent
-                                    ? "Sí asistió"
-                                    : "Marcar ausente"}
-                                </Button>
-                              </form>
-                            )}
-                          </div>
-                        </TD>
-                      </TR>
+                        entry={e}
+                        matchId={match.id}
+                        isMine={isMine}
+                        canClaim={canClaim}
+                        canToggleAbsent={canToggleAbsent}
+                        isHitsBased={isHitsBased}
+                        isTimeBased={isTimeBased}
+                      />
                     );
                   })}
                 </TBody>

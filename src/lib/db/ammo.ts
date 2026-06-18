@@ -9,6 +9,90 @@ import { unwrap } from "./unwrap";
  * se encarga de que el usuario solo vea lo suyo.
  */
 
+/**
+ * Campos editables de un tipo de munición (sin `owner_user_id`). El insert
+ * agrega el owner; el update reusa este mismo shape.
+ */
+export type AmmoValues = {
+  name: string;
+  type: "factory" | "reload";
+  caliber: string | null;
+  brand: string | null;
+  bullet_weight_grains: number | null;
+  bullet_type: string | null;
+  powder: string | null;
+  powder_charge_grains: number | null;
+  power_factor: "Min" | "Maj" | null;
+  power_factor_measured: number | null;
+  notes: string | null;
+};
+
+/** Inserta un tipo de munición y devuelve su `id`. */
+export async function createAmmo(
+  supabase: TypedSupabaseClient,
+  input: AmmoValues & { owner_user_id: string },
+): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from("ammunition_types")
+    .insert(input)
+    .select("id")
+    .single();
+  return { id: data?.id ?? null, error: error?.message ?? null };
+}
+
+/** Snapshot completo de un tipo de munición para auditar before/after. */
+export async function getAmmoAuditSnapshot(
+  supabase: TypedSupabaseClient,
+  ammoId: string,
+) {
+  const { data } = await supabase
+    .from("ammunition_types")
+    .select(
+      "name, type, caliber, brand, bullet_weight_grains, bullet_type, powder, powder_charge_grains, power_factor, power_factor_measured, notes",
+    )
+    .eq("id", ammoId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Snapshot reducido de un tipo de munición para auditar deletes. */
+export async function getAmmoDeleteSnapshot(
+  supabase: TypedSupabaseClient,
+  ammoId: string,
+) {
+  const { data } = await supabase
+    .from("ammunition_types")
+    .select("name, type, caliber, brand")
+    .eq("id", ammoId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Actualiza un tipo de munición. */
+export async function updateAmmo(
+  supabase: TypedSupabaseClient,
+  ammoId: string,
+  values: AmmoValues,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("ammunition_types")
+    .update(values)
+    .eq("id", ammoId);
+  return { error: error?.message ?? null };
+}
+
+/** Borra un tipo de munición por id. */
+export async function deleteAmmo(
+  supabase: TypedSupabaseClient,
+  ammoId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("ammunition_types")
+    .delete()
+    .eq("id", ammoId);
+  return { error: error?.message ?? null };
+}
+
 export async function listMyAmmo(
   supabase: TypedSupabaseClient,
   userId: string,

@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { redirectWithError } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
+import * as shootersDb from "@/lib/db/shooters";
+import { getMatchName } from "@/lib/db/matches";
 
 /**
  * Acción de claim de un shooter: el usuario logueado declara
@@ -34,11 +36,7 @@ export async function claimShooter(formData: FormData) {
   const { supabase, user } = await requireUser();
   const userId = user.id;
 
-  const { data: shooter } = await supabase
-    .from("shooters")
-    .select("id, full_name, linked_user_id")
-    .eq("id", shooterId)
-    .maybeSingle();
+  const shooter = await shootersDb.getShooterClaimState(supabase, shooterId);
 
   // Ya es mío: no-op, redirigimos como si todo bien.
   if (shooter && shooter.linked_user_id === userId) {
@@ -55,16 +53,12 @@ export async function claimShooter(formData: FormData) {
     redirectWithError(errorTarget, "Este tirador ya fue claimado por otro usuario.");
   }
 
-  const { error } = await supabase
-    .from("shooters")
-    .update({ linked_user_id: userId })
-    .eq("id", shooterId)
-    .is("linked_user_id", null);
+  const { error } = await shootersDb.claimShooter(supabase, shooterId, userId);
 
   if (error) {
     redirectWithError(
       errorTarget,
-      "No se pudo asociar el tirador a tu cuenta: " + error.message,
+      "No se pudo asociar el tirador a tu cuenta: " + error,
     );
   }
 
@@ -72,12 +66,8 @@ export async function claimShooter(formData: FormData) {
   // la línea del audit log diga "desde 'Social 4 - 19/04/26'".
   let matchName: string | undefined;
   if (matchId) {
-    const { data: m } = await supabase
-      .from("matches")
-      .select("name")
-      .eq("id", matchId)
-      .maybeSingle();
-    matchName = (m as { name?: string } | null)?.name;
+    const m = await getMatchName(supabase, matchId);
+    matchName = m?.name;
   }
 
   await logAction(supabase, userId, {
@@ -85,7 +75,7 @@ export async function claimShooter(formData: FormData) {
     entityType: "shooter",
     entityId: shooterId,
     metadata: {
-      shooter_full_name: (shooter as { full_name?: string } | null)?.full_name,
+      shooter_full_name: shooter?.full_name,
       match_id: matchId || undefined,
       match_name: matchName,
     },
@@ -111,29 +101,23 @@ export async function unclaimShooter(formData: FormData) {
   const { supabase, user } = await requireUser();
 
   // Snapshot del nombre antes de desvincular.
-  const { data: shooter } = await supabase
-    .from("shooters")
-    .select("full_name")
-    .eq("id", shooterId)
-    .eq("linked_user_id", user.id)
-    .maybeSingle();
+  const shooter = await shootersDb.getMyShooterName(supabase, shooterId, user.id);
 
-  const { data: updated } = await supabase
-    .from("shooters")
-    .update({ linked_user_id: null })
-    .eq("id", shooterId)
-    .eq("linked_user_id", user.id)
-    .select("id");
+  const { affected } = await shootersDb.unclaimShooter(
+    supabase,
+    shooterId,
+    user.id,
+  );
 
   // Solo logueamos si el update afectó alguna fila — sino podríamos loggear
   // intentos que no hicieron nada (ej. doble submit, shooter ajeno).
-  if (Array.isArray(updated) && updated.length > 0) {
+  if (affected > 0) {
     await logAction(supabase, user.id, {
       action: AUDIT_ACTION.SHOOTER_UNCLAIM,
       entityType: "shooter",
       entityId: shooterId,
       metadata: {
-        shooter_full_name: (shooter as { full_name?: string } | null)?.full_name,
+        shooter_full_name: shooter?.full_name,
       },
     });
   }

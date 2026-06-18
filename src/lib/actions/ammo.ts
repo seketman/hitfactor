@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { redirectWithError } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
+import * as ammoDb from "@/lib/db/ammo";
 
 /**
  * Acciones para administrar el catálogo de tipos de munición del tirador.
@@ -85,20 +86,16 @@ export async function createAmmo(formData: FormData) {
     notes: trimOrNull(formData.get("notes")),
   };
 
-  const { data: created, error } = await supabase
-    .from("ammunition_types")
-    .insert(payload)
-    .select("id")
-    .single();
+  const { id: createdId, error } = await ammoDb.createAmmo(supabase, payload);
 
   if (error) {
-    redirectWithError("/ammo", error.message);
+    redirectWithError("/ammo", error);
   }
 
   await logAction(supabase, user.id, {
     action: AUDIT_ACTION.AMMO_CREATE,
     entityType: "ammunition_type",
-    entityId: created?.id,
+    entityId: createdId ?? undefined,
     metadata: {
       name: payload.name,
       type: payload.type,
@@ -121,13 +118,7 @@ export async function updateAmmo(formData: FormData) {
 
   const { supabase, user } = await requireUser();
 
-  const { data: before } = await supabase
-    .from("ammunition_types")
-    .select(
-      "name, type, caliber, brand, bullet_weight_grains, bullet_type, powder, powder_charge_grains, power_factor, power_factor_measured, notes",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const before = await ammoDb.getAmmoAuditSnapshot(supabase, id);
 
   const after = {
     name,
@@ -145,13 +136,10 @@ export async function updateAmmo(formData: FormData) {
     notes: trimOrNull(formData.get("notes")),
   };
 
-  const { error } = await supabase
-    .from("ammunition_types")
-    .update(after)
-    .eq("id", id);
+  const { error } = await ammoDb.updateAmmo(supabase, id, after);
 
   if (error) {
-    redirectWithError(`/ammo/${id}`, error.message);
+    redirectWithError(`/ammo/${id}`, error);
   }
 
   await logAction(supabase, user.id, {
@@ -178,19 +166,12 @@ export async function deleteAmmo(formData: FormData) {
   // Snapshot antes de borrar. El FK match_firearm_log.ammunition_type_id
   // está con ON DELETE SET NULL, así que los logs históricos quedan
   // desvinculados pero no se destruyen.
-  const { data: snapshot } = await supabase
-    .from("ammunition_types")
-    .select("name, type, caliber, brand")
-    .eq("id", id)
-    .maybeSingle();
+  const snapshot = await ammoDb.getAmmoDeleteSnapshot(supabase, id);
 
-  const { error } = await supabase
-    .from("ammunition_types")
-    .delete()
-    .eq("id", id);
+  const { error } = await ammoDb.deleteAmmo(supabase, id);
 
   if (error) {
-    redirectWithError("/ammo", error.message);
+    redirectWithError("/ammo", error);
   }
 
   if (snapshot) {
