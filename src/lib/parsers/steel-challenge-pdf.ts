@@ -7,6 +7,7 @@ import type {
   ParsedStageResult,
 } from "../types/match";
 import type { PdfPage } from "./pdf-extract";
+import { resolveDivisionCode, normalizeDivisionName } from "./division-registry";
 import {
   extractClubFromTitle,
   stripDqPrefix,
@@ -80,32 +81,16 @@ const ENTRY_ROW_RE = /^(\d+)\s+(.+?)\s+P\s+([\d.]+)\s+([\d.]+)(?:\s|$)/;
 const FINAL_HEADER_RE = /^Final\b.*\bName\b/i;
 
 /**
- * Mapeo de la etiqueta de división visible en el PDF al `code` que usamos
- * en la tabla `divisions` para Steel Challenge. Mantenemos las claves
- * normalizadas a MAYÚSCULAS y SIN tildes para que el match no dependa de
- * cómo PractiScore las muestre.
+ * Resuelve la etiqueta de división visible en el PDF al `code` de la tabla
+ * `divisions` para Steel Challenge, vía el registry compartido
+ * (`division-registry.ts`). Si la etiqueta no se reconoce, caemos al nombre
+ * normalizado como code (best-effort) en lugar de descartar la sección.
  */
-const DIVISION_CODE_BY_LABEL: Record<string, string> = {
-  PCC: "PCC",
-  PISTOLA: "PISTOLA",
-  OPEN: "OPEN",
-  IRON: "IRON",
-  OPTIC: "OPTIC",
-  REVOLVER: "REVOLVER",
-  ROOKIE: "ROOKIE",
-};
-
-function normalizeDivisionLabel(label: string): string {
-  return label
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toUpperCase()
-    .trim();
-}
-
 function divisionCodeFromLabel(label: string): string {
-  const norm = normalizeDivisionLabel(label);
-  return DIVISION_CODE_BY_LABEL[norm] ?? norm;
+  return (
+    resolveDivisionCode(DISCIPLINE.STEEL, label) ??
+    normalizeDivisionName(label)
+  );
 }
 
 /**

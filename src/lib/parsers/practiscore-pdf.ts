@@ -6,6 +6,7 @@ import type {
   ParsedStageResult,
   PowerFactor,
 } from "../types/match";
+import { resolveDivisionCode } from "./division-registry";
 import {
   extractClubFromTitle,
   stripDqPrefix,
@@ -46,33 +47,10 @@ export interface PractiscorePdfPage {
   text: string;
 }
 
-/**
- * Mapea el nombre de la división tal como aparece en el header de sección
- * (texto en inglés, title-case) al `code` de la tabla `divisions` de IPSC.
- *
- * El lookup se hace en MAYÚSCULAS. Si aparece una división no listada, la
- * sección se ignora con un warning y el resto del archivo sigue importándose.
- */
-const DIVISION_NAME_TO_CODE: Record<string, string> = {
-  OPEN: "O",
-  PRODUCTION: "P",
-  "PRODUCTION OPTICS": "PO",
-  STANDARD: "S",
-  "STANDARD MANUAL": "SM",
-  "CARRY OPTICS": "CO",
-  REVOLVER: "R",
-  CLASSIC: "CL",
-  // Escopeta: PractiScore exporta "Classic Manual" como división propia.
-  // Ver migración 0017 — el code `CM` no existía (distinto de `CL` Classic).
-  "CLASSIC MANUAL": "CM",
-  MODIFIED: "MS",
-  "MODIFIED SHOTGUN": "MS",
-  PCC: "PCC",
-  "PCC OPTICS": "PCCO",
-  "PISTOL CALIBER CARBINE": "PCC",
-  "PISTOL CALIBER CARBINE OPTICS": "PCCO",
-  PISTOLA: "PIS",
-};
+// El mapeo nombre-de-división (header de sección, texto en inglés) → `code`
+// IPSC vive en el registry compartido (`division-registry.ts`), incluyendo
+// "Classic Manual" (CM, escopeta). Si una sección no se reconoce, se ignora
+// con warning y el resto del archivo sigue importándose.
 
 // Tokens cortos que aparecen como columnas entre el nombre y la PF
 // (No. = dorsal, Class = clasificación, Div = división). Los pelamos del
@@ -280,7 +258,7 @@ function splitSections(text: string, kind: "Match Results" | "Stage Results"): S
     const divisionRaw = m[1]!.trim().replace(/\s+/g, " ").toUpperCase();
     const start = m.index! + m[0].length;
     const end = i + 1 < matches.length ? matches[i + 1]!.index! : text.length;
-    const code = DIVISION_NAME_TO_CODE[divisionRaw];
+    const code = resolveDivisionCode(DISCIPLINE.IPSC, divisionRaw);
     if (!code) {
       console.warn(
         `[practiscore-pdf] división desconocida "${divisionRaw}" — sección ignorada.`,

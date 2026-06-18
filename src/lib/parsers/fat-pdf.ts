@@ -4,6 +4,7 @@ import {
   type DisciplineCode,
 } from "../disciplines";
 import type { ParsedMatch, ParsedMatchEntry } from "../types/match";
+import { resolveDivisionCode } from "./division-registry";
 import { stripNameSuffixes } from "./shared";
 
 /**
@@ -71,43 +72,10 @@ const FILENAME_DISCIPLINE: Array<{ keyword: RegExp; discipline: DisciplineCode }
     { keyword: /\bcombat\b/, discipline: DISCIPLINE.COMBAT },
   ];
 
-/**
- * Mapa de nombre de división (tal como aparece en el header de sección,
- * normalizado a MAYÚSCULAS sin acentos) al `code` de la tabla `divisions`,
- * por disciplina.
- *
- * Solo el set de Tiro FBI está verificado contra un PDF real. Los demás
- * son best-effort: si un header no matchea, esa sección se ignora.
- */
-const DIVISION_NAME_TO_CODE: Record<DisciplineCode, Record<string, string>> = {
-  [DISCIPLINE.FBI]: {
-    PISTOLA: "PIS",
-    REVOLVER: "REV",
-    MINIRIFLE: "MINI",
-    PCC: "PCC",
-  },
-  [DISCIPLINE.IPSC]: {
-    OPEN: "O",
-    PRODUCTION: "P",
-    "PRODUCTION OPTICS": "PO",
-    STANDARD: "S",
-    "CARRY OPTICS": "CO",
-    REVOLVER: "R",
-    CLASSIC: "CL",
-    PCC: "PCC",
-    PISTOLA: "PIS",
-  },
-  [DISCIPLINE.STEEL]: {
-    PISTOLA: "PISTOLA",
-    REVOLVER: "REVOLVER",
-    OPEN: "OPEN",
-    ROOKIE: "ROOKIE",
-    IRON: "IRON",
-    OPTIC: "OPTIC",
-    PCC: "PCC",
-  },
-  [DISCIPLINE.COMBAT]: {},
-};
+// El mapeo nombre-de-división → `code` por disciplina vive en el registry
+// compartido (`division-registry.ts`). Solo el set de Tiro FBI está verificado
+// contra un PDF real; los demás son best-effort (si un header no matchea, la
+// sección se ignora).
 
 /** Palabras de ruido a sacar al derivar el nombre del match del filename. */
 const FILENAME_NOISE = /\b(resultados?|ranking|oficial|fat)\b/gi;
@@ -363,13 +331,12 @@ function classifyHeader(
     .replace(/\s+/g, " ")
     .trim();
   const tokens = norm.split(" ");
-  const divMap = DIVISION_NAME_TO_CODE[discipline];
 
   // Longest-prefix match: "PRODUCTION OPTICS GENERAL" → división
   // "PRODUCTION OPTICS", categoría "GENERAL".
   for (let take = Math.min(tokens.length, 3); take >= 1; take--) {
     const candidate = tokens.slice(0, take).join(" ");
-    const code = divMap[candidate];
+    const code = resolveDivisionCode(discipline, candidate);
     if (code) {
       return {
         divisionCode: code,
