@@ -12,6 +12,191 @@ import { unwrap } from "./unwrap";
  * "self-scoped" — RLS se encarga de que el usuario solo vea/edite lo suyo.
  */
 
+/** Payload de creación de un arma (mismo shape que arma el server action). */
+export interface CreateFirearmInput {
+  owner_user_id: string;
+  name: string;
+  brand: string | null;
+  model: string | null;
+  caliber: string | null;
+  notes: string | null;
+}
+
+/**
+ * Inserta un arma y devuelve su `id`. Sigue la convención WRITE: devuelve
+ * `{ error }` para que la action maneje `redirectWithError`.
+ */
+export async function createFirearm(
+  supabase: TypedSupabaseClient,
+  input: CreateFirearmInput,
+): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from("firearms")
+    .insert(input)
+    .select("id")
+    .single();
+  return { id: data?.id ?? null, error: error?.message ?? null };
+}
+
+/** Snapshot de un arma para auditar before/after en updates. */
+export async function getFirearmAuditSnapshot(
+  supabase: TypedSupabaseClient,
+  firearmId: string,
+): Promise<Pick<Firearm, "name" | "brand" | "model" | "caliber" | "notes"> | null> {
+  const { data } = await supabase
+    .from("firearms")
+    .select("name, brand, model, caliber, notes")
+    .eq("id", firearmId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Snapshot reducido de un arma para auditar deletes. */
+export async function getFirearmDeleteSnapshot(
+  supabase: TypedSupabaseClient,
+  firearmId: string,
+): Promise<Pick<Firearm, "name" | "brand" | "model" | "caliber"> | null> {
+  const { data } = await supabase
+    .from("firearms")
+    .select("name, brand, model, caliber")
+    .eq("id", firearmId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Actualiza los campos editables de un arma. */
+export async function updateFirearm(
+  supabase: TypedSupabaseClient,
+  firearmId: string,
+  values: {
+    name: string;
+    brand: string | null;
+    model: string | null;
+    caliber: string | null;
+    notes: string | null;
+  },
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("firearms")
+    .update(values)
+    .eq("id", firearmId);
+  return { error: error?.message ?? null };
+}
+
+/** Borra un arma por id. */
+export async function deleteFirearm(
+  supabase: TypedSupabaseClient,
+  firearmId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase.from("firearms").delete().eq("id", firearmId);
+  return { error: error?.message ?? null };
+}
+
+/** Inserta un log manual de uso de un arma y devuelve su `id`. */
+export async function createFirearmUsage(
+  supabase: TypedSupabaseClient,
+  input: {
+    firearm_id: string;
+    used_on: string;
+    rounds_fired: number;
+    ammunition_type_id: string | null;
+    notes: string | null;
+  },
+): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase
+    .from("firearm_usage_log")
+    .insert(input)
+    .select("id")
+    .single();
+  return { id: data?.id ?? null, error: error?.message ?? null };
+}
+
+/**
+ * Snapshot de un log de uso manual (con nombres embebidos de arma y
+ * munición) para auditar su borrado.
+ */
+export async function getFirearmUsageDeleteSnapshot(
+  supabase: TypedSupabaseClient,
+  usageId: string,
+): Promise<{
+  used_on: string;
+  rounds_fired: number;
+  firearms: { name: string } | null;
+  ammunition_types: { name: string } | null;
+} | null> {
+  const { data } = await supabase
+    .from("firearm_usage_log")
+    .select("used_on, rounds_fired, firearms(name), ammunition_types(name)")
+    .eq("id", usageId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Borra un log de uso manual por id. */
+export async function deleteFirearmUsage(
+  supabase: TypedSupabaseClient,
+  usageId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("firearm_usage_log")
+    .delete()
+    .eq("id", usageId);
+  return { error: error?.message ?? null };
+}
+
+/**
+ * Snapshot del log de arma de un match_entry (con nombres embebidos) para
+ * auditar el set/clear. Errores ignorados a propósito (igual que el original).
+ */
+export async function getMatchFirearmAuditSnapshot(
+  supabase: TypedSupabaseClient,
+  matchEntryId: string,
+): Promise<{
+  firearm_id: string;
+  rounds_fired: number;
+  ammunition_type_id: string | null;
+  firearms: { name: string } | null;
+  ammunition_types: { name: string } | null;
+} | null> {
+  const { data } = await supabase
+    .from("match_firearm_log")
+    .select(
+      "firearm_id, rounds_fired, ammunition_type_id, firearms(name), ammunition_types(name)",
+    )
+    .eq("match_entry_id", matchEntryId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/** Borra el log de arma de un match_entry (acción "no aplica / no recuerdo"). */
+export async function deleteMatchFirearmLog(
+  supabase: TypedSupabaseClient,
+  matchEntryId: string,
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("match_firearm_log")
+    .delete()
+    .eq("match_entry_id", matchEntryId);
+  return { error: error?.message ?? null };
+}
+
+/** Upsert (onConflict match_entry_id) del log de arma de un match_entry. */
+export async function upsertMatchFirearmLog(
+  supabase: TypedSupabaseClient,
+  input: {
+    match_entry_id: string;
+    firearm_id: string;
+    rounds_fired: number;
+    ammunition_type_id: string | null;
+    notes: string | null;
+  },
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from("match_firearm_log")
+    .upsert(input, { onConflict: "match_entry_id" });
+  return { error: error?.message ?? null };
+}
+
 export async function listMyFirearms(
   supabase: TypedSupabaseClient,
   userId: string,
