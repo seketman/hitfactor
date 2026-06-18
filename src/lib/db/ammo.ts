@@ -1,5 +1,6 @@
 import type { TypedSupabaseClient } from "../supabase/types";
 import type { AmmunitionType, AmmunitionUsageStats } from "./types";
+import { unwrap } from "./unwrap";
 
 /**
  * Catálogo de tipos de munición del tirador y stats de uso. Calcado del
@@ -12,11 +13,14 @@ export async function listMyAmmo(
   supabase: TypedSupabaseClient,
   userId: string,
 ): Promise<AmmunitionType[]> {
-  const { data } = await supabase
-    .from("ammunition_types")
-    .select("*")
-    .eq("owner_user_id", userId)
-    .order("created_at", { ascending: true });
+  const data = unwrap(
+    await supabase
+      .from("ammunition_types")
+      .select("*")
+      .eq("owner_user_id", userId)
+      .order("created_at", { ascending: true }),
+    "listMyAmmo",
+  );
   return (data as AmmunitionType[] | null) ?? [];
 }
 
@@ -24,11 +28,14 @@ export async function getAmmoById(
   supabase: TypedSupabaseClient,
   ammoId: string,
 ): Promise<AmmunitionType | null> {
-  const { data } = await supabase
-    .from("ammunition_types")
-    .select("*")
-    .eq("id", ammoId)
-    .maybeSingle();
+  const data = unwrap(
+    await supabase
+      .from("ammunition_types")
+      .select("*")
+      .eq("id", ammoId)
+      .maybeSingle(),
+    "getAmmoById",
+  );
   return (data as AmmunitionType | null) ?? null;
 }
 
@@ -44,13 +51,16 @@ export async function listAmmoUsageStats(
   const ammoList = await listMyAmmo(supabase, userId);
   if (ammoList.length === 0) return [];
 
-  const { data } = await supabase
-    .from("match_firearm_log")
-    .select("ammunition_type_id, rounds_fired, match_entries(matches(date))")
-    .in(
-      "ammunition_type_id",
-      ammoList.map((a) => a.id),
-    );
+  const data = unwrap(
+    await supabase
+      .from("match_firearm_log")
+      .select("ammunition_type_id, rounds_fired, match_entries(matches(date))")
+      .in(
+        "ammunition_type_id",
+        ammoList.map((a) => a.id),
+      ),
+    "listAmmoUsageStats",
+  );
 
   const logs = data ?? [];
 
@@ -105,12 +115,15 @@ export async function listAmmoHistory(
     roundsFired: number;
   }>
 > {
-  const { data } = await supabase
-    .from("match_firearm_log")
-    .select(
-      "match_entry_id, rounds_fired, firearms(name), match_entries(id, matches(id, name, date, disciplines(name)))",
-    )
-    .eq("ammunition_type_id", ammoId);
+  const data = unwrap(
+    await supabase
+      .from("match_firearm_log")
+      .select(
+        "match_entry_id, rounds_fired, firearms(name), match_entries(id, matches(id, name, date, disciplines(name)))",
+      )
+      .eq("ammunition_type_id", ammoId),
+    "listAmmoHistory",
+  );
 
   const rows = data ?? [];
 

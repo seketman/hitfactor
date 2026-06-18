@@ -667,6 +667,7 @@ export type Database = {
         }[]
       }
       resolve_firearm_qr_code: { Args: { p_code: string }; Returns: string }
+      update_ui_prefs: { Args: { patch: Json }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

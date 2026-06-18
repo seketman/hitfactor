@@ -1,5 +1,6 @@
 import type { TypedSupabaseClient } from "../supabase/types";
 import type { AuditLogRow } from "./types";
+import { unwrap } from "./unwrap";
 
 const DEFAULT_PAGE_SIZE = 50;
 
@@ -21,16 +22,17 @@ export async function listAuditLog(
   const from = (safePage - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const { data, count } = await supabase
+  const res = await supabase
     .from("audit_log")
     .select("*", { count: "exact" })
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .range(from, to);
+  const data = unwrap(res, "listAuditLog");
 
   return {
     rows: (data as AuditLogRow[] | null) ?? [],
-    total: count ?? 0,
+    total: res.count ?? 0,
     pageSize,
   };
 }

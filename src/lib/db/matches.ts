@@ -8,6 +8,7 @@ import type {
   MyStageRow,
   Stage,
 } from "./types";
+import { unwrap } from "./unwrap";
 
 const MATCH_BASE_SELECT =
   "id, name, date, region, imported_at, imported_by_user_id, source_filename, min_shots, disciplines(code, name, scoring_type)";
@@ -24,14 +25,15 @@ export async function listMatchesPage(
 ): Promise<{ matches: MatchWithDiscipline[]; total: number }> {
   const from = (page - 1) * size;
   const to = from + size - 1;
-  const { data, count } = await supabase
+  const res = await supabase
     .from("matches")
     .select(MATCH_BASE_SELECT, { count: "exact" })
     .order("date", { ascending: false })
     .range(from, to);
+  const data = unwrap(res, "listMatchesPage");
   return {
     matches: data ?? [],
-    total: count ?? 0,
+    total: res.count ?? 0,
   };
 }
 
@@ -40,11 +42,14 @@ export async function getMatchById(
   supabase: TypedSupabaseClient,
   matchId: string,
 ): Promise<MatchWithDiscipline | null> {
-  const { data } = await supabase
-    .from("matches")
-    .select(MATCH_BASE_SELECT)
-    .eq("id", matchId)
-    .maybeSingle();
+  const data = unwrap(
+    await supabase
+      .from("matches")
+      .select(MATCH_BASE_SELECT)
+      .eq("id", matchId)
+      .maybeSingle(),
+    "getMatchById",
+  );
   return data ?? null;
 }
 
@@ -53,11 +58,14 @@ export async function listStagesByMatch(
   supabase: TypedSupabaseClient,
   matchId: string,
 ): Promise<Stage[]> {
-  const { data } = await supabase
-    .from("stages")
-    .select("id, match_id, stage_number, name, max_points")
-    .eq("match_id", matchId)
-    .order("stage_number");
+  const data = unwrap(
+    await supabase
+      .from("stages")
+      .select("id, match_id, stage_number, name, max_points")
+      .eq("match_id", matchId)
+      .order("stage_number"),
+    "listStagesByMatch",
+  );
   return (data as Stage[] | null) ?? [];
 }
 
@@ -75,16 +83,19 @@ export async function listEntriesByMatch(
   supabase: TypedSupabaseClient,
   matchId: string,
 ): Promise<MatchEntryWithRelations[]> {
-  const { data } = await supabase
-    .from("match_entries")
-    .select(
-      "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
-    )
-    .eq("match_id", matchId)
-    // Ausentes y DQs van al final del listado para que el podio quede arriba.
-    .order("is_absent", { ascending: true })
-    .order("is_dq", { ascending: true })
-    .order("place", { ascending: true });
+  const data = unwrap(
+    await supabase
+      .from("match_entries")
+      .select(
+        "id, match_id, shooter_id, division_id, classification, power_factor, category, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, divisions(code, name), shooters(id, full_name, member_number, region, linked_user_id)",
+      )
+      .eq("match_id", matchId)
+      // Ausentes y DQs van al final del listado para que el podio quede arriba.
+      .order("is_absent", { ascending: true })
+      .order("is_dq", { ascending: true })
+      .order("place", { ascending: true }),
+    "listEntriesByMatch",
+  );
   // `power_factor` es `text` en la DB; el parser de import garantiza que solo
   // sea "Min" | "Maj" | null, así que estrechamos el tipo acá.
   return (data ?? []) as MatchEntryWithRelations[];
@@ -103,10 +114,13 @@ export async function getDivisionSizes(
 ): Promise<Map<string, number>> {
   if (matchIds.length === 0) return new Map();
 
-  const { data } = await supabase
-    .from("match_entries")
-    .select("match_id, divisions(code)")
-    .in("match_id", matchIds);
+  const data = unwrap(
+    await supabase
+      .from("match_entries")
+      .select("match_id, divisions(code)")
+      .in("match_id", matchIds),
+    "getDivisionSizes",
+  );
 
   const counts = new Map<string, number>();
   for (const row of data ?? []) {
@@ -127,18 +141,21 @@ export async function listEntriesByShooters(
   shooterIds: string[],
 ): Promise<MyEntryRow[]> {
   if (shooterIds.length === 0) return [];
-  const { data } = await supabase
-    .from("match_entries")
-    .select(
-      // Embed `match_firearm_log(rounds_fired)`: la FK es UNIQUE (es la PK
-      // de match_firearm_log), así que PostgREST devuelve un objeto
-      // (no array). Si el tirador no registró su arma, viene null.
-      // `matches.min_shots` se usa con `rounds_fired` para calcular
-      // disparos extra (issue #75).
-      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, divisions(code, name), matches(id, name, date, region, min_shots, disciplines(code, name, scoring_type)), match_firearm_log(rounds_fired)",
-    )
-    .in("shooter_id", shooterIds)
-    .order("matches(date)", { ascending: false });
+  const data = unwrap(
+    await supabase
+      .from("match_entries")
+      .select(
+        // Embed `match_firearm_log(rounds_fired)`: la FK es UNIQUE (es la PK
+        // de match_firearm_log), así que PostgREST devuelve un objeto
+        // (no array). Si el tirador no registró su arma, viene null.
+        // `matches.min_shots` se usa con `rounds_fired` para calcular
+        // disparos extra (issue #75).
+        "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, divisions(code, name), matches(id, name, date, region, min_shots, disciplines(code, name, scoring_type)), match_firearm_log(rounds_fired)",
+      )
+      .in("shooter_id", shooterIds)
+      .order("matches(date)", { ascending: false }),
+    "listEntriesByShooters",
+  );
   // `power_factor` es `text` en la DB; el parser garantiza "Min" | "Maj" | null.
   return (data ?? []) as MyEntryRow[];
 }
@@ -158,14 +175,17 @@ export async function listMyEntriesInMatch(
 ): Promise<MyMatchSummary["entry"][]> {
   if (shooterIds.length === 0) return [];
 
-  const { data } = await supabase
-    .from("match_entries")
-    .select(
-      "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, classification, divisions(code, name)",
-    )
-    .eq("match_id", matchId)
-    .in("shooter_id", shooterIds)
-    .order("place", { ascending: true });
+  const data = unwrap(
+    await supabase
+      .from("match_entries")
+      .select(
+        "id, place, match_points, match_percentage, total_time_seconds, hits, is_dq, is_absent, power_factor, category, classification, divisions(code, name)",
+      )
+      .eq("match_id", matchId)
+      .in("shooter_id", shooterIds)
+      .order("place", { ascending: true }),
+    "listMyEntriesInMatch",
+  );
 
   // `power_factor` es `text` en la DB; el parser garantiza "Min" | "Maj" | null.
   return (data ?? []) as MyMatchSummary["entry"][];
@@ -181,13 +201,16 @@ export async function listStageResultsForEntry(
   matchEntryId: string,
   matchId: string,
 ): Promise<MyStageResultRow[]> {
-  const { data } = await supabase
-    .from("stage_results")
-    .select(
-      "id, points, penalties, time_seconds, hit_factor, stage_points, stage_percentage, place, hits, is_dq, stages!inner(id, stage_number, name, match_id)",
-    )
-    .eq("match_entry_id", matchEntryId)
-    .eq("stages.match_id", matchId);
+  const data = unwrap(
+    await supabase
+      .from("stage_results")
+      .select(
+        "id, points, penalties, time_seconds, hit_factor, stage_points, stage_percentage, place, hits, is_dq, stages!inner(id, stage_number, name, match_id)",
+      )
+      .eq("match_entry_id", matchEntryId)
+      .eq("stages.match_id", matchId),
+    "listStageResultsForEntry",
+  );
 
   const results = data ?? [];
   results.sort((a, b) => {
@@ -210,9 +233,12 @@ export async function listMyStageResultsForEntries(
   entryIds: string[],
 ): Promise<MyStageRow[]> {
   if (entryIds.length === 0) return [];
-  const { data } = await supabase
-    .from("stage_results")
-    .select("place, penalties, stage_percentage, is_dq")
-    .in("match_entry_id", entryIds);
+  const data = unwrap(
+    await supabase
+      .from("stage_results")
+      .select("place, penalties, stage_percentage, is_dq")
+      .in("match_entry_id", entryIds),
+    "listMyStageResultsForEntries",
+  );
   return (data as MyStageRow[] | null) ?? [];
 }
