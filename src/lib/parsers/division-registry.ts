@@ -23,6 +23,13 @@ const DIVISION_CODE_BY_DISCIPLINE: Record<
     "SG OPEN": "O",
     PRODUCTION: "P",
     "PRODUCTION OPTICS": "PO",
+    // PractiScore (clubes argentinos) etiqueta Production Optics como
+    // "Pistola P. Optic" / "Pistola Production Optic" — la misma división PO
+    // de IPSC (pistola Production con óptica). Ver PR #137.
+    "PISTOLA P. OPTIC": "PO",
+    "PISTOLA P OPTIC": "PO",
+    "PISTOLA PRODUCTION OPTIC": "PO",
+    "PISTOLA PRODUCTION OPTICS": "PO",
     STANDARD: "S",
     "SG STANDARD": "S",
     "STANDARD MANUAL": "SM",
