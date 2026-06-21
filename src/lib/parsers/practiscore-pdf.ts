@@ -98,13 +98,28 @@ export function parsePractiscorePdfText(
   }
 
   const matchEntries: ParsedMatchEntry[] = [];
-  const stagesByNum = new Map<number, ParsedStage>();
 
   let matchName = "";
   let matchDate = "";
 
-  // Estado para la inferencia del número de stage cuando el título no lo
-  // trae (ver `resolveStageNumber`).
+  // Un stage (o el overall) puede abarcar varias páginas físicas cuando tiene
+  // muchas divisiones: PractiScore Android desborda 8 divisiones a una 2da
+  // página. Solo la 1ra página trae el título; las de continuación empiezan
+  // directo con filas. Concatenamos el texto de todas las páginas de un mismo
+  // stage/overall ANTES de `splitSections`, así una división partida por el
+  // salto de página no pierde sus filas de la 2da página y el stage no se
+  // duplica.
+  let overallText = "";
+
+  interface StageGroup {
+    stageNumber: number;
+    name: string;
+    text: string;
+  }
+  const stageGroups: StageGroup[] = [];
+  let currentGroup: StageGroup | null = null;
+
+  // Estado para resolver/inferir el número de stage (ver `resolveStageNumber`).
   let stagePageIndex = 0;
   let prevStageNumber: number | null = null;
   const usedStageNumbers = new Set<number>();
@@ -126,42 +141,61 @@ export function parsePractiscorePdfText(
     matchDate = matchDate || extractDate(page.text);
 
     if (isOverallPage) {
-      for (const section of splitSections(page.text, "Match Results")) {
-        for (const entry of parseOverallRows(section.body)) {
-          matchEntries.push({ ...entry, divisionCode: section.divisionCode });
-        }
-      }
+      overallText += `\n${page.text}`;
+      currentGroup = null;
       continue;
     }
 
-    // Stage page.
-    stagePageIndex++;
-    const explicit = extractExplicitStageNumber(page.text);
-    const stageNumber = resolveStageNumber(
-      explicit,
-      stagePageIndex,
-      prevStageNumber,
-      usedStageNumbers,
-      page.num,
-    );
-    usedStageNumbers.add(stageNumber);
-    prevStageNumber = stageNumber;
-
-    let stage = stagesByNum.get(stageNumber);
-    if (!stage) {
-      stage = {
+    // Stage page. Una página "titulada" (su 1ra línea termina en la fecha ISO
+    // del torneo) arranca un stage nuevo; una de continuación (sin título) se
+    // agrega al stage actual.
+    if (pageHasTitle(page.text)) {
+      stagePageIndex++;
+      const explicit = extractExplicitStageNumber(page.text);
+      const stageNumber = resolveStageNumber(
+        explicit,
+        stagePageIndex,
+        prevStageNumber,
+        usedStageNumbers,
+        page.num,
+      );
+      usedStageNumbers.add(stageNumber);
+      prevStageNumber = stageNumber;
+      currentGroup = {
         stageNumber,
         name: extractStageName(page.text) ?? `Stage ${stageNumber}`,
-        results: [],
+        text: page.text,
       };
-      stagesByNum.set(stageNumber, stage);
-    }
-    for (const section of splitSections(page.text, "Stage Results")) {
-      for (const result of parseStageRows(section.body)) {
-        stage.results.push({ ...result, divisionCode: section.divisionCode });
-      }
+      stageGroups.push(currentGroup);
+    } else if (currentGroup) {
+      currentGroup.text += `\n${page.text}`;
+    } else {
+      // Continuación sin un stage previo: no debería pasar (la 1ra página de
+      // un stage siempre trae título). La descartamos con warning.
+      console.warn(
+        `[practiscore-pdf] página ${page.num} de continuación sin stage previo — descartada.`,
+      );
     }
   }
+
+  for (const section of splitSections(overallText, "Match Results")) {
+    for (const entry of parseOverallRows(section.body)) {
+      matchEntries.push({ ...entry, divisionCode: section.divisionCode });
+    }
+  }
+
+  const stages: ParsedStage[] = stageGroups
+    .map((g) => ({
+      stageNumber: g.stageNumber,
+      name: g.name,
+      results: splitSections(g.text, "Stage Results").flatMap((section) =>
+        parseStageRows(section.body).map((r) => ({
+          ...r,
+          divisionCode: section.divisionCode,
+        })),
+      ),
+    }))
+    .sort((a, b) => (a.stageNumber ?? 0) - (b.stageNumber ?? 0));
 
   if (!matchName) {
     const snippet = (pages[0]?.text ?? "").slice(0, 200).replace(/\s+/g, " ");
@@ -174,15 +208,11 @@ export function parsePractiscorePdfText(
       "No se pudo extraer la fecha del PDF (esperaba un título con fecha ISO 'YYYY-MM-DD').",
     );
   }
-  if (matchEntries.length === 0 && stagesByNum.size === 0) {
+  if (matchEntries.length === 0 && stages.length === 0) {
     throw new Error(
       "El PDF se identificó como PractiScore pero no se pudo extraer ninguna fila de resultados.",
     );
   }
-
-  const stages: ParsedStage[] = Array.from(stagesByNum.values()).sort(
-    (a, b) => (a.stageNumber ?? 0) - (b.stageNumber ?? 0),
-  );
 
   const region = extractClubFromTitle(matchName);
 
@@ -271,17 +301,32 @@ function splitSections(text: string, kind: "Match Results" | "Stage Results"): S
 }
 
 /**
+ * `true` si la página arranca con el título del torneo (su 1ra línea termina
+ * en "- <fecha ISO>"). Una página de continuación (2da+ página de un stage
+ * con muchas divisiones) empieza directo con filas de datos y NO matchea.
+ */
+function pageHasTitle(text: string): boolean {
+  const firstLine = text.split(/\n/)[0]?.trim() ?? "";
+  return /-\s*\d{4}-\d{2}-\d{2}\s*$/.test(firstLine);
+}
+
+/**
  * El título arranca la página: "<Nombre> - <descriptor?> - <fecha ISO>".
  * El nombre es lo que está antes del primer " - " que precede a un stage
  * descriptor o a la fecha. Pelamos la fecha y el descriptor de stage del
- * final y nos quedamos con el resto.
+ * final y nos quedamos con el resto. El descriptor puede ser "Stage N Campo
+ * X" (PractiScore iPhone), "Ejercicio N" / "Etapa N" (PractiScore Android) o
+ * "Campo X" (sin número).
  */
 function extractMatchName(text: string): string {
   const firstLine = text.split(/\n/)[0]?.trim() ?? "";
   if (!firstLine) return "";
   return firstLine
     .replace(/\s*-\s*\d{4}-\d{2}-\d{2}\s*$/, "")
-    .replace(/\s*-\s*(?:Stage\s+\d+\b.*|Campo\b.*)$/i, "")
+    .replace(
+      /\s*-\s*(?:(?:Stage|Ejercicio|Etapa)\s+\d+\b.*|Campo\b.*)$/i,
+      "",
+    )
     .trim();
 }
 
@@ -292,24 +337,30 @@ function extractDate(text: string): string {
 }
 
 /**
- * Número de stage explícito del título ("... - Stage 4 Campo 13 - ..."),
- * o `null` si la página no lo trae (ej. "... - Campo 4B - ...").
+ * Número de stage explícito del título. Soporta "Stage N" (PractiScore
+ * iPhone: "... - Stage 4 Campo 13 - ...") y "Ejercicio N" / "Etapa N"
+ * (PractiScore Android: "... - Ejercicio 1 - ..."). `null` si la página no
+ * lo trae (ej. "... - Campo 4B - ...") → se infiere.
  */
 function extractExplicitStageNumber(text: string): number | null {
   const firstLine = text.split(/\n/)[0] ?? "";
-  const m = /\bStage\s+(\d+)\b/i.exec(firstLine);
+  const m = /\b(?:Stage|Ejercicio|Etapa)\s+(\d+)\b/i.exec(firstLine);
   return m ? parseInt(m[1]!, 10) : null;
 }
 
 /**
- * Nombre legible del stage tomado del descriptor del título ("Stage 4 Campo
- * 13" → "Campo 13", "Campo 4B" → "Campo 4B"). `null` si no hay descriptor.
+ * Nombre legible del stage tomado del descriptor del título:
+ *  - "Stage 4 Campo 13" → "Campo 13"   (iPhone)
+ *  - "Campo 4B"         → "Campo 4B"    (iPhone, sin número)
+ *  - "Ejercicio 1"      → "Ejercicio 1" (Android)
+ * `null` si no hay descriptor (overall, o título sólo "Nombre - fecha").
  */
 function extractStageName(text: string): string | null {
   const firstLine = text.split(/\n/)[0] ?? "";
-  const m = /-\s*((?:Stage\s+\d+\s+)?Campo\b[^-]*?)\s*-\s*\d{4}-\d{2}-\d{2}/i.exec(
-    firstLine,
-  );
+  const m =
+    /-\s*((?:Stage\s+\d+\s+)?Campo\b[^-]*?|(?:Ejercicio|Etapa)\s+\d+)\s*-\s*\d{4}-\d{2}-\d{2}/i.exec(
+      firstLine,
+    );
   if (!m) return null;
   return m[1]!.replace(/^Stage\s+\d+\s+/i, "").trim() || null;
 }
