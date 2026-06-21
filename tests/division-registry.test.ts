@@ -38,6 +38,8 @@ describe("resolveDivisionCode — IPSC", () => {
     ["SG Open", "O"], // prefijo shotgun WinMSS
     ["SG Classic", "CL"],
     ["Pistola", "PIS"],
+    ["Pistola P. Optic", "PO"], // Production Optics, label PractiScore AR
+    ["Pistola Production Optic", "PO"],
   ];
   it.each(cases)("'%s' → %s", (name, code) => {
     expect(resolveDivisionCode(DISCIPLINE.IPSC, name)).toBe(code);
