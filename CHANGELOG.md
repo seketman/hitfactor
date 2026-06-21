@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.6](https://github.com/seketman/hitfactor/compare/v1.20.5...v1.20.6) (2026-06-21)
+
+
+### Bug Fixes
+
+* **parsers:** PractiScore Android stages collapsing to 2 (multi-page) ([#137](https://github.com/seketman/hitfactor/issues/137)) ([70b74bd](https://github.com/seketman/hitfactor/commit/70b74bd24fe15a7509019282125cb60876d2b3d2))
+
 ## [1.20.5](https://github.com/seketman/hitfactor/compare/v1.20.4...v1.20.5) (2026-06-18)
 
 
