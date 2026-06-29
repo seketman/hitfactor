@@ -88,6 +88,8 @@
     "sharedBody": "Cada torneo que se importa a HitFactor queda disponible para todos los que participaron. ¿Tiraste un match que otro ya cargó? No lo subas de nuevo: buscate en el ranking, marcate con “Soy yo” y tus resultados aparecen al instante.",
     "sharedDiagramResults": "425 resultados · importado una vez",
     "sharedDiagramAvailable": "Disponible para todos",
+    "sharedDiagramMatchName": "Social Domingo",
+    "sharedDiagramYou": "Vos",
     "sharedDiagramMore": "+ 422 tiradores",
     "featuresKicker": "Qué vas a ver",
     "featuresTitle": "Pensado para que veas lo que importa",

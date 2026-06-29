@@ -287,7 +287,7 @@ async function SharedLibrary() {
 /** Diagrama: un match importado → disponible para todos. Decorativo. */
 async function SharedLibraryDiagram() {
   const t = await getTranslations("landing");
-  const shooters = ["Vos", "Marina G.", "Felipe D."];
+  const shooters = [t("sharedDiagramYou"), "Marina G.", "Felipe D."];
   return (
     <div
       className="mx-auto w-full max-w-md rounded-[10px] border border-border bg-surface p-5 lg:mx-0"
@@ -299,7 +299,7 @@ async function SharedLibraryDiagram() {
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-fg">
-            Social Domingo
+            {t("sharedDiagramMatchName")}
           </p>
           <p className="text-xs text-fg-muted">
             {t("sharedDiagramResults")}
