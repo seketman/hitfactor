@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.0](https://github.com/seketman/hitfactor/compare/v1.20.7...v1.21.0) (2026-06-29)
+
+
+### Features
+
+* **i18n:** bilingual app (es/en) — MVP Core con path-prefix y switcher ([#145](https://github.com/seketman/hitfactor/issues/145)) ([557ede8](https://github.com/seketman/hitfactor/commit/557ede8ea830f173ef30d7e3f516343150235455))
+
 ## [1.20.7](https://github.com/seketman/hitfactor/compare/v1.20.6...v1.20.7) (2026-06-29)
 
 
