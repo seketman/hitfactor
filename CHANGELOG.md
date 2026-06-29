@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.20.7](https://github.com/seketman/hitfactor/compare/v1.20.6...v1.20.7) (2026-06-29)
+
+
+### Bug Fixes
+
+* **import:** dedupe match_entries by conflict key before upsert ([#143](https://github.com/seketman/hitfactor/issues/143)) ([55de772](https://github.com/seketman/hitfactor/commit/55de77220ae30c21c76a072aaeb2ccf25a4f6c0a))
+
 ## [1.20.6](https://github.com/seketman/hitfactor/compare/v1.20.5...v1.20.6) (2026-06-21)
 
 
