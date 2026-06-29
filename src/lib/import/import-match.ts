@@ -441,16 +441,44 @@ async function upsertMatchEntries(
 
   if (entryRows.length === 0) return 0;
 
+  // Dedup defensivo por la conflict key (match_id, shooter_id, division_id).
+  // Un mismo tirador puede aparecer 2+ veces en la misma división cuando el
+  // oficial lo cargó duplicado (mismo nº de socio, nombre tipeado distinto):
+  // todas las filas resuelven al mismo shooter_id. Postgres rechaza un
+  // `INSERT ... ON CONFLICT DO UPDATE` que afecte la misma fila destino dos
+  // veces ("cannot affect row a second time"), así que colapsamos a una por
+  // clave quedándonos con el mejor resultado (mayor match_%, desempate por
+  // menor place > 0).
+  const bestByKey = new Map<string, (typeof entryRows)[number]>();
+  let droppedDuplicates = 0;
+  for (const row of entryRows) {
+    const key = `${row.match_id}|${row.shooter_id}|${row.division_id}`;
+    const prev = bestByKey.get(key);
+    if (!prev) {
+      bestByKey.set(key, row);
+      continue;
+    }
+    droppedDuplicates++;
+    if (isBetterEntry(row, prev)) bestByKey.set(key, row);
+  }
+  const dedupedRows = [...bestByKey.values()];
+  if (droppedDuplicates > 0) {
+    console.warn(
+      `[import] ${droppedDuplicates} entry(s) duplicada(s) por (shooter, división) ` +
+        "en el archivo — se mantuvo la de mejor resultado por clave.",
+    );
+  }
+
   const { error } = await supabase
     .from("match_entries")
-    .upsert(entryRows, { onConflict: "match_id,shooter_id,division_id" });
+    .upsert(dedupedRows, { onConflict: "match_id,shooter_id,division_id" });
   if (error) {
     throw new ImportError(
       `Error insertando resultados: ${error.message}`,
       "MATCH_ENTRIES_INSERT_FAILED",
     );
   }
-  return entryRows.length;
+  return dedupedRows.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -479,6 +507,24 @@ async function maybeApplyMinShots(
     .from("matches")
     .update({ min_shots: optionsMinShots })
     .eq("id", matchId);
+}
+
+/**
+ * Compara dos filas de match_entry que colisionan en la misma clave
+ * (shooter, división) y decide cuál conservar. Gana el mejor resultado:
+ * mayor `match_percentage`; a igualdad, el de menor `place` válido (> 0;
+ * place 0 = DQ/ausente, peor). Determinista para que el dedup sea estable.
+ */
+function isBetterEntry(
+  candidate: { match_percentage: number; place: number },
+  current: { match_percentage: number; place: number },
+): boolean {
+  if (candidate.match_percentage !== current.match_percentage) {
+    return candidate.match_percentage > current.match_percentage;
+  }
+  const candPlace = candidate.place > 0 ? candidate.place : Infinity;
+  const curPlace = current.place > 0 ? current.place : Infinity;
+  return candPlace < curPlace;
 }
 
 function mapMatchEntryToRow(
