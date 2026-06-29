@@ -473,6 +473,69 @@ describe("importParsedMatch — Dedup de shooters por member_number", () => {
   });
 });
 
+describe("importParsedMatch — Entry duplicada en la misma división", () => {
+  // Caso real (Ranking Social Junio 2026): el oficial cargó al mismo tirador
+  // (socio 793) DOS veces en Production con el nombre tipeado distinto. Ambas
+  // filas resuelven al mismo shooter_id (el match por nº de socio gana), así
+  // que el batch de upsert tenía dos filas con la misma conflict key
+  // (match_id, shooter_id, division_id) → Postgres: "ON CONFLICT DO UPDATE
+  // command cannot affect row a second time". El importer ahora deduplica.
+  let fake: FakeSupabase;
+  beforeEach(() => {
+    fake = buildSupabase();
+    fake.seed("shooters", [
+      {
+        id: "existing-shooter",
+        full_name: "TIMBERI, Jesus",
+        member_number: "793",
+        linked_user_id: null,
+        created_at: "2026-01-01",
+      },
+    ]);
+  });
+
+  const entry = (name: string, place: number, pct: number) => ({
+    shooter: { fullName: name, memberNumber: "793", region: null },
+    divisionCode: "P",
+    classification: null,
+    powerFactor: "Min" as const,
+    category: null,
+    place,
+    matchPoints: pct,
+    matchPercentage: pct,
+    totalTimeSeconds: null,
+    hits: null,
+    isDq: false,
+    isAbsent: false,
+  });
+
+  it("colapsa a una sola entry por (shooter, división) y conserva el mejor resultado", async () => {
+    const parsed = {
+      discipline: "ipsc" as const,
+      source: "practiscore_match_html" as const,
+      name: "Ranking Social Junio 2026",
+      date: "2026-06-27",
+      region: null,
+      generatedBy: null,
+      // misma persona (socio 793) cargada dos veces en Production.
+      matchEntries: [
+        entry("TIMBERI, Jesus OP", 11, 53.9539),
+        entry("TIMBERI, Jesus", 12, 52.7667),
+      ],
+      stages: [],
+    };
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "f.html");
+
+    const entries = fake.tables.match_entries.rows;
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.shooter_id).toBe("existing-shooter");
+    // Gana la de mayor match_% (53.95, place 11), no la última vista.
+    expect(entries[0]!.match_percentage).toBeCloseTo(53.9539);
+    expect(entries[0]!.place).toBe(11);
+  });
+});
+
 describe("importParsedMatch — Stage results", () => {
   let fake: FakeSupabase;
   beforeEach(async () => {
