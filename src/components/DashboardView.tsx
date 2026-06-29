@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
+import { getLocale, getTranslations } from "next-intl/server";
+import { Link, redirect } from "@/i18n/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -17,6 +17,8 @@ import {
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
 import { DISCIPLINE, type DisciplineCode } from "@/lib/disciplines";
+
+type DashboardT = Awaited<ReturnType<typeof getTranslations<"dashboard">>>;
 
 interface DashboardViewProps {
   /** Filtra entries y matches a esta disciplina. Null = vista consolidada. */
@@ -63,6 +65,7 @@ export async function DashboardView({
   asProfile = null,
 }: DashboardViewProps) {
   const { supabase, user } = await requireUser();
+  const t = await getTranslations("dashboard");
   const userId = user.id;
   const isConsolidated = disciplineCode === null;
 
@@ -108,7 +111,8 @@ export async function DashboardView({
   // No redirigimos bajo impersonación: el admin puede estar diagnosticando
   // a un usuario sin shooters y necesita ver el empty state real.
   if (isConsolidated && !isImpersonating && effectiveShooters.length === 0) {
-    redirect("/matches");
+    const locale = await getLocale();
+    redirect({ href: "/matches", locale });
   }
 
   const allEntries = await listEntriesByShooters(
@@ -146,14 +150,14 @@ export async function DashboardView({
   // así el admin ve EXACTAMENTE lo que vería ese usuario. El banner deja
   // claro que es impersonación, no la sesión real del admin.
   const headerTitle = isConsolidated
-    ? `Hola, ${activeProfile?.display_name ?? "tirador"}`
+    ? t("greeting", { name: activeProfile?.display_name ?? t("defaultShooter") })
     : divisionCode
-      ? `${disciplineName ?? "Disciplina"} · ${divisionName ?? divisionCode}`
-      : (disciplineName ?? "Disciplina");
+      ? `${disciplineName ?? t("defaultDiscipline")} · ${divisionName ?? divisionCode}`
+      : (disciplineName ?? t("defaultDiscipline"));
 
   const headerSubtitle = isConsolidated
-    ? renderConsolidatedSubtitle(effectiveShooters)
-    : renderDisciplineSubtitle(myEntries.length, divisionCode);
+    ? renderConsolidatedSubtitle(effectiveShooters, t)
+    : renderDisciplineSubtitle(myEntries.length, divisionCode, t);
 
   // Lista de divisiones disponibles para el tab filter. Solo la mostramos
   // si el usuario tiene entries en más de una división dentro de esta
@@ -175,6 +179,7 @@ export async function DashboardView({
           profileName={impersonatedProfile.display_name}
           shooterCount={effectiveShooters.length}
           exitHref={exitImpersonationHref}
+          t={t}
         />
       )}
 
@@ -189,12 +194,13 @@ export async function DashboardView({
           divisions={divisionOptions}
           activeDivision={divisionCode}
           asProfile={isImpersonating ? asProfile : null}
+          t={t}
         />
       )}
 
       {myEntries.length > 0 ? (
         <>
-          <Section title="Tus resultados">
+          <Section title={t("yourResults")}>
             <StatsOverview
               stats={computeShooterStats(myEntries, {
                 divisionSizes,
@@ -206,7 +212,7 @@ export async function DashboardView({
             />
           </Section>
 
-          <Section title={`Tu historial (${myEntries.length})`}>
+          <Section title={t("yourHistory", { count: myEntries.length })}>
             <HistoryTable
               entries={myEntries}
               clubs={clubs}
@@ -215,7 +221,7 @@ export async function DashboardView({
           </Section>
         </>
       ) : (
-        <EmptyState hasIdentities={effectiveShooters.length > 0} />
+        <EmptyState hasIdentities={effectiveShooters.length > 0} t={t} />
       )}
     </PageContainer>
   );
@@ -230,23 +236,25 @@ function ImpersonationBanner({
   profileName,
   shooterCount,
   exitHref,
+  t,
 }: {
   profileName: string;
   shooterCount: number;
   exitHref: string;
+  t: DashboardT;
 }) {
   const identityText =
     shooterCount === 0
-      ? "sin identidades linkeadas"
+      ? t("impersonationNoIdentities")
       : shooterCount === 1
-        ? "1 identidad linkeada"
-        : `${shooterCount} identidades linkeadas`;
+        ? t("impersonationOneIdentity")
+        : t("impersonationManyIdentities", { count: shooterCount });
 
   return (
     <Card className="mb-6 border-accent/40 bg-accent-soft/40">
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
         <span className="text-fg-muted">
-          Modo admin · viendo el dashboard como{" "}
+          {t("impersonationBanner")}{" "}
           <strong className="text-fg">{profileName}</strong>{" "}
           <span className="text-fg-subtle">({identityText})</span>
         </span>
@@ -254,7 +262,7 @@ function ImpersonationBanner({
           href={exitHref}
           className="rounded-md border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-fg-muted hover:border-border-strong hover:text-fg"
         >
-          Salir
+          {t("exit")}
         </Link>
       </div>
     </Card>
@@ -270,6 +278,7 @@ function DivisionFilterTabs({
   divisions,
   activeDivision,
   asProfile = null,
+  t,
 }: {
   disciplineCode: string;
   divisions: Array<{ code: string; name: string }>;
@@ -279,6 +288,7 @@ function DivisionFilterTabs({
    * sino el admin pierde el contexto al cambiar de división.
    */
   asProfile?: string | null;
+  t: DashboardT;
 }) {
   const tabClass = (active: boolean) =>
     [
@@ -300,10 +310,10 @@ function DivisionFilterTabs({
   return (
     <div className="mb-8 flex flex-wrap items-center gap-2">
       <span className="text-xs uppercase tracking-wider text-fg-muted">
-        División
+        {t("division")}
       </span>
       <Link href={hrefFor(null)} className={tabClass(activeDivision === null)}>
-        Todas
+        {t("allDivisions")}
       </Link>
       {divisions.map((d) => (
         <Link
@@ -340,15 +350,15 @@ function collectDivisionOptions(
 function renderDisciplineSubtitle(
   filteredEntriesCount: number,
   divisionCode: string | null,
+  t: DashboardT,
 ): string {
   // Nota: aún cuando el tirador haya corrido el mismo torneo en 2
   // divisiones, este subtítulo cuenta entries (cada participación). Las
   // KPIs adentro sí deduplican por match. Si querés ver "torneos únicos",
   // está en la card "Torneos disputados" más abajo.
-  const palabra = filteredEntriesCount === 1 ? "participación" : "participaciones";
   return divisionCode
-    ? `${filteredEntriesCount} ${palabra} en esta división`
-    : `${filteredEntriesCount} ${palabra} en esta disciplina`;
+    ? t("participationsInDivision", { count: filteredEntriesCount })
+    : t("participationsInDiscipline", { count: filteredEntriesCount });
 }
 
 /**
@@ -356,29 +366,33 @@ function renderDisciplineSubtitle(
  *  - Sin identidades: necesita encontrarse en algún match y hacer "Soy yo"
  *  - Con identidades pero sin entries: probablemente no se importaron sus matches
  */
-function EmptyState({ hasIdentities }: { hasIdentities: boolean }) {
+function EmptyState({
+  hasIdentities,
+  t,
+}: {
+  hasIdentities: boolean;
+  t: DashboardT;
+}) {
   return (
     <Card className="p-10 text-center">
       {hasIdentities ? (
         <>
-          <p className="font-medium">Tus estadísticas van a aparecer acá</p>
+          <p className="font-medium">{t("emptyHasIdentitiesTitle")}</p>
           <p className="mt-2 text-sm text-fg-muted">
-            En cuanto se importe un match en el que hayas participado, vas a
-            ver tus resultados, estadísticas e historial.
+            {t("emptyHasIdentitiesBody")}
           </p>
           <Link href="/matches" className="mt-4 inline-block">
-            <Button size="sm">Ver matches</Button>
+            <Button size="sm">{t("viewMatches")}</Button>
           </Link>
         </>
       ) : (
         <>
-          <p className="font-medium">Asociá una participación a tu cuenta</p>
+          <p className="font-medium">{t("emptyNoIdentitiesTitle")}</p>
           <p className="mt-2 text-sm text-fg-muted">
-            Buscá tu nombre en el ranking de algún match y hacé click en
-            “Soy yo” para empezar a ver tus estadísticas acá.
+            {t("emptyNoIdentitiesBody")}
           </p>
           <Link href="/matches" className="mt-4 inline-block">
-            <Button size="sm">Ver matches</Button>
+            <Button size="sm">{t("viewMatches")}</Button>
           </Link>
         </>
       )}
@@ -388,20 +402,21 @@ function EmptyState({ hasIdentities }: { hasIdentities: boolean }) {
 
 function renderConsolidatedSubtitle(
   myShooters: Awaited<ReturnType<typeof listMyShooters>>,
+  t: DashboardT,
 ) {
   if (myShooters.length === 0) {
-    return "Todavía no asociaste ninguna participación a tu cuenta. Buscá tu nombre en algún match para hacerlo.";
+    return t("consolidatedNoneLinked");
   }
   if (myShooters.length === 1) {
     return (
       <>
-        Asociado con <span className="text-fg">{myShooters[0]!.full_name}</span>
+        {t("linkedWith")} <span className="text-fg">{myShooters[0]!.full_name}</span>
       </>
     );
   }
   return (
     <>
-      Asociado con{" "}
+      {t("linkedWith")}{" "}
       <span
         className="text-fg"
         title={myShooters.map((s) => s.full_name).join(" · ")}
@@ -409,8 +424,7 @@ function renderConsolidatedSubtitle(
         {myShooters[0]!.full_name}
       </span>{" "}
       <span className="text-fg-subtle">
-        (+{myShooters.length - 1}{" "}
-        {myShooters.length - 1 === 1 ? "identidad" : "identidades"})
+        {t("extraIdentities", { count: myShooters.length - 1 })}
       </span>
     </>
   );

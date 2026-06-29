@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { buildClubLookup, getClubName } from "@/lib/clubs";
@@ -36,7 +37,8 @@ interface MatchListProps {
  * acá. Hoy se usa solo desde `/matches`; el prop `from` queda genérico por si
  * vuelve a renderizarse desde otra ruta.
  */
-export function MatchList({ matches, userId, from, clubs }: MatchListProps) {
+export async function MatchList({ matches, userId, from, clubs }: MatchListProps) {
+  const t = await getTranslations("matches");
   const clubLookup = buildClubLookup(clubs);
   return (
     <Card>
@@ -64,7 +66,7 @@ export function MatchList({ matches, userId, from, clubs }: MatchListProps) {
                     {clubLabel && ` · ${clubLabel}`}
                   </p>
                 </div>
-                {isMine && <Badge>vos importaste</Badge>}
+                {isMine && <Badge>{t("youImported")}</Badge>}
               </Link>
             </li>
           );

@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Select } from "@/components/ui/Select";
@@ -27,12 +28,12 @@ const EXTRAS_TIER_CLASS: Record<AmmoExtrasTier, string> = {
 
 type SortKey = "date_desc" | "date_asc" | "pct_desc" | "pct_asc" | "place_asc";
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: "date_desc", label: "Más reciente" },
-  { key: "date_asc", label: "Más antiguo" },
-  { key: "pct_desc", label: "Mejor %" },
-  { key: "pct_asc", label: "Peor %" },
-  { key: "place_asc", label: "Mejor puesto" },
+const SORT_OPTIONS: { key: SortKey; labelKey: string }[] = [
+  { key: "date_desc", labelKey: "sortDateDesc" },
+  { key: "date_asc", labelKey: "sortDateAsc" },
+  { key: "pct_desc", labelKey: "sortPctDesc" },
+  { key: "pct_asc", labelKey: "sortPctAsc" },
+  { key: "place_asc", labelKey: "sortPlaceAsc" },
 ];
 
 const POWER_FACTOR_LABELS: Record<string, string> = {
@@ -60,6 +61,7 @@ export function HistoryTable({
   clubs,
   showDisciplineFilter = true,
 }: HistoryTableProps) {
+  const t = useTranslations("dashboard.history");
   const clubLookup = useMemo(() => buildClubLookup(clubs), [clubs]);
   const [discipline, setDiscipline] = useState<string>("all");
   const [division, setDivision] = useState<string>("all");
@@ -162,11 +164,11 @@ export function HistoryTable({
       >
         {showDisciplineFilter && (
           <Select
-            label="Disciplina"
+            label={t("discipline")}
             value={discipline}
             onChange={(e) => setDiscipline(e.target.value)}
           >
-            <option value="all">Todas</option>
+            <option value="all">{t("all")}</option>
             {disciplineOptions.map(([code, name]) => (
               <option key={code} value={code}>
                 {name}
@@ -176,11 +178,11 @@ export function HistoryTable({
         )}
 
         <Select
-          label="División"
+          label={t("division")}
           value={division}
           onChange={(e) => setDivision(e.target.value)}
         >
-          <option value="all">Todas</option>
+          <option value="all">{t("all")}</option>
           {divisionOptions.map(([code, name]) => (
             <option key={code} value={code}>
               {name} ({code})
@@ -189,21 +191,21 @@ export function HistoryTable({
         </Select>
 
         <Select
-          label="Factor"
+          label={t("factor")}
           value={factor}
           onChange={(e) => setFactor(e.target.value)}
         >
-          <option value="all">Todos</option>
+          <option value="all">{t("allMasc")}</option>
           <option value="Maj">Major</option>
           <option value="Min">Minor</option>
         </Select>
 
         <Select
-          label="Club"
+          label={t("club")}
           value={club}
           onChange={(e) => setClub(e.target.value)}
         >
-          <option value="all">Todos</option>
+          <option value="all">{t("allMasc")}</option>
           {clubOptions.map(([code, name]) => (
             <option key={code} value={code}>
               {name}
@@ -212,13 +214,13 @@ export function HistoryTable({
         </Select>
 
         <Select
-          label="Ordenar por"
+          label={t("sortBy")}
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
         >
           {SORT_OPTIONS.map((o) => (
             <option key={o.key} value={o.key}>
-              {o.label}
+              {t(o.labelKey)}
             </option>
           ))}
         </Select>
@@ -226,24 +228,24 @@ export function HistoryTable({
 
       {filtered.length === 0 ? (
         <Card className="p-10 text-center text-fg-muted">
-          No hay torneos que coincidan con los filtros.
+          {t("noMatches")}
         </Card>
       ) : (
         <Card className="overflow-hidden">
           <Table>
             <THead>
               <TR>
-                <TH>Fecha</TH>
-                <TH>Disciplina</TH>
-                <TH>Torneo</TH>
-                <TH>Club</TH>
-                <TH>División</TH>
-                <TH>Factor</TH>
-                <TH className="text-right">Puesto</TH>
-                {showHits && <TH className="text-right">Impactos</TH>}
+                <TH>{t("colDate")}</TH>
+                <TH>{t("colDiscipline")}</TH>
+                <TH>{t("colMatch")}</TH>
+                <TH>{t("colClub")}</TH>
+                <TH>{t("colDivision")}</TH>
+                <TH>{t("colFactor")}</TH>
+                <TH className="text-right">{t("colPlace")}</TH>
+                {showHits && <TH className="text-right">{t("colHits")}</TH>}
                 {showExtras && (
-                  <TH className="text-right" title="Disparos por encima del mínimo del match">
-                    Extras
+                  <TH className="text-right" title={t("extrasTooltip")}>
+                    {t("colExtras")}
                   </TH>
                 )}
                 <TH className="text-right">%</TH>
@@ -269,7 +271,7 @@ export function HistoryTable({
                       <Link
                         href={`/matches/${e.matches?.id}/me?entry=${e.id}`}
                         className="font-medium text-fg hover:text-accent"
-                        title="Ver tu detalle del torneo"
+                        title={t("matchLinkTitle")}
                       >
                         {e.matches?.name}
                       </Link>
@@ -295,9 +297,9 @@ export function HistoryTable({
                     </TD>
                     <TD className="text-right font-mono">
                       {e.is_dq ? (
-                        <Badge tone="danger">DQ</Badge>
+                        <Badge tone="danger">{t("dq")}</Badge>
                       ) : e.is_absent ? (
-                        <Badge tone="default">Ausente</Badge>
+                        <Badge tone="default">{t("absent")}</Badge>
                       ) : (
                         e.place
                       )}
@@ -312,6 +314,9 @@ export function HistoryTable({
                         <ExtrasCell
                           minShots={e.matches?.min_shots ?? null}
                           roundsFired={e.match_firearm_log?.rounds_fired ?? null}
+                          tooltip={(min, used) =>
+                            t("extrasCellTooltip", { min, used })
+                          }
                         />
                       </TD>
                     )}
@@ -349,9 +354,11 @@ export function HistoryTable({
 function ExtrasCell({
   minShots,
   roundsFired,
+  tooltip,
 }: {
   minShots: number | null;
   roundsFired: number | null;
+  tooltip: (min: number, used: number) => string;
 }) {
   if (minShots == null || roundsFired == null) {
     return <span className="text-fg-subtle">—</span>;
@@ -360,7 +367,7 @@ function ExtrasCell({
   const tier = getAmmoExtrasTier(extras, minShots);
   return (
     <span
-      title={`${minShots} mín / ${roundsFired} usados`}
+      title={tooltip(minShots, roundsFired)}
       className={cn("tabular-nums", EXTRAS_TIER_CLASS[tier])}
     >
       {extras > 0 ? `+${extras}` : extras}

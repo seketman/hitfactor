@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
@@ -20,18 +20,33 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  // metadataBase hace que todas las URLs relativas de metadata (og:image,
-  // canonical, etc.) se resuelvan a URLs absolutas automáticamente.
-  metadataBase: new URL(getSiteUrl()),
-  title: "HitFactor",
-  description: "Tu historial de matches y stages de tiro deportivo.",
-  // Verificación de propiedad en Google Search Console y Bing Webmaster Tools.
-  verification: {
-    google: "3gnfzDn0WL6Gj0br1QOHIKMvNc3FGRYsFYKbNiHREHU",
-    other: { "msvalidate.01": "7215C47CF39FFCA40199B8DA385A5700" },
-  },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "meta" });
+  return {
+    // metadataBase hace que todas las URLs relativas de metadata (og:image,
+    // canonical, etc.) se resuelvan a URLs absolutas automáticamente.
+    metadataBase: new URL(getSiteUrl()),
+    title: "HitFactor",
+    description: t("description"),
+    // hreflang: relaciona las versiones es/en de la home para Google.
+    alternates: {
+      languages: {
+        es: "/es",
+        en: "/en",
+      },
+    },
+    // Verificación de propiedad en Google Search Console y Bing Webmaster Tools.
+    verification: {
+      google: "3gnfzDn0WL6Gj0br1QOHIKMvNc3FGRYsFYKbNiHREHU",
+      other: { "msvalidate.01": "7215C47CF39FFCA40199B8DA385A5700" },
+    },
+  };
+}
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));

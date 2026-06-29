@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 
 interface AuthLayoutProps {
   title: string;
@@ -18,7 +19,10 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
             <span className="inline-block h-2 w-2 rounded-full bg-accent" aria-hidden />
             <span className="font-semibold tracking-tight">HitFactor</span>
           </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <LocaleSwitcher />
+            <ThemeToggle />
+          </div>
         </div>
 
         <div className="rounded-[10px] border border-border bg-surface p-7">

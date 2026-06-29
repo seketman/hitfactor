@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -37,6 +38,7 @@ export default async function MatchesPage({ searchParams }: PageProps) {
   const { page: pageParam, size: sizeParam } = await searchParams;
 
   const { supabase, user } = await requireUser();
+  const t = await getTranslations("matches");
 
   // Si la URL trae `?size=N` y es válido, gana — eso permite compartir un
   // link con un tamaño puntual sin pisar la preferencia. Si no, usamos lo
@@ -87,34 +89,28 @@ export default async function MatchesPage({ searchParams }: PageProps) {
     <PageContainer>
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Matches</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
           <p className="mt-1 text-sm text-fg-muted">
-            {total === 0
-              ? "Todavía no se importó ningún match."
-              : `${total} torneo${total === 1 ? "" : "s"} cargado${total === 1 ? "" : "s"} en HitFactor`}
+            {total === 0 ? t("none") : t("loadedCount", { count: total })}
           </p>
           {total > 0 && (
             <p className="mt-1 max-w-prose text-sm text-fg-subtle">
-              Los importa la comunidad y quedan disponibles para todos. Buscá
-              uno en el que hayas participado y marcate con “Soy yo” — no hace
-              falta volver a subirlo.
+              {t("communityHint")}
             </p>
           )}
         </div>
         <Link href="/import">
-          <Button>Importar match</Button>
+          <Button>{t("importMatch")}</Button>
         </Link>
       </header>
 
       {total === 0 ? (
         <Card className="p-10 text-center">
           <p className="mx-auto max-w-prose text-fg-muted">
-            Sé el primero en importar uno desde tu planilla de PractiScore o el
-            CSV de Tiro FBI. Va a quedar disponible para todos los tiradores que
-            participaron, no solo para vos.
+            {t("emptyBody")}
           </p>
           <Link href="/import" className="mt-4 inline-block">
-            <Button size="sm">Importar el primero</Button>
+            <Button size="sm">{t("importFirst")}</Button>
           </Link>
         </Card>
       ) : (
@@ -138,7 +134,7 @@ export default async function MatchesPage({ searchParams }: PageProps) {
             size={size}
             sizes={PAGE_SIZES}
             basePath="/matches"
-            itemLabel={{ one: "torneo", many: "torneos" }}
+            itemLabel={{ one: t("itemOne"), many: t("itemMany") }}
             onSizeChange={saveMatchesPageSize}
           />
         </>
