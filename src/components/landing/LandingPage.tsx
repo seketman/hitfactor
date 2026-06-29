@@ -1,4 +1,6 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { LaPlataLink } from "@/components/LaPlataLink";
+import { Link } from "@/i18n/navigation";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
   ArrowDown,
@@ -53,7 +55,8 @@ export function LandingPage() {
 // Header
 // ---------------------------------------------------------------------------
 
-function SiteHeader() {
+async function SiteHeader() {
+  const t = await getTranslations("landing");
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -64,10 +67,10 @@ function SiteHeader() {
             href="/login"
             className="rounded-md px-3 py-2 text-sm font-medium text-fg-muted transition-colors hover:text-fg"
           >
-            Ingresar
+            {t("signIn")}
           </Link>
           <CtaLink href="/signup" size="sm">
-            Crear cuenta
+            {t("createAccount")}
           </CtaLink>
         </div>
       </div>
@@ -79,7 +82,9 @@ function SiteHeader() {
 // Hero
 // ---------------------------------------------------------------------------
 
-function Hero() {
+async function Hero() {
+  const t = await getTranslations("landing");
+  const benefits = [t("benefitFree"), t("benefitNoCard"), t("benefitYourData")];
   return (
     <section className="relative overflow-hidden">
       {/* Resplandor ámbar muy tenue desde el borde superior. */}
@@ -91,38 +96,34 @@ function Hero() {
         <div>
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wider text-fg-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
-            Tiro deportivo
+            {t("heroBadge")}
           </span>
 
           <h1 className="mt-5 text-4xl font-semibold tracking-tight text-fg sm:text-5xl sm:leading-[1.1]">
-            Tu historial de tiro deportivo, ordenado y en un solo lugar.
+            {t("heroTitle")}
           </h1>
 
           <p className="mt-5 max-w-xl text-base leading-relaxed text-fg-muted sm:text-lg">
-            Subís la planilla de resultados del torneo y HitFactor arma tu
-            historial, tus estadísticas y tu progreso en cada disciplina. Sin
-            planillas sueltas, sin llevar la cuenta a mano.
+            {t("heroSubtitle")}
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <CtaLink href="/signup" size="lg">
-              Crear cuenta gratis
+              {t("createAccountFree")}
               <ArrowRight className="h-4 w-4" aria-hidden />
             </CtaLink>
             <CtaLink href="/login" variant="secondary" size="lg">
-              Ya tengo cuenta
+              {t("haveAccount")}
             </CtaLink>
           </div>
 
           <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm text-fg-muted">
-            {["Gratis y sin límites", "Sin tarjeta de crédito", "Tus datos, solo tuyos"].map(
-              (item) => (
-                <li key={item} className="flex items-center gap-2">
-                  <CheckDot />
-                  {item}
-                </li>
-              ),
-            )}
+            {benefits.map((item) => (
+              <li key={item} className="flex items-center gap-2">
+                <CheckDot />
+                {item}
+              </li>
+            ))}
           </ul>
         </div>
 
@@ -137,7 +138,8 @@ function Hero() {
  * cómo se ve la app sin exponer datos reales ni ruido para lectores de
  * pantalla. Replica los KPI cards y el chart de evolución reales.
  */
-function HeroPreview() {
+async function HeroPreview() {
+  const t = await getTranslations("landing");
   const bars = [46, 56, 51, 63, 58, 69, 64, 74, 80];
 
   return (
@@ -147,22 +149,22 @@ function HeroPreview() {
 
       <div className="relative rounded-[10px] border border-border bg-surface p-5 shadow-sm">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-fg">Hola, tirador</p>
+          <p className="text-sm font-semibold text-fg">{t("previewGreeting")}</p>
           <span className="rounded-md bg-surface-2 px-2 py-0.5 text-[10px] font-medium text-fg-muted">
-            Consolidado
+            {t("previewConsolidated")}
           </span>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <PreviewKpi label="Torneos" value="19" />
-          <PreviewKpi label="Promedio %" value="71.4" />
-          <PreviewKpi label="Mejor puesto" value="#2" />
-          <PreviewKpi label="Tendencia" value="+2.3%" tone="text-success" />
+          <PreviewKpi label={t("previewMatches")} value="19" />
+          <PreviewKpi label={t("previewAvgPct")} value="71.4" />
+          <PreviewKpi label={t("previewBestPlace")} value="#2" />
+          <PreviewKpi label={t("previewTrend")} value="+2.3%" tone="text-success" />
         </div>
 
         <div className="mt-2.5 rounded-md border border-border bg-surface-2 px-3 py-3">
           <p className="text-[10px] font-medium uppercase tracking-wider text-fg-muted">
-            Evolución del %
+            {t("previewPctEvolution")}
           </p>
           <div className="mt-3 flex h-20 items-end gap-1.5">
             {bars.map((h, i) => (
@@ -212,34 +214,24 @@ function PreviewKpi({
 // Cómo funciona
 // ---------------------------------------------------------------------------
 
-const STEPS = [
-  {
-    icon: Upload,
-    title: "Se importa la planilla",
-    body: "Si el torneo todavía no está en HitFactor, subís el archivo de resultados del match. Se lee entero: tiradores, stages y puntajes.",
-  },
-  {
-    icon: UserCheck,
-    title: "Te encontrás en el ranking",
-    body: "Buscás tu nombre en la lista y hacés click en “Soy yo”. Ese resultado queda asociado a tu cuenta.",
-  },
-  {
-    icon: LineChart,
-    title: "Seguís tu progreso",
-    body: "Cada torneo nuevo se suma solo a tu historial. Ves tus posiciones, tus promedios y cómo venís mejorando.",
-  },
-];
+const STEP_ICONS = [Upload, UserCheck, LineChart];
 
-function HowItWorks() {
+async function HowItWorks() {
+  const t = await getTranslations("landing");
+  const steps = STEP_ICONS.map((icon, i) => ({
+    icon,
+    title: t(`step${i + 1}Title` as "step1Title"),
+    body: t(`step${i + 1}Body` as "step1Body"),
+  }));
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
       <SectionHeading
-        kicker="Cómo funciona"
-        title="De la planilla del match a tu historial"
-        subtitle="Tres pasos, una sola vez por torneo. El resto lo hace HitFactor."
+        kicker={t("howKicker")}
+        title={t("howTitle")}
+        subtitle={t("howSubtitle")}
       />
       <ol className="mt-12 grid gap-5 md:grid-cols-3">
-        {STEPS.map((step, i) => (
+        {steps.map((step, i) => (
           <li
             key={step.title}
             className="rounded-[10px] border border-border bg-surface p-6"
@@ -247,7 +239,7 @@ function HowItWorks() {
             <div className="flex items-center gap-3">
               <IconBadge icon={step.icon} />
               <span className="font-mono text-xs font-medium tracking-wider text-fg-subtle">
-                PASO {String(i + 1).padStart(2, "0")}
+                {t("step", { n: String(i + 1).padStart(2, "0") })}
               </span>
             </div>
             <h3 className="mt-4 text-base font-semibold text-fg">
@@ -268,7 +260,8 @@ function HowItWorks() {
 // disponible para todos los tiradores que participaron.
 // ---------------------------------------------------------------------------
 
-function SharedLibrary() {
+async function SharedLibrary() {
+  const t = await getTranslations("landing");
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
       <div className="grid gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
@@ -276,17 +269,14 @@ function SharedLibrary() {
           <div className="flex items-center gap-3">
             <IconBadge icon={Users} />
             <p className="text-xs font-medium uppercase tracking-wider text-accent">
-              Una sola vez
+              {t("sharedKicker")}
             </p>
           </div>
           <h2 className="mt-4 text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
-            Lo sube un tirador, lo aprovechan todos
+            {t("sharedTitle")}
           </h2>
           <p className="mt-3 text-base leading-relaxed text-fg-muted">
-            Cada torneo que se importa a HitFactor queda disponible para todos
-            los que participaron. ¿Tiraste un match que otro ya cargó? No lo
-            subas de nuevo: buscate en el ranking, marcate con “Soy yo” y tus
-            resultados aparecen al instante.
+            {t("sharedBody")}
           </p>
         </div>
         <SharedLibraryDiagram />
@@ -296,8 +286,9 @@ function SharedLibrary() {
 }
 
 /** Diagrama: un match importado → disponible para todos. Decorativo. */
-function SharedLibraryDiagram() {
-  const shooters = ["Vos", "Marina G.", "Felipe D."];
+async function SharedLibraryDiagram() {
+  const t = await getTranslations("landing");
+  const shooters = [t("sharedDiagramYou"), "Marina G.", "Felipe D."];
   return (
     <div
       className="mx-auto w-full max-w-md rounded-[10px] border border-border bg-surface p-5 lg:mx-0"
@@ -309,10 +300,10 @@ function SharedLibraryDiagram() {
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-fg">
-            Social Domingo
+            {t("sharedDiagramMatchName")}
           </p>
           <p className="text-xs text-fg-muted">
-            425 resultados · importado una vez
+            {t("sharedDiagramResults")}
           </p>
         </div>
       </div>
@@ -322,7 +313,7 @@ function SharedLibraryDiagram() {
       </div>
 
       <p className="text-[10px] font-medium uppercase tracking-wider text-fg-muted">
-        Disponible para todos
+        {t("sharedDiagramAvailable")}
       </p>
       <div className="mt-2 grid grid-cols-2 gap-2">
         {shooters.map((name) => (
@@ -338,7 +329,7 @@ function SharedLibraryDiagram() {
         ))}
         <div className="flex items-center gap-2 rounded-md border border-dashed border-border px-2.5 py-2">
           <span className="truncate text-xs font-medium text-fg-subtle">
-            + 422 tiradores
+            {t("sharedDiagramMore")}
           </span>
         </div>
       </div>
@@ -350,50 +341,32 @@ function SharedLibraryDiagram() {
 // Features
 // ---------------------------------------------------------------------------
 
-const FEATURES = [
-  {
-    icon: History,
-    title: "Historial completo",
-    body: "Todos los torneos que disputaste, con fecha, club, división y posición final.",
-  },
-  {
-    icon: BarChart3,
-    title: "Estadísticas claras",
-    body: "Hit factor, match %, percentil y promedios calculados solos, torneo a torneo.",
-  },
-  {
-    icon: ListChecks,
-    title: "Resultados por stage",
-    body: "No solo el total: cómo te fue en cada stage del match, con tiempos y puntajes.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Tu evolución",
-    body: "Un gráfico simple que muestra si venís subiendo, estable o en baja.",
-  },
-  {
-    icon: Crosshair,
-    title: "Tus armas",
-    body: "Anotá con qué arma tiraste cada torneo y llevá la cuenta de tus disparos.",
-  },
-  {
-    icon: Layers,
-    title: "Todo junto o por disciplina",
-    body: "Mirá cada disciplina por separado o todas combinadas en una vista consolidada.",
-  },
+const FEATURE_ICONS = [
+  History,
+  BarChart3,
+  ListChecks,
+  TrendingUp,
+  Crosshair,
+  Layers,
 ];
 
-function Features() {
+async function Features() {
+  const t = await getTranslations("landing");
+  const features = FEATURE_ICONS.map((icon, i) => ({
+    icon,
+    title: t(`feature${i + 1}Title` as "feature1Title"),
+    body: t(`feature${i + 1}Body` as "feature1Body"),
+  }));
   return (
     <section className="border-y border-border bg-surface">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <SectionHeading
-          kicker="Qué vas a ver"
-          title="Pensado para que veas lo que importa"
-          subtitle="Las cuentas las hace HitFactor. Vos mirás tus resultados."
+          kicker={t("featuresKicker")}
+          title={t("featuresTitle")}
+          subtitle={t("featuresSubtitle")}
         />
         <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((feature) => (
+          {features.map((feature) => (
             <div
               key={feature.title}
               className="rounded-[10px] border border-border bg-bg p-6 transition-colors hover:border-border-strong"
@@ -417,23 +390,29 @@ function Features() {
 // Disciplinas
 // ---------------------------------------------------------------------------
 
-const DISCIPLINES = [
-  { code: DISCIPLINE.IPSC, name: "IPSC", note: "Hit factor y match %." },
-  { code: DISCIPLINE.STEEL, name: "Steel Challenge", note: "Ranking por tiempo." },
-  { code: DISCIPLINE.COMBAT, name: "Combat Solutions", note: "Puntaje por tiempo." },
-  { code: DISCIPLINE.FBI, name: "Tiro FBI", note: "Ranking por impactos." },
-];
+const DISCIPLINE_DATA = [
+  { code: DISCIPLINE.IPSC, name: "IPSC", noteKey: "disciplineIpscNote" },
+  { code: DISCIPLINE.STEEL, name: "Steel Challenge", noteKey: "disciplineSteelNote" },
+  { code: DISCIPLINE.COMBAT, name: "Combat Solutions", noteKey: "disciplineCombatNote" },
+  { code: DISCIPLINE.FBI, name: "Tiro FBI", noteKey: "disciplineFbiNote" },
+] as const;
 
-function Disciplines() {
+async function Disciplines() {
+  const t = await getTranslations("landing");
+  const disciplines = DISCIPLINE_DATA.map((d) => ({
+    code: d.code,
+    name: d.name,
+    note: t(d.noteKey),
+  }));
   return (
     <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
       <SectionHeading
-        kicker="Disciplinas"
-        title="Hecho para cómo se puntúa cada una"
-        subtitle="HitFactor entiende que no todas las disciplinas se miden igual."
+        kicker={t("disciplinesKicker")}
+        title={t("disciplinesTitle")}
+        subtitle={t("disciplinesSubtitle")}
       />
       <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {DISCIPLINES.map((discipline) => {
+        {disciplines.map((discipline) => {
           const Icon = getDisciplineIcon(discipline.code);
           return (
             <div
@@ -461,7 +440,8 @@ function Disciplines() {
 // CTA final
 // ---------------------------------------------------------------------------
 
-function FinalCta() {
+async function FinalCta() {
+  const t = await getTranslations("landing");
   return (
     <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 sm:pb-28">
       <div className="relative overflow-hidden rounded-[14px] border border-border bg-surface px-6 py-14 text-center sm:px-12">
@@ -471,19 +451,18 @@ function FinalCta() {
         />
         <div className="relative mx-auto max-w-xl">
           <h2 className="text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
-            Empezá hoy tu historial de tiro
+            {t("ctaTitle")}
           </h2>
           <p className="mt-3 text-base leading-relaxed text-fg-muted">
-            Crear la cuenta toma menos de un minuto. El primer torneo que
-            importes ya te va a mostrar resultados.
+            {t("ctaBody")}
           </p>
           <div className="mt-7 flex flex-wrap justify-center gap-3">
             <CtaLink href="/signup" size="lg">
-              Crear cuenta gratis
+              {t("createAccountFree")}
               <ArrowRight className="h-4 w-4" aria-hidden />
             </CtaLink>
             <CtaLink href="/login" variant="secondary" size="lg">
-              Ya tengo cuenta
+              {t("haveAccount")}
             </CtaLink>
           </div>
         </div>
@@ -496,15 +475,19 @@ function FinalCta() {
 // Footer
 // ---------------------------------------------------------------------------
 
-function SiteFooter() {
+async function SiteFooter() {
+  const t = await getTranslations("landing");
   return (
     <footer className="border-t border-border bg-surface">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           <Wordmark />
           <p className="mt-2 text-sm text-fg-muted">
-            Creado por{" "}
-            <span className="font-medium text-fg">Seketman</span> en La Plata.
+            {t("footerCreatedByBefore")}{" "}
+            <span className="font-medium text-fg">Seketman</span>{" "}
+            {t.rich("footerCreatedByAfter", {
+              city: (chunks) => <LaPlataLink>{chunks}</LaPlataLink>,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-5 text-sm">
@@ -512,13 +495,13 @@ function SiteFooter() {
             href="/login"
             className="text-fg-muted transition-colors hover:text-fg"
           >
-            Ingresar
+            {t("signIn")}
           </Link>
           <Link
             href="/signup"
             className="text-fg-muted transition-colors hover:text-fg"
           >
-            Crear cuenta
+            {t("createAccount")}
           </Link>
         </div>
       </div>

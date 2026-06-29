@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useTranslations } from "next-intl";
 import { cn, formatDate, formatPercent } from "@/lib/utils";
 import type { MatchTimelinePoint } from "@/lib/stats/shooter-stats";
 
@@ -32,6 +33,7 @@ interface PerformanceChartProps {
 export function PerformanceChart({ points, mode = "percentage" }: PerformanceChartProps) {
   const [hover, setHover] = useState<number | null>(null);
   const gradientId = useId();
+  const t = useTranslations("dashboard.chart");
 
   // Para "hits", excluimos puntos sin hits (matches de IPSC/Steel cuando el
   // dashboard es consolidado). Si no quedan al menos 2 puntos, no graficamos.
@@ -101,9 +103,7 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
   const xLabelStep = Math.max(1, Math.ceil(filteredPoints.length / 5));
 
   const ariaLabel =
-    mode === "hits"
-      ? "Evolución de impactos"
-      : "Evolución del match percentage";
+    mode === "hits" ? t("hitsEvolution") : t("pctEvolution");
 
   return (
     <div className="mt-3">
@@ -167,9 +167,9 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
           const cy = isInvalid ? yFor(0) : yFor(valueOf(p));
           const isHover = hover === i;
           const statusLabel = p.isDq
-            ? "DQ"
+            ? t("dq")
             : p.isAbsent
-              ? "Ausente"
+              ? t("absent")
               : formatValue(valueOf(p));
           return (
             <g key={p.matchId + i}>
@@ -234,14 +234,14 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
           </span>
           <span className="ml-auto font-mono">
             {filteredPoints[hover].isDq
-              ? "DQ"
+              ? t("dq")
               : filteredPoints[hover].isAbsent
-                ? "Ausente"
+                ? t("absent")
                 : formatValue(valueOf(filteredPoints[hover]))}
             {!filteredPoints[hover].isDq &&
               !filteredPoints[hover].isAbsent && (
                 <span className="ml-2 text-fg-subtle">
-                  puesto #{filteredPoints[hover].place}
+                  {t("place", { place: filteredPoints[hover].place })}
                 </span>
               )}
           </span>

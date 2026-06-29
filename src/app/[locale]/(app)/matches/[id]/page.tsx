@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -36,6 +36,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
   const { error, from } = await searchParams;
 
   const { supabase, user } = await requireUser();
+  const t = await getTranslations("matches.detail");
   const userId = user.id;
 
   const match = await getMatchById(supabase, id);
@@ -114,11 +115,11 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
             {match.disciplines?.name && <span>· {match.disciplines.name}</span>}
           </div>
           <p className="mt-2 text-xs text-fg-subtle">
-            Importado por{" "}
+            {t("importedBy")}{" "}
             <span className="text-fg-muted">
               {importerProfile?.display_name ?? "—"}
             </span>{" "}
-            el {formatDateTime(match.imported_at)}
+            {t("importedOn", { date: formatDateTime(match.imported_at) })}
           </p>
         </div>
 
@@ -141,11 +142,11 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
       {stages.length > 0 && (
         <Card className="mb-8 p-4">
           <p className="mb-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Stages cargados ({stages.length})
+            {t("stagesLoaded", { count: stages.length })}
           </p>
           <div className="flex flex-wrap gap-2">
             {stages.map((s) => (
-              <Badge key={s.id}>Stage {s.stage_number}</Badge>
+              <Badge key={s.id}>{t("stage", { n: s.stage_number ?? "" })}</Badge>
             ))}
           </div>
         </Card>
@@ -153,7 +154,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
 
       {isHitsBased && (
         <p className="-mt-4 mb-6 text-xs text-fg-subtle">
-          Ranking por <strong className="text-fg-muted">impactos</strong> (puntos como desempate).
+          {t("rankByHitsBefore")}{" "}
+          <strong className="text-fg-muted">{t("rankByHitsBold")}</strong>{" "}
+          {t("rankByHitsAfter")}
         </p>
       )}
 
@@ -188,13 +191,13 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
                         ancho explícito md:w-24 porque la columna no se ensancha
                         sola — con w-12 el badge se desbordaba sobre el nombre. */}
                     <TH className="w-12 md:w-24">#</TH>
-                    <TH>Tirador</TH>
-                    <TH className="md:w-40">Categoría</TH>
+                    <TH>{t("colShooter")}</TH>
+                    <TH className="md:w-40">{t("colCategory")}</TH>
                     {isHitsBased && (
-                      <TH className="text-right md:w-24">Impactos</TH>
+                      <TH className="text-right md:w-24">{t("colHits")}</TH>
                     )}
                     <TH className="text-right md:w-28">
-                      {isTimeBased ? "Tiempo" : "Puntos"}
+                      {isTimeBased ? t("colTime") : t("colPoints")}
                     </TH>
                     <TH className="text-right md:w-20">%</TH>
                     <TH className="w-28"></TH>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useId } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
+import { Link } from "@/i18n/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ export function Pagination({
 }: PaginationProps) {
   const router = useRouter();
   const selectId = useId();
+  const t = useTranslations("matches.pagination");
 
   const buildHref = (p: number) => `${basePath}?page=${p}&size=${size}`;
 
@@ -76,7 +78,7 @@ export function Pagination({
     <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-sm">
       <div className="flex items-center gap-2 text-fg-muted">
         <label htmlFor={selectId} className="text-xs uppercase tracking-wider">
-          Por página
+          {t("perPage")}
         </label>
         <select
           id={selectId}
@@ -93,29 +95,27 @@ export function Pagination({
         <span className="ml-2">
           {totalPages > 1 ? (
             <>
-              Página <span className="text-fg">{page}</span> de{" "}
+              {t("page")} <span className="text-fg">{page}</span> {t("of")}{" "}
               <span className="text-fg">{totalPages}</span>{" "}
               <span className="text-fg-subtle">
-                ({total} {itemWord})
+                ({t("countItem", { count: total, item: itemWord })})
               </span>
             </>
           ) : (
-            <>
-              {total} {itemWord}
-            </>
+            <>{t("countItem", { count: total, item: itemWord })}</>
           )}
         </span>
       </div>
 
       {totalPages > 1 && (
-        <nav className="flex items-center gap-1" aria-label="Paginación">
+        <nav className="flex items-center gap-1" aria-label={t("ariaLabel")}>
           <PageLink
             href={buildHref(page - 1)}
             disabled={page <= 1}
-            label="Anterior"
+            label={t("previous")}
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
-            <span className="hidden sm:inline">Anterior</span>
+            <span className="hidden sm:inline">{t("previous")}</span>
           </PageLink>
 
           {getPageItems(page, totalPages).map((item, i) =>
@@ -140,9 +140,9 @@ export function Pagination({
           <PageLink
             href={buildHref(page + 1)}
             disabled={page >= totalPages}
-            label="Siguiente"
+            label={t("next")}
           >
-            <span className="hidden sm:inline">Siguiente</span>
+            <span className="hidden sm:inline">{t("next")}</span>
             <ChevronRight className="h-4 w-4" aria-hidden />
           </PageLink>
         </nav>

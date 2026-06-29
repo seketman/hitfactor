@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -14,25 +15,26 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string; info?: string; next?: string }>;
 }) {
   const params = await searchParams;
+  const t = await getTranslations("auth");
   // Validamos el `next` acá mismo: si no es interno, no lo metemos en el
   // form (la server action también lo re-valida — defense in depth).
   const next = isInternalAppPath(params.next) ? params.next : null;
 
   return (
     <AuthLayout
-      title="Ingresar"
-      subtitle="Tu historial de matches y stages."
+      title={t("login.title")}
+      subtitle={t("login.subtitle")}
       footer={
         <>
-          ¿No tenés cuenta?{" "}
+          {t("login.noAccount")}{" "}
           <Link href="/signup" className="text-accent hover:underline">
-            Registrate
+            {t("login.signUpLink")}
           </Link>
         </>
       }
     >
       {params.error && (
-        <Alert tone="danger" className="mb-4" title="No se pudo ingresar">
+        <Alert tone="danger" className="mb-4" title={t("login.errorTitle")}>
           {params.error}
         </Alert>
       )}
@@ -42,25 +44,25 @@ export default async function LoginPage({
         </Alert>
       )}
 
-      <GoogleSignInButton label="Continuar con Google" />
+      <GoogleSignInButton label={t("continueWithGoogle")} />
 
       <div className="my-5 flex items-center gap-3 text-xs text-fg-subtle">
         <span className="h-px flex-1 bg-border" aria-hidden />
-        <span>o con tu email</span>
+        <span>{t("orWithEmail")}</span>
         <span className="h-px flex-1 bg-border" aria-hidden />
       </div>
 
       <form action={login} className="space-y-4">
         {next && <input type="hidden" name="next" value={next} />}
-        <Input label="Email" type="email" name="email" required autoComplete="email" />
+        <Input label={t("email")} type="email" name="email" required autoComplete="email" />
         <PasswordInput
-          label="Contraseña"
+          label={t("password")}
           name="password"
           required
           autoComplete="current-password"
         />
         <Button type="submit" className="w-full">
-          Ingresar
+          {t("login.submit")}
         </Button>
       </form>
     </AuthLayout>

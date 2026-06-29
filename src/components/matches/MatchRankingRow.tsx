@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { TD, TR } from "@/components/ui/Table";
@@ -5,7 +6,7 @@ import { cn, formatNumber, formatPercent } from "@/lib/utils";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { claimShooter } from "@/lib/actions/claim";
 import { PlaceCell } from "@/components/matches/PlaceCell";
-import { toggleEntryAbsent } from "@/app/(app)/matches/[id]/actions";
+import { toggleEntryAbsent } from "@/app/[locale]/(app)/matches/[id]/actions";
 
 /**
  * Fila del ranking público de un match. El cómputo de los flags
@@ -13,7 +14,7 @@ import { toggleEntryAbsent } from "@/app/(app)/matches/[id]/actions";
  * (`isHitsBased`/`isTimeBased`) se calculan en la página y se pasan como
  * props — acá solo vive el JSX, movido verbatim desde matches/[id]/page.tsx.
  */
-export function MatchRankingRow({
+export async function MatchRankingRow({
   entry: e,
   matchId,
   isMine,
@@ -30,6 +31,7 @@ export function MatchRankingRow({
   isHitsBased: boolean;
   isTimeBased: boolean;
 }) {
+  const t = await getTranslations("matches.detail");
   const shooter = e.shooters;
   return (
     <TR
@@ -43,7 +45,7 @@ export function MatchRankingRow({
       <TD>
         <div className="flex items-center gap-2 font-medium">
           {shooter?.full_name}
-          {isMine && <Badge tone="accent">vos</Badge>}
+          {isMine && <Badge tone="accent">{t("you")}</Badge>}
         </div>
         {shooter?.member_number && (
           <div className="font-mono text-xs text-fg-subtle">
@@ -103,7 +105,7 @@ export function MatchRankingRow({
                 value={matchId}
               />
               <Button type="submit" variant="secondary" size="sm">
-                Soy yo
+                {t("imYou")}
               </Button>
             </form>
           )}
@@ -111,7 +113,7 @@ export function MatchRankingRow({
             shooter?.linked_user_id &&
             !isMine && (
               <span className="text-xs text-fg-subtle">
-                ya asociado
+                {t("alreadyLinked")}
               </span>
             )}
           {canToggleAbsent && (
@@ -132,9 +134,7 @@ export function MatchRankingRow({
                 size="sm"
                 className="text-xs"
               >
-                {e.is_absent
-                  ? "Sí asistió"
-                  : "Marcar ausente"}
+                {e.is_absent ? t("markPresent") : t("markAbsent")}
               </Button>
             </form>
           )}

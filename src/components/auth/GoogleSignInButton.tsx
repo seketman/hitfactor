@@ -3,7 +3,7 @@
 import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { signInWithGoogle } from "@/app/(auth)/oauth";
+import { signInWithGoogle } from "@/app/[locale]/(auth)/oauth";
 
 /**
  * Botón "Continuar con Google" para login y signup. Usa la action

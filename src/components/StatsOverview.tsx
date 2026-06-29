@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
 import { PerformanceChart } from "@/components/PerformanceChart";
 import { cn, formatPercent, formatDate } from "@/lib/utils";
@@ -21,6 +22,8 @@ const EXTRAS_TIER_CLASS: Record<AmmoExtrasTier, string> = {
 };
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
+type StatsT = Awaited<ReturnType<typeof getTranslations<"dashboard.stats">>>;
+
 /**
  * Bloque de KPIs + chart para el historial del tirador.
  * Se renderiza solo si hay al menos un torneo válido (no DQ).
@@ -36,7 +39,7 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
  * fila extra de 4 KPIs de impactos para que el tirador siga viendo su
  * progreso por esa dimensión.
  */
-export function StatsOverview({
+export async function StatsOverview({
   stats,
   primaryMetric = "percentage",
 }: {
@@ -44,6 +47,8 @@ export function StatsOverview({
   primaryMetric?: "percentage" | "hits";
 }) {
   if (stats.scoredMatches === 0) return null;
+
+  const t = await getTranslations("dashboard.stats");
 
   const hitsTimelineCount = stats.timeline.filter((p) => p.hits !== null).length;
   const hasHits = hitsTimelineCount >= 2;
@@ -57,13 +62,16 @@ export function StatsOverview({
   const dqCount = stats.timeline.filter((p) => p.isDq).length;
   const absentCount = stats.timeline.filter((p) => p.isAbsent).length;
   const invalidParts: string[] = [];
-  if (dqCount > 0) invalidParts.push(`${dqCount} DQ`);
+  if (dqCount > 0) invalidParts.push(t("dqCount", { count: dqCount }));
   if (absentCount > 0) {
-    invalidParts.push(`${absentCount} ausente${absentCount === 1 ? "" : "s"}`);
+    invalidParts.push(t("absentCount", { count: absentCount }));
   }
   const invalidHint =
     invalidParts.length > 0
-      ? `${stats.scoredMatches} válidos · ${invalidParts.join(" · ")}`
+      ? t("invalidHint", {
+          scored: stats.scoredMatches,
+          parts: invalidParts.join(" · "),
+        })
       : undefined;
 
   return (
@@ -71,7 +79,7 @@ export function StatsOverview({
       {/* Fila 1: performance — métrica primaria */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label="Torneos disputados"
+          label={t("matchesPlayed")}
           value={String(stats.totalMatches)}
           hint={invalidHint}
         />
@@ -79,12 +87,12 @@ export function StatsOverview({
         {showHitsAsPrimary ? (
           <>
             <KpiCard
-              label="Promedio impactos"
+              label={t("avgHits")}
               value={stats.avgHits !== null ? stats.avgHits.toFixed(1) : "—"}
-              hint={`sobre ${hitsTimelineCount} torneo${hitsTimelineCount === 1 ? "" : "s"}`}
+              hint={t("avgHitsHint", { count: hitsTimelineCount })}
             />
             <KpiCard
-              label="Mejor impactos"
+              label={t("bestHits")}
               value={stats.bestHits ? String(stats.bestHits.value) : "—"}
               hint={
                 stats.bestHits ? (
@@ -102,16 +110,16 @@ export function StatsOverview({
         ) : (
           <>
             <KpiCard
-              label="Promedio %"
+              label={t("avgPct")}
               value={formatPercent(stats.avgPercentage)}
               hint={
                 stats.topDivision
-                  ? `Top div: ${stats.topDivision.code}`
+                  ? t("topDivHint", { code: stats.topDivision.code })
                   : undefined
               }
             />
             <KpiCard
-              label="Mejor %"
+              label={t("bestPct")}
               value={
                 stats.bestPercentage
                   ? formatPercent(stats.bestPercentage.value)
@@ -133,7 +141,7 @@ export function StatsOverview({
         )}
 
         <KpiCard
-          label="Mejor puesto"
+          label={t("bestPlace")}
           value={stats.bestPlace ? `#${stats.bestPlace.value}` : "—"}
           hint={
             stats.bestPlace ? (
@@ -154,12 +162,12 @@ export function StatsOverview({
       {showHitsExtraRow && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
-            label="Promedio impactos"
+            label={t("avgHits")}
             value={stats.avgHits !== null ? stats.avgHits.toFixed(1) : "—"}
-            hint={`sobre ${hitsTimelineCount} torneo${hitsTimelineCount === 1 ? "" : "s"} FBI`}
+            hint={t("avgHitsHintFbi", { count: hitsTimelineCount })}
           />
           <KpiCard
-            label="Mejor impactos"
+            label={t("bestHits")}
             value={stats.bestHits ? String(stats.bestHits.value) : "—"}
             hint={
               stats.bestHits ? (
@@ -173,26 +181,26 @@ export function StatsOverview({
               ) : undefined
             }
           />
-          <ConsistencyHitsCard value={stats.consistencyHits} />
-          <SlopeHitsCard slope={stats.trajectoryHitsSlope} />
+          <ConsistencyHitsCard value={stats.consistencyHits} t={t} />
+          <SlopeHitsCard slope={stats.trajectoryHitsSlope} t={t} />
         </div>
       )}
 
       {/* Fila 2: KPIs derivados — consistencia / tendencia siguen primaryMetric */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <PercentileCard avg={stats.avgPercentile} best={stats.bestPercentile} />
+        <PercentileCard avg={stats.avgPercentile} best={stats.bestPercentile} t={t} />
         {showHitsAsPrimary ? (
           <>
-            <ConsistencyHitsCard value={stats.consistencyHits} />
-            <SlopeHitsCard slope={stats.trajectoryHitsSlope} />
+            <ConsistencyHitsCard value={stats.consistencyHits} t={t} />
+            <SlopeHitsCard slope={stats.trajectoryHitsSlope} t={t} />
           </>
         ) : (
           <>
-            <ConsistencyCard value={stats.consistency} />
-            <SlopeCard slope={stats.trajectorySlope} />
+            <ConsistencyCard value={stats.consistency} t={t} />
+            <SlopeCard slope={stats.trajectorySlope} t={t} />
           </>
         )}
-        <CadenceCard cadence={stats.cadence} />
+        <CadenceCard cadence={stats.cadence} t={t} />
       </div>
 
       {/* Por stage: KPIs cross-matches a nivel de stage (podios, ganados,
@@ -211,25 +219,26 @@ export function StatsOverview({
         return (
           <div className={cn("grid gap-3 sm:grid-cols-2", gridLg)}>
             <KpiCard
-              label="Podios por stage"
+              label={t("podiumsPerStage")}
               value={`${stats.stageStats!.podiumRate.toFixed(0)}%`}
-              hint={`stages top 3 · ${stats.stageStats!.scoredStages} contabilizados`}
+              hint={t("podiumsHint", { count: stats.stageStats!.scoredStages })}
             />
             <KpiCard
-              label="Stages ganados"
+              label={t("stagesWon")}
               value={`${stats.stageStats!.winRate.toFixed(0)}%`}
-              hint="stages con #1"
+              hint={t("stagesWonHint")}
             />
             {showPenalties && (
               <PenaltyRateCard
                 rate={stats.stageStats!.penaltyRate}
                 tracksPenalties={true}
+                t={t}
               />
             )}
             <KpiCard
-              label="Mejor stage %"
+              label={t("bestStagePct")}
               value={formatPercent(stats.stageStats!.bestStagePercentage)}
-              hint="máximo % de stage"
+              hint={t("bestStagePctHint")}
             />
           </div>
         );
@@ -243,8 +252,8 @@ export function StatsOverview({
       */}
       {stats.ammoEfficiency && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <AmmoAvgExtrasCard ammo={stats.ammoEfficiency} />
-          <AmmoTotalExtrasCard ammo={stats.ammoEfficiency} />
+          <AmmoAvgExtrasCard ammo={stats.ammoEfficiency} t={t} />
+          <AmmoTotalExtrasCard ammo={stats.ammoEfficiency} t={t} />
         </div>
       )}
 
@@ -261,13 +270,13 @@ export function StatsOverview({
         <>
           <Card className="px-5 py-4">
             <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-              Evolución de impactos
+              {t("hitsEvolution")}
             </p>
             {stats.timeline.length >= 2 ? (
               <PerformanceChart points={stats.timeline} mode="hits" />
             ) : (
               <p className="mt-3 text-sm text-fg-subtle">
-                Necesitás al menos 2 torneos para ver la evolución.
+                {t("needTwoMatches")}
               </p>
             )}
           </Card>
@@ -277,14 +286,14 @@ export function StatsOverview({
                 <span className="transition-transform group-open:rotate-90" aria-hidden>
                   ▸
                 </span>
-                Ver también: evolución del %
+                {t("alsoSeePctEvolution")}
               </summary>
               <div className="mt-3">
                 {stats.timeline.length >= 2 ? (
                   <PerformanceChart points={stats.timeline} mode="percentage" />
                 ) : (
                   <p className="text-sm text-fg-subtle">
-                    Necesitás al menos 2 torneos para ver la evolución.
+                    {t("needTwoMatches")}
                   </p>
                 )}
               </div>
@@ -295,13 +304,13 @@ export function StatsOverview({
         <>
           <Card className="px-5 py-4">
             <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-              Evolución del %
+              {t("pctEvolution")}
             </p>
             {stats.timeline.length >= 2 ? (
               <PerformanceChart points={stats.timeline} mode="percentage" />
             ) : (
               <p className="mt-3 text-sm text-fg-subtle">
-                Necesitás al menos 2 torneos para ver la evolución.
+                {t("needTwoMatches")}
               </p>
             )}
           </Card>
@@ -309,7 +318,7 @@ export function StatsOverview({
           {hasHits && (
             <Card className="px-5 py-4">
               <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-                Evolución de impactos
+                {t("hitsEvolution")}
               </p>
               <PerformanceChart points={stats.timeline} mode="hits" />
             </Card>
@@ -320,7 +329,7 @@ export function StatsOverview({
       {stats.byDiscipline.length > 1 && (
         <Card className="px-5 py-4">
           <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Por disciplina
+            {t("byDiscipline")}
           </p>
           <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {stats.byDiscipline.map((d) => (
@@ -331,7 +340,7 @@ export function StatsOverview({
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{d.name}</p>
                   <p className="text-xs text-fg-muted">
-                    {d.count} torneo{d.count === 1 ? "" : "s"}
+                    {t("matchesCount", { count: d.count })}
                   </p>
                 </div>
                 <div className="text-right text-xs">
@@ -339,7 +348,7 @@ export function StatsOverview({
                     {formatPercent(d.avgPercentage)}
                   </p>
                   <p className="text-fg-subtle">
-                    máx {formatPercent(d.bestPercentage)}
+                    {t("max", { value: formatPercent(d.bestPercentage) })}
                   </p>
                 </div>
               </li>
@@ -387,16 +396,18 @@ function KpiCard({
 function PercentileCard({
   avg,
   best,
+  t,
 }: {
   avg: number | null;
   best: ShooterStats["bestPercentile"];
+  t: StatsT;
 }) {
   if (avg === null) {
     return (
       <KpiCard
-        label="% superado en división"
+        label={t("percentileLabel")}
         value="—"
-        hint="Sin datos de tamaño de división"
+        hint={t("percentileNoData")}
       />
     );
   }
@@ -408,7 +419,7 @@ function PercentileCard({
   const surpassedAvg = 100 - avg;
   return (
     <KpiCard
-      label="% superado en división"
+      label={t("percentileLabel")}
       value={`${surpassedAvg.toFixed(0)}%`}
       hint={
         best ? (
@@ -417,65 +428,70 @@ function PercentileCard({
             className="hover:text-accent"
             title={best.matchName}
           >
-            mejor: {(100 - best.value).toFixed(0)}% ({formatDate(best.date)})
+            {t("percentileBest", {
+              value: (100 - best.value).toFixed(0),
+              date: formatDate(best.date),
+            })}
           </Link>
         ) : (
-          "mayor = mejor"
+          t("percentileHigherBetter")
         )
       }
     />
   );
 }
 
-function ConsistencyCard({ value }: { value: number | null }) {
+function ConsistencyCard({ value, t }: { value: number | null; t: StatsT }) {
   if (value === null) {
     return (
       <KpiCard
-        label="Consistencia"
+        label={t("consistency")}
         value="—"
-        hint="Necesitás al menos 2 torneos"
+        hint={t("consistencyNoData")}
       />
     );
   }
   // Convención: <10 sólido, 10-20 normal, >20 volátil.
-  const tag = value < 10 ? "sólido" : value < 20 ? "normal" : "volátil";
+  const tag =
+    value < 10 ? t("tagSolid") : value < 20 ? t("tagNormal") : t("tagVolatile");
   return (
     <KpiCard
-      label="Consistencia"
+      label={t("consistency")}
       value={`±${value.toFixed(1)}%`}
-      hint={`${tag} · menor = más predecible`}
+      hint={t("consistencyHint", { tag })}
     />
   );
 }
 
-function ConsistencyHitsCard({ value }: { value: number | null }) {
+function ConsistencyHitsCard({ value, t }: { value: number | null; t: StatsT }) {
   if (value === null) {
     return (
       <KpiCard
-        label="Consistencia impactos"
+        label={t("consistencyHits")}
         value="—"
-        hint="Necesitás al menos 2 torneos FBI"
+        hint={t("consistencyHitsNoData")}
       />
     );
   }
   // FBI: 40 impactos máx. Umbrales: <2 sólido, 2-5 normal, >5 volátil.
-  const tag = value < 2 ? "sólido" : value < 5 ? "normal" : "volátil";
+  const tag =
+    value < 2 ? t("tagSolid") : value < 5 ? t("tagNormal") : t("tagVolatile");
   return (
     <KpiCard
-      label="Consistencia impactos"
+      label={t("consistencyHits")}
       value={`±${value.toFixed(1)}`}
-      hint={`${tag} · menor = más predecible`}
+      hint={t("consistencyHint", { tag })}
     />
   );
 }
 
-function SlopeCard({ slope }: { slope: number | null }) {
+function SlopeCard({ slope, t }: { slope: number | null; t: StatsT }) {
   if (slope === null) {
     return (
       <KpiCard
-        label="Tendencia"
+        label={t("trend")}
         value="—"
-        hint="Necesitás al menos 2 torneos"
+        hint={t("trendNoData")}
       />
     );
   }
@@ -495,7 +511,7 @@ function SlopeCard({ slope }: { slope: number | null }) {
   return (
     <Card className="px-5 py-4">
       <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-        Tendencia
+        {t("trend")}
       </p>
       <p
         className={cn(
@@ -504,22 +520,22 @@ function SlopeCard({ slope }: { slope: number | null }) {
         )}
       >
         <Icon className="h-5 w-5" aria-hidden />
-        {isFlat ? "Estable" : `${sign}${slope.toFixed(1)}%`}
+        {isFlat ? t("stable") : `${sign}${slope.toFixed(1)}%`}
       </p>
       <p className="mt-1 text-xs text-fg-subtle">
-        {isFlat ? "regresión lineal sobre tu historial" : "% por torneo (regresión lineal)"}
+        {isFlat ? t("trendStableHint") : t("trendPctHint")}
       </p>
     </Card>
   );
 }
 
-function SlopeHitsCard({ slope }: { slope: number | null }) {
+function SlopeHitsCard({ slope, t }: { slope: number | null; t: StatsT }) {
   if (slope === null) {
     return (
       <KpiCard
-        label="Tendencia impactos"
+        label={t("trendHits")}
         value="—"
-        hint="Necesitás al menos 2 torneos FBI"
+        hint={t("trendHitsNoData")}
       />
     );
   }
@@ -538,7 +554,7 @@ function SlopeHitsCard({ slope }: { slope: number | null }) {
   return (
     <Card className="px-5 py-4">
       <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-        Tendencia impactos
+        {t("trendHits")}
       </p>
       <p
         className={cn(
@@ -547,12 +563,10 @@ function SlopeHitsCard({ slope }: { slope: number | null }) {
         )}
       >
         <Icon className="h-5 w-5" aria-hidden />
-        {isFlat ? "Estable" : `${sign}${slope.toFixed(1)}`}
+        {isFlat ? t("stable") : `${sign}${slope.toFixed(1)}`}
       </p>
       <p className="mt-1 text-xs text-fg-subtle">
-        {isFlat
-          ? "regresión lineal sobre tu historial"
-          : "impactos por torneo (regresión lineal)"}
+        {isFlat ? t("trendStableHint") : t("trendHitsHint")}
       </p>
     </Card>
   );
@@ -561,9 +575,11 @@ function SlopeHitsCard({ slope }: { slope: number | null }) {
 function PenaltyRateCard({
   rate,
   tracksPenalties,
+  t,
 }: {
   rate: number | null;
   tracksPenalties: boolean;
+  t: StatsT;
 }) {
   if (rate === null) {
     // Distinguimos "no aplica" (FBI/Steel) de "aplica pero el archivo
@@ -571,23 +587,23 @@ function PenaltyRateCard({
     // Mismo display "—" pero hint preciso para no engañar al usuario.
     return (
       <KpiCard
-        label="Tasa de penalties"
+        label={t("penaltyRate")}
         value="—"
         hint={
           tracksPenalties
-            ? "sin datos de penalties en el historial"
-            : "no aplica a esta disciplina"
+            ? t("penaltyNoDataTracks")
+            : t("penaltyNoDataNotApplicable")
         }
       />
     );
   }
   // Convención: <10% bajo, 10-25% normal, >25% alto.
-  const tag = rate < 10 ? "bajo" : rate < 25 ? "normal" : "alto";
+  const tag = rate < 10 ? t("tagLow") : rate < 25 ? t("tagNormal") : t("tagHigh");
   return (
     <KpiCard
-      label="Tasa de penalties"
+      label={t("penaltyRate")}
       value={`${rate.toFixed(0)}%`}
-      hint={`${tag} · stages con penalties`}
+      hint={t("penaltyHint", { tag })}
     />
   );
 }
@@ -601,17 +617,17 @@ function PenaltyRateCard({
  * (FBI 45 vs IPSC 150). Mismos thresholds que el badge per-match:
  * 0=verde, ≤5%=default, ≤15%=amber, >15%=rojo.
  */
-function AmmoAvgExtrasCard({ ammo }: { ammo: AmmoEfficiencyStats }) {
+function AmmoAvgExtrasCard({ ammo, t }: { ammo: AmmoEfficiencyStats; t: StatsT }) {
   const avg = ammo.avgExtras;
   const sign = avg > 0 ? "+" : "";
   const tier = getAmmoExtrasTier(ammo.totalExtras, ammo.totalMinShots);
   const sampleHint =
     ammo.matchCount < 3
-      ? `n=${ammo.matchCount} · muestra chica`
-      : `sobre ${ammo.matchCount} entries con datos`;
+      ? t("avgExtraShotsHintSmall", { count: ammo.matchCount })
+      : t("avgExtraShotsHint", { count: ammo.matchCount });
   return (
     <KpiCard
-      label="Promedio disparos extra"
+      label={t("avgExtraShots")}
       value={`${sign}${avg.toFixed(1)}`}
       hint={sampleHint}
       tone={EXTRAS_TIER_CLASS[tier] || undefined}
@@ -626,46 +642,46 @@ function AmmoAvgExtrasCard({ ammo }: { ammo: AmmoEfficiencyStats }) {
  * con muchos matches y promedio bajo terminaba con total visualmente
  * alarmante aunque la eficiencia fuera buena.
  */
-function AmmoTotalExtrasCard({ ammo }: { ammo: AmmoEfficiencyStats }) {
+function AmmoTotalExtrasCard({ ammo, t }: { ammo: AmmoEfficiencyStats; t: StatsT }) {
   const total = ammo.totalExtras;
   const sign = total > 0 ? "+" : "";
   const tier = getAmmoExtrasTier(ammo.totalExtras, ammo.totalMinShots);
   return (
     <KpiCard
-      label="Disparos extra acumulados"
+      label={t("totalExtraShots")}
       value={`${sign}${total}`}
-      hint={`sumados sobre ${ammo.matchCount} entries`}
+      hint={t("totalExtraShotsHint", { count: ammo.matchCount })}
       tone={EXTRAS_TIER_CLASS[tier] || undefined}
     />
   );
 }
 
-function CadenceCard({ cadence }: { cadence: CadenceStats | null }) {
+function CadenceCard({ cadence, t }: { cadence: CadenceStats | null; t: StatsT }) {
   if (!cadence) {
-    return <KpiCard label="Cadencia" value="—" hint="Sin matches" />;
+    return <KpiCard label={t("cadence")} value="—" hint={t("cadenceNoMatches")} />;
   }
   const days = cadence.daysSinceLastMatch;
   const lastLabel =
     days === null
       ? null
       : days === 0
-        ? "hoy"
+        ? t("lastToday")
         : days === 1
-          ? "ayer"
+          ? t("lastYesterday")
           : days < 14
-            ? `hace ${days} días`
+            ? t("lastDaysAgo", { count: days })
             : days < 60
-              ? `hace ${Math.round(days / 7)} sem`
-              : `hace ${Math.round(days / 30)} meses`;
+              ? t("lastWeeksAgo", { count: Math.round(days / 7) })
+              : t("lastMonthsAgo", { count: Math.round(days / 30) });
 
   return (
     <KpiCard
-      label="Cadencia"
-      value={`${cadence.matchesPerMonth.toFixed(1)}/mes`}
+      label={t("cadence")}
+      value={t("cadenceValue", { value: cadence.matchesPerMonth.toFixed(1) })}
       hint={
         lastLabel
-          ? `últ. 90d · último match ${lastLabel}`
-          : "últimos 90 días"
+          ? t("cadenceHint", { last: lastLabel })
+          : t("cadenceHintNoLast")
       }
     />
   );

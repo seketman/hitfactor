@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -12,55 +13,56 @@ export default async function SignupPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const params = await searchParams;
+  const t = await getTranslations("auth");
 
   return (
     <AuthLayout
-      title="Crear cuenta"
-      subtitle="Importá resultados y seguí tu evolución."
+      title={t("signup.title")}
+      subtitle={t("signup.subtitle")}
       footer={
         <>
-          ¿Ya tenés cuenta?{" "}
+          {t("signup.haveAccount")}{" "}
           <Link href="/login" className="text-accent hover:underline">
-            Iniciá sesión
+            {t("signup.loginLink")}
           </Link>
         </>
       }
     >
       {params.error && (
-        <Alert tone="danger" className="mb-4" title="No se pudo crear la cuenta">
+        <Alert tone="danger" className="mb-4" title={t("signup.errorTitle")}>
           {params.error}
         </Alert>
       )}
 
-      <GoogleSignInButton label="Registrarme con Google" />
+      <GoogleSignInButton label={t("signup.googleLabel")} />
 
       <div className="my-5 flex items-center gap-3 text-xs text-fg-subtle">
         <span className="h-px flex-1 bg-border" aria-hidden />
-        <span>o con tu email</span>
+        <span>{t("orWithEmail")}</span>
         <span className="h-px flex-1 bg-border" aria-hidden />
       </div>
 
       <form action={signup} className="space-y-4">
         <Input
-          label="Nombre para mostrar"
+          label={t("signup.displayName")}
           type="text"
           name="display_name"
           required
           autoComplete="name"
-          placeholder="ej. Diego Demarziani"
+          placeholder={t("signup.displayNamePlaceholder")}
         />
-        <Input label="Email" type="email" name="email" required autoComplete="email" />
+        <Input label={t("email")} type="email" name="email" required autoComplete="email" />
         <Input
-          label="Contraseña"
+          label={t("password")}
           type="password"
           name="password"
           required
           minLength={8}
           autoComplete="new-password"
-          hint="Mínimo 8 caracteres."
+          hint={t("signup.passwordHint")}
         />
         <Button type="submit" className="w-full">
-          Registrarme
+          {t("signup.submit")}
         </Button>
       </form>
     </AuthLayout>

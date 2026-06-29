@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { CalendarClock, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -79,10 +80,11 @@ function UploadBody({
   // `multiple` para soportar Steel Challenge (un PDF por stage). Para el
   // resto de los formatos un solo archivo alcanza — el server action
   // distingue por cantidad y branchea al parser correspondiente.
+  const t = useTranslations("import.form");
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const pickerLabel = hasPreviousResult ? "Elegir otros archivos" : "Elegir archivos";
+  const pickerLabel = hasPreviousResult ? t("pickOther") : t("pick");
   const hasFiles = files.length > 0;
   const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
 
@@ -95,11 +97,11 @@ function UploadBody({
     <fieldset disabled={pending} className="space-y-6 disabled:opacity-60">
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
-          <span>Archivos a importar</span>
+          <span>{t("filesToImport")}</span>
           {pending && (
             <span className="inline-flex items-center gap-1 text-accent normal-case tracking-normal">
               <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-              Procesando archivo{files.length === 1 ? "" : "s"}…
+              {t("processing", { count: files.length })}
             </span>
           )}
         </div>
@@ -135,11 +137,14 @@ function UploadBody({
               hasFiles ? "text-fg" : "text-fg-subtle",
             )}
           >
-            {files.length === 0 && "Ningún archivo seleccionado"}
+            {files.length === 0 && t("noFileSelected")}
             {files.length === 1 &&
               `${files[0]!.name} · ${formatBytes(files[0]!.size)}`}
             {files.length > 1 &&
-              `${files.length} archivos · ${formatBytes(totalBytes)}`}
+              t("filesCount", {
+                count: files.length,
+                size: formatBytes(totalBytes),
+              })}
           </span>
           {hasFiles && !pending && (
             <button
@@ -150,8 +155,8 @@ function UploadBody({
                 e.stopPropagation();
                 clearFiles();
               }}
-              aria-label="Quitar archivos seleccionados"
-              title="Quitar archivos"
+              aria-label={t("removeFiles")}
+              title={t("removeFilesShort")}
               className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-fg-subtle hover:bg-surface hover:text-fg"
             >
               <X className="h-4 w-4" aria-hidden />
@@ -182,9 +187,9 @@ function UploadBody({
         */}
         {lastFile && !hasFiles && (
           <p className="mt-1.5 text-xs text-fg-subtle">
-            Último intento:{" "}
-            <span className="font-mono text-fg-muted">{lastFile}</span>.
-            Volvé a elegirlo para reintentar.
+            {t("lastAttempt")}{" "}
+            <span className="font-mono text-fg-muted">{lastFile}</span>.{" "}
+            {t("lastAttemptHint")}
           </p>
         )}
       </div>
@@ -197,13 +202,13 @@ function UploadBody({
         métrica de eficiencia hasta que se complete.
       */}
       <Input
-        label="Disparos mínimos del match"
+        label={t("minShotsLabel")}
         name="min_shots"
         type="number"
         min={1}
         step={1}
-        placeholder="Ej. 90"
-        hint="Opcional. Tiro FBI se asigna en 45 automáticamente. Para IPSC, Steel Challenge y Combat Solutions ingresá el mínimo de disparos por entry. Se usa para mostrar 'disparos extra' en el detalle y promediar la eficiencia del tirador."
+        placeholder={t("minShotsPlaceholder")}
+        hint={t("minShotsHint")}
       />
 
       <Button
@@ -215,16 +220,16 @@ function UploadBody({
         {pending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Importando...
+            {t("importing")}
           </>
         ) : (
-          "Importar"
+          t("import")
         )}
       </Button>
 
       {pending && (
         <p className="text-center text-xs text-fg-subtle">
-          No cierres la pestaña hasta que termine.
+          {t("dontClose")}
         </p>
       )}
     </fieldset>
@@ -245,6 +250,7 @@ function NeedsDateBody({
   state: Extract<ImportFormState, { status: "needsDate" }>;
   pending: boolean;
 }) {
+  const t = useTranslations("import.form");
   return (
     <fieldset disabled={pending} className="space-y-5 disabled:opacity-60">
       <div className="flex items-start gap-3 rounded-md border border-accent/30 bg-accent-soft px-4 py-3">
@@ -253,27 +259,27 @@ function NeedsDateBody({
           aria-hidden
         />
         <div className="text-sm text-fg-muted">
-          <p className="font-medium text-fg">Falta la fecha del torneo</p>
+          <p className="font-medium text-fg">{t("needsDateTitle")}</p>
           <p className="mt-0.5">
-            Los rankings oficiales de la FAT no incluyen la fecha. Leímos{" "}
+            {t("needsDateBodyBefore")}{" "}
             <strong className="text-fg">
-              {state.entriesCount} resultado{state.entriesCount === 1 ? "" : "s"}
+              {t("needsDateEntries", { count: state.entriesCount })}
             </strong>{" "}
-            de {state.disciplineLabel}
-            {state.divisions.length > 0 && ` (${state.divisions.join(" / ")})`}.
-            Completá los datos para terminar la importación.
+            {t("needsDateOf", { label: state.disciplineLabel })}
+            {state.divisions.length > 0 && ` (${state.divisions.join(" / ")})`}.{" "}
+            {t("needsDateComplete")}
           </p>
         </div>
       </div>
 
       {state.error && (
-        <Alert tone="danger" title="No se pudo importar">
+        <Alert tone="danger" title={t("errorTitle")}>
           {state.error}
         </Alert>
       )}
 
       <Input
-        label="Nombre del torneo"
+        label={t("nameLabel")}
         name="name"
         type="text"
         defaultValue={state.parsed.name}
@@ -281,11 +287,11 @@ function NeedsDateBody({
       />
 
       <Input
-        label="Fecha del torneo"
+        label={t("dateLabel")}
         name="date"
         type="date"
         required
-        hint="No figura en el archivo de la FAT — indicá la fecha en que se corrió el match."
+        hint={t("dateHint")}
       />
 
       <div className="flex gap-3">
@@ -293,10 +299,10 @@ function NeedsDateBody({
           {pending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Importando...
+              {t("importing")}
             </>
           ) : (
-            "Confirmar e importar"
+            t("confirmImport")
           )}
         </Button>
         <Link
@@ -308,7 +314,7 @@ function NeedsDateBody({
             pending && "pointer-events-none opacity-50",
           )}
         >
-          Cancelar
+          {t("cancel")}
         </Link>
       </div>
     </fieldset>

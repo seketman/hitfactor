@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -10,7 +11,7 @@ import {
   deleteMatch,
   updateMatchClub,
   updateMatchMinShots,
-} from "@/app/(app)/matches/[id]/actions";
+} from "@/app/[locale]/(app)/matches/[id]/actions";
 import type { Club } from "@/lib/db/types";
 
 interface MatchActionsBarProps {
@@ -63,6 +64,7 @@ export function MatchActionsBar({
   // "editando min_shots". Lo modelamos como un mode único en lugar de dos
   // booleanos para que abrir uno cierre el otro automáticamente.
   const [mode, setMode] = useState<"idle" | "club" | "minShots">("idle");
+  const t = useTranslations("matches.actions");
 
   if (mode === "club") {
     return (
@@ -99,7 +101,7 @@ export function MatchActionsBar({
     <div className="flex flex-wrap items-center justify-end gap-2">
       {isImporter && (
         <Button variant="ghost" size="sm" onClick={() => setMode("club")}>
-          {currentRegion ? "Editar club" : "Asignar club"}
+          {currentRegion ? t("editClub") : t("assignClub")}
         </Button>
       )}
       {canEditMinShots && (
@@ -107,11 +109,11 @@ export function MatchActionsBar({
           variant="ghost"
           size="sm"
           onClick={() => setMode("minShots")}
-          title="Disparos mínimos del match (para medir eficiencia de munición)"
+          title={t("minShotsTooltip")}
         >
           {currentMinShots != null
-            ? `Mínimo: ${currentMinShots}`
-            : "Definir mínimo"}
+            ? t("minimum", { count: currentMinShots })
+            : t("defineMinimum")}
         </Button>
       )}
       {isImporter && <DeleteButton matchId={matchId} from={from} />}
@@ -180,6 +182,7 @@ function DeleteSubmit({
   onArm: () => void;
 }) {
   const { pending } = useFormStatus();
+  const t = useTranslations("matches.actions");
   return (
     <Button
       type="submit"
@@ -206,7 +209,7 @@ function DeleteSubmit({
           : undefined
       }
     >
-      {pending ? "Eliminando…" : armed ? "¿Confirmar?" : "Eliminar"}
+      {pending ? t("deleting") : armed ? t("confirm") : t("delete")}
     </Button>
   );
 }
@@ -218,6 +221,7 @@ function ClubForm({
   clubs,
   onCancel,
 }: MatchActionsBarProps & { onCancel: () => void }) {
+  const t = useTranslations("matches.actions");
   // Estado inicial: si el club actual está en el catálogo, lo preseleccionamos.
   // Si no está pero hay un texto, arrancamos en "Otro..." con ese texto.
   const knownCodes = new Set(clubs.map((c) => c.code));
@@ -247,30 +251,30 @@ function ClubForm({
 
       <div className="min-w-0 sm:flex-1 sm:min-w-[220px]">
         <Select
-          label="Club"
+          label={t("club")}
           name="club_code"
           value={clubCode}
           onChange={(e) => setClubCode(e.target.value)}
         >
-          <option value="">— Sin asignar —</option>
+          <option value="">{t("unassigned")}</option>
           {clubs.map((c) => (
             <option key={c.code} value={c.code}>
               {c.name}
               {c.country ? ` (${c.country})` : ""}
             </option>
           ))}
-          <option value="OTHER">Otro…</option>
+          <option value="OTHER">{t("other")}</option>
         </Select>
       </div>
 
       {isOther && (
         <div className="min-w-0 sm:flex-1 sm:min-w-[200px]">
           <Input
-            label="Nombre del club"
+            label={t("clubName")}
             name="custom"
             value={custom}
             onChange={(e) => setCustom(e.target.value)}
-            placeholder="Ej: Club Tiro XYZ"
+            placeholder={t("clubNamePlaceholder")}
             required
           />
         </div>
@@ -308,6 +312,7 @@ function MinShotsForm({
   currentMinShots: number | null;
   onCancel: () => void;
 }) {
+  const t = useTranslations("matches.actions");
   const [value, setValue] = useState<string>(
     currentMinShots != null ? String(currentMinShots) : "",
   );
@@ -323,21 +328,21 @@ function MinShotsForm({
       <div className="space-y-3 sm:flex sm:flex-wrap sm:items-end sm:gap-3 sm:space-y-0">
         <div className="min-w-0 sm:flex-1 sm:min-w-[220px]">
           <Input
-            label="Mínimo de disparos"
+            label={t("minShotsLabel")}
             name="min_shots"
             type="number"
             min={1}
             step={1}
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Ej. 90"
+            placeholder={t("minShotsPlaceholder")}
           />
         </div>
         <FormButtons onCancel={onCancel} />
       </div>
 
       <p className="text-xs text-fg-subtle">
-        Por entry según las reglas. Dejá vacío para borrar el valor.
+        {t("minShotsHint")}
       </p>
     </form>
   );
@@ -345,16 +350,17 @@ function MinShotsForm({
 
 function FormButtons({ onCancel }: { onCancel: () => void }) {
   const { pending } = useFormStatus();
+  const t = useTranslations("matches.actions");
   return (
     <div className="flex gap-2">
       <Button type="submit" disabled={pending} aria-busy={pending}>
         {pending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-            Guardando…
+            {t("saving")}
           </>
         ) : (
-          "Guardar"
+          t("save")
         )}
       </Button>
       <Button
@@ -363,7 +369,7 @@ function FormButtons({ onCancel }: { onCancel: () => void }) {
         onClick={onCancel}
         disabled={pending}
       >
-        Cancelar
+        {t("cancel")}
       </Button>
     </div>
   );

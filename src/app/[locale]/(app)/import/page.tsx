@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { Users } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
@@ -34,6 +35,7 @@ export default async function ImportPage({
   }>;
 }) {
   const params = await searchParams;
+  const t = await getTranslations("import");
 
   // Si vinimos de un import exitoso con matchId, buscamos candidatos a claim
   // (solo si el usuario aún no linkeó su shooter).
@@ -53,61 +55,56 @@ export default async function ImportPage({
   return (
     <PageContainer className="max-w-2xl">
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Importar resultados</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="mt-1 text-sm text-fg-muted">
-          Subí un archivo HTML de PractiScore (IPSC / Steel Challenge), un CSV
-          exportado de Google Sheets para Tiro FBI, un PDF WinMSS de
-          ipsc.org.ar (overall y stages por separado), un PDF de ranking
-          oficial de la FAT, o los PDFs de Steel Challenge exportados desde
-          PractiScore iPhone (un archivo por stage, los subís todos juntos).
+          {t("subtitle")}
         </p>
       </header>
 
       <div className="mb-6 flex items-start gap-3 rounded-md border border-border bg-surface-2 px-4 py-3">
         <Users className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
         <p className="text-sm text-fg-muted">
-          Lo que importás queda disponible para{" "}
-          <span className="font-medium text-fg">todos los tiradores</span> del
-          torneo, no solo para vos. Si el match ya lo cargó otra persona, no
-          hace falta volver a subirlo:{" "}
+          {t("sharedNoticeBefore")}{" "}
+          <span className="font-medium text-fg">{t("sharedNoticeAllShooters")}</span>{" "}
+          {t("sharedNoticeAfter")}{" "}
           <Link href="/matches" className="text-accent hover:underline">
-            buscalo en Matches
+            {t("searchInMatches")}
           </Link>{" "}
-          y marcate con &ldquo;Soy yo&rdquo;.
+          {t("sharedNoticeEnd")}
         </p>
       </div>
 
       {(params.error || params.ok === "1") && (
         <DismissOnSubmit key={`alerts:${resultKey(params)}`}>
           {params.error && (
-            <Alert tone="danger" title="No se pudo importar" className="mb-6">
+            <Alert tone="danger" title={t("errorTitle")} className="mb-6">
               {params.error}
             </Alert>
           )}
           {params.ok === "1" && (
             <Alert
               tone="success"
-              title={`Importado: ${params.name}`}
+              title={t("importedTitle", { name: params.name ?? "" })}
               className="mb-6"
             >
               <ul className="mt-1 list-disc space-y-0.5 pl-5">
                 {params.discipline && (
                   <li>
-                    Disciplina:{" "}
+                    {t("resultDiscipline")}{" "}
                     <strong className="text-fg">{params.discipline}</strong>
                   </li>
                 )}
                 {params.entries && Number(params.entries) > 0 && (
-                  <li>{params.entries} resultados de tiradores</li>
+                  <li>{t("resultEntries", { count: Number(params.entries) })}</li>
                 )}
                 {params.stages && Number(params.stages) > 0 && (
-                  <li>{params.stages} stage(s) nuevos</li>
+                  <li>{t("resultStages", { count: Number(params.stages) })}</li>
                 )}
                 {params.stageResults && Number(params.stageResults) > 0 && (
-                  <li>{params.stageResults} resultados de stages</li>
+                  <li>{t("resultStageResults", { count: Number(params.stageResults) })}</li>
                 )}
                 {params.existed === "1" && (
-                  <li>El match ya existía — solo se agregaron stages.</li>
+                  <li>{t("resultExisted")}</li>
                 )}
               </ul>
             </Alert>
@@ -119,16 +116,16 @@ export default async function ImportPage({
         <Card className="mb-6 border-accent/30 bg-accent-soft">
           <div className="px-5 py-4">
             <h2 className="text-sm font-medium text-accent">
-              ¿Sos alguno de estos tiradores?
+              {t("candidatesTitle")}
             </h2>
             <p className="mt-1 text-sm text-fg-muted">
-              Encontramos{" "}
+              {t("candidatesBodyBefore")}{" "}
               {candidates.length === 1
-                ? "una coincidencia"
-                : `${candidates.length} coincidencias`}{" "}
-              entre los participantes y tu perfil. Si sos vos, hacé click en{" "}
-              <span className="font-medium text-fg">&ldquo;Soy yo&rdquo;</span>{" "}
-              para asociar esa participación a tu cuenta y ver tus resultados.
+                ? t("candidatesOne")
+                : t("candidatesMany", { count: candidates.length })}{" "}
+              {t("candidatesBodyAfter")}{" "}
+              <span className="font-medium text-fg">{t("candidatesImYouQuoted")}</span>{" "}
+              {t("candidatesBodyEnd")}
             </p>
           </div>
           <ul className="divide-y divide-border border-t border-border">
@@ -143,7 +140,12 @@ export default async function ImportPage({
                     {c.divisionCode && <Badge>{c.divisionCode}</Badge>}
                     {c.memberNumber && <span>#{c.memberNumber}</span>}
                     <span className="text-fg-subtle">
-                      coincidencia por {c.reason === "member_number" ? "número de socio" : "nombre"}
+                      {t("matchByPrefix", {
+                        by:
+                          c.reason === "member_number"
+                            ? t("matchByMember")
+                            : t("matchByName"),
+                      })}
                     </span>
                   </p>
                 </div>
@@ -152,19 +154,19 @@ export default async function ImportPage({
                   <input type="hidden" name="match_id" value={params.matchId} />
                   <input type="hidden" name="redirect_to" value="/dashboard" />
                   <Button type="submit" size="sm">
-                    Soy yo
+                    {t("imYou")}
                   </Button>
                 </form>
               </li>
             ))}
           </ul>
           <div className="border-t border-border px-5 py-3 text-xs text-fg-subtle">
-            ¿Ninguno?{" "}
+            {t("noneOfThem")}{" "}
             <Link
               href={`/matches/${params.matchId}`}
               className="text-accent hover:underline"
             >
-              Buscalo manualmente en el ranking
+              {t("searchManually")}
             </Link>
             .
           </div>
@@ -183,48 +185,38 @@ export default async function ImportPage({
 
       <details className="mt-6 text-sm text-fg-muted">
         <summary className="cursor-pointer hover:text-fg">
-          ¿Qué archivos puedo subir?
+          {t("whichFiles")}
         </summary>
         <div className="mt-3 space-y-2 pl-4">
           <p>
-            <strong className="text-fg">Match Results — Combined</strong>: ranking
-            general de todas las divisiones en un único archivo.
+            <strong className="text-fg">{t("fileCombinedName")}</strong>
+            {t("fileCombinedBody")}
           </p>
           <p>
-            <strong className="text-fg">Match Results — por división</strong>:
-            ranking del torneo, separado en bloques por división.
+            <strong className="text-fg">{t("fileByDivisionName")}</strong>
+            {t("fileByDivisionBody")}
           </p>
           <p>
-            <strong className="text-fg">Stage Results</strong>: resultados de un
-            stage individual. Subilos después de haber importado el match overall.
+            <strong className="text-fg">{t("fileStageName")}</strong>
+            {t("fileStageBody")}
           </p>
           <p>
-            <strong className="text-fg">CSV de Tiro FBI</strong>: planilla
-            exportada de Google Sheets (Archivo → Descargar → CSV) con las
-            columnas Tirador, Club, Categoría, Disciplina, Impactos y Puntos.
+            <strong className="text-fg">{t("fileCsvName")}</strong>
+            {t("fileCsvBody")}
           </p>
           <p>
-            <strong className="text-fg">PDF WinMSS</strong> (ipsc.org.ar):
-            archivos históricos de Tiro Práctico. Subí el "overall" primero
-            (crea el match) y después el "stages" para completar los detalles
-            por etapa. La fecha del torneo se toma de la fecha de impresión
-            del archivo.
+            <strong className="text-fg">{t("fileWinmssName")}</strong>
+            {t("fileWinmssBody")}
           </p>
           <p>
-            <strong className="text-fg">PDF de ranking de la FAT</strong>: el
-            PDF de &ldquo;Ranking Oficial&rdquo; con los resultados generales
-            del match (sin stages). La disciplina se toma del nombre del
-            archivo (ej.: <code>resultados-apertura-fbi.pdf</code>). Como ese
-            formato no incluye la fecha del torneo, te la vamos a pedir antes
-            de terminar la importación.
+            <strong className="text-fg">{t("fileFatName")}</strong>
+            {t("fileFatBody")}
+            <code>resultados-apertura-fbi.pdf</code>
+            {t("fileFatBodyEnd")}
           </p>
           <p>
-            <strong className="text-fg">PDFs de Steel Challenge</strong>{" "}
-            (PractiScore iPhone): un archivo por stage tipo &ldquo;Stage
-            Results - By Division&rdquo;. Subilos todos juntos en el mismo
-            import — el overall del match lo computamos sumando los tiempos
-            de los stages. Los PDFs &ldquo;Category Leaders&rdquo; se ignoran
-            (sus porcentajes son por categoría, no por división).
+            <strong className="text-fg">{t("fileSteelName")}</strong>
+            {t("fileSteelBody")}
           </p>
         </div>
       </details>

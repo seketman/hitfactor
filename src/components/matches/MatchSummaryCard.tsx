@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/Card";
 import { PlaceCell } from "@/components/matches/PlaceCell";
 
@@ -41,7 +42,7 @@ export function Stat({
  * Bloque `<Stat label="Puesto">` compartido por las 3 variantes de summary
  * card: DQ → Ausente → place vía PlaceCell. Render idéntico al inline.
  */
-export function PlacementStat({
+export async function PlacementStat({
   isDq,
   isAbsent,
   place,
@@ -50,8 +51,9 @@ export function PlacementStat({
   isAbsent: boolean;
   place: number;
 }) {
+  const t = await getTranslations("matches.summary");
   return (
-    <Stat label="Puesto">
+    <Stat label={t("place")}>
       <PlaceCell isDq={isDq} isAbsent={isAbsent} place={place} />
     </Stat>
   );

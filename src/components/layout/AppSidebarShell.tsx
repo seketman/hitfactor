@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Link, usePathname } from "@/i18n/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { getDisciplineIcon } from "@/components/icons/discipline-icons";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ export function AppSidebarShell({
   appVersion,
 }: AppSidebarShellProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -66,7 +68,7 @@ export function AppSidebarShell({
   const userTooltip = [
     userName,
     userEmail || null,
-    memberSince ? `Miembro desde ${memberSince}` : null,
+    memberSince ? t("memberSince", { date: memberSince }) : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -92,7 +94,7 @@ export function AppSidebarShell({
       <div className="sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b border-border bg-bg/80 px-4 backdrop-blur md:hidden print:hidden">
         <button
           type="button"
-          aria-label="Abrir menú"
+          aria-label={t("openMenu")}
           onClick={() => setMobileOpen(true)}
           className="rounded-md p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg"
         >
@@ -109,7 +111,7 @@ export function AppSidebarShell({
       {mobileOpen && (
         <button
           type="button"
-          aria-label="Cerrar menú"
+          aria-label={t("closeMenu")}
           onClick={() => setMobileOpen(false)}
           className="fixed inset-0 z-30 bg-black/40 md:hidden"
         />
@@ -137,7 +139,7 @@ export function AppSidebarShell({
           {/* Botón collapse desktop */}
           <button
             type="button"
-            aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
+            aria-label={collapsed ? t("expandMenu") : t("collapseMenu")}
             onClick={() => setCollapsed((c) => !c)}
             className="hidden rounded-md p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg md:block"
           >
@@ -150,7 +152,7 @@ export function AppSidebarShell({
           {/* Botón cerrar mobile */}
           <button
             type="button"
-            aria-label="Cerrar menú"
+            aria-label={t("closeMenu")}
             onClick={() => setMobileOpen(false)}
             className="rounded-md p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg md:hidden"
           >
@@ -162,7 +164,7 @@ export function AppSidebarShell({
         <nav className="flex-1 overflow-y-auto px-2 py-4">
           {!collapsed && (
             <p className="mb-1 px-3 text-xs font-medium uppercase tracking-wider text-fg-subtle">
-              Disciplinas
+              {t("disciplines")}
             </p>
           )}
           <ul className="mb-4 space-y-0.5">
@@ -183,7 +185,7 @@ export function AppSidebarShell({
             <NavItem
               href="/dashboard"
               icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}
-              label="Consolidado"
+              label={t("consolidated")}
               active={pathname === "/dashboard"}
               collapsed={collapsed}
             />
@@ -193,7 +195,7 @@ export function AppSidebarShell({
             <NavItem
               href="/matches"
               icon={<Trophy className="h-4 w-4" aria-hidden />}
-              label="Matches"
+              label={t("matches")}
               active={
                 pathname === "/matches" || pathname.startsWith("/matches/")
               }
@@ -202,21 +204,21 @@ export function AppSidebarShell({
             <NavItem
               href="/firearms"
               icon={<Crosshair className="h-4 w-4" aria-hidden />}
-              label="Armas"
+              label={t("firearms")}
               active={pathname.startsWith("/firearms")}
               collapsed={collapsed}
             />
             <NavItem
               href="/ammo"
               icon={<Package className="h-4 w-4" aria-hidden />}
-              label="Municiones"
+              label={t("ammo")}
               active={pathname.startsWith("/ammo")}
               collapsed={collapsed}
             />
             <NavItem
               href="/activity"
               icon={<History className="h-4 w-4" aria-hidden />}
-              label="Actividad"
+              label={t("activity")}
               active={pathname === "/activity"}
               collapsed={collapsed}
             />
@@ -232,14 +234,17 @@ export function AppSidebarShell({
         >
           {!collapsed && (
             <>
-              <ThemeToggle stretch />
+              <div className="flex items-center gap-2">
+                <ThemeToggle stretch />
+                <LocaleSwitcher stretch />
+              </div>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="truncate text-fg-muted" title={userTooltip}>
                   {userName}
                 </span>
                 <form action="/auth/signout" method="post">
                   <Button type="submit" variant="ghost" size="sm">
-                    Salir
+                    {t("signOut")}
                   </Button>
                 </form>
               </div>
@@ -251,7 +256,7 @@ export function AppSidebarShell({
                     pathname === "/about" && "bg-accent-soft text-accent",
                   )}
                 >
-                  Acerca de & feedback
+                  {t("aboutFeedback")}
                 </Link>
                 {/* Versión: uso interno para verificar qué build corre cada
                  * usuario cuando reportan bugs. Render bien discreto —
@@ -269,8 +274,8 @@ export function AppSidebarShell({
             <>
               <Link
                 href="/about"
-                aria-label="Acerca de"
-                title="Acerca de"
+                aria-label={t("about")}
+                title={t("about")}
                 className={cn(
                   "rounded-md p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg",
                   pathname === "/about" && "bg-accent-soft text-accent",
@@ -279,7 +284,7 @@ export function AppSidebarShell({
                 <Info className="h-4 w-4" aria-hidden />
               </Link>
               <form action="/auth/signout" method="post">
-                <Button type="submit" variant="ghost" size="sm" aria-label="Salir">
+                <Button type="submit" variant="ghost" size="sm" aria-label={t("signOut")}>
                   <X className="h-4 w-4" aria-hidden />
                 </Button>
               </form>
