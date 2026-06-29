@@ -116,7 +116,7 @@
     "ctaTitle": "Start your shooting history today",
     "ctaBody": "Creating an account takes less than a minute. The first match you import will already show you results.",
     "footerCreatedByBefore": "Created by",
-    "footerCreatedByAfter": "in La Plata."
+    "footerCreatedByAfter": "in <city>La Plata</city>."
   },
   "dashboard": {
     "impersonationNoIdentities": "no linked identities",

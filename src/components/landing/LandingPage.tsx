@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { LaPlataLink } from "@/components/LaPlataLink";
 import { Link } from "@/i18n/navigation";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import {
@@ -484,7 +485,9 @@ async function SiteFooter() {
           <p className="mt-2 text-sm text-fg-muted">
             {t("footerCreatedByBefore")}{" "}
             <span className="font-medium text-fg">Seketman</span>{" "}
-            {t("footerCreatedByAfter")}
+            {t.rich("footerCreatedByAfter", {
+              city: (chunks) => <LaPlataLink>{chunks}</LaPlataLink>,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-5 text-sm">

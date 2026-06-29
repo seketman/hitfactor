@@ -116,7 +116,7 @@
     "ctaTitle": "Empezá hoy tu historial de tiro",
     "ctaBody": "Crear la cuenta toma menos de un minuto. El primer torneo que importes ya te va a mostrar resultados.",
     "footerCreatedByBefore": "Creado por",
-    "footerCreatedByAfter": "en La Plata."
+    "footerCreatedByAfter": "en <city>La Plata</city>."
   },
   "dashboard": {
     "impersonationNoIdentities": "sin identidades linkeadas",

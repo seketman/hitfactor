@@ -2,6 +2,7 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { FeedbackForm } from "@/components/FeedbackForm";
+import { LaPlataLink } from "@/components/LaPlataLink";
 import { requireUser } from "@/lib/supabase/require-user";
 import { FEEDBACK_MIN_ENTRIES, listMyFeedback } from "@/lib/db/feedback";
 import { countMyMatchEntries } from "@/lib/db/shooters";
@@ -89,7 +90,8 @@ export default async function AboutPage({ searchParams }: PageProps) {
           progreso por disciplina.
         </p>
         <p className="mt-4 text-sm leading-relaxed text-fg-muted">
-          Creado por <span className="font-medium text-fg">Seketman</span> en La Plata, con la ayuda invaluable de{" "}
+          Creado por <span className="font-medium text-fg">Seketman</span> en{" "}
+          <LaPlataLink>La Plata</LaPlataLink>, con la ayuda invaluable de{" "}
           <a
             href="https://claude.com/claude-code"
             target="_blank"
