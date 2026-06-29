@@ -10,7 +10,7 @@ import {
   deleteMatch,
   updateMatchClub,
   updateMatchMinShots,
-} from "@/app/(app)/matches/[id]/actions";
+} from "@/app/[locale]/(app)/matches/[id]/actions";
 import type { Club } from "@/lib/db/types";
 
 interface MatchActionsBarProps {

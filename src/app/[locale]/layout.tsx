@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { notFound } from "next/navigation";
+import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { setRequestLocale } from "next-intl/server";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { getSiteUrl } from "@/lib/seo/site-url";
-import "./globals.css";
+import { routing } from "@/i18n/routing";
+import "../globals.css";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -29,27 +33,35 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
+export default async function LocaleLayout({
   children,
-}: Readonly<{
+  params,
+}: {
   children: React.ReactNode;
-}>) {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
+
+  // Habilita el render estático del árbol para este locale (next-intl).
+  setRequestLocale(locale);
+
   return (
     <html
-      lang="es"
+      lang={locale}
       // suppressHydrationWarning: necesario porque next-themes setea
       // la clase del tema antes de la hidratación del cliente.
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="bg-bg text-fg min-h-full flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
-        {/*
-          Analytics + Speed Insights de Vercel. Cookieless, GDPR-friendly,
-          dashboards en vercel.com/<project>/analytics. Tier free de Hobby
-          alcanza para nuestro volumen actual (decenas de usuarios). Si lo
-          excedemos, se mueve a Pro o se quita sin tocar código en la app.
-        */}
+        <NextIntlClientProvider>
+          <ThemeProvider>{children}</ThemeProvider>
+        </NextIntlClientProvider>
         <Analytics />
         <SpeedInsights />
       </body>

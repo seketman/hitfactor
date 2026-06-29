@@ -5,7 +5,7 @@ import { cn, formatNumber, formatPercent } from "@/lib/utils";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { claimShooter } from "@/lib/actions/claim";
 import { PlaceCell } from "@/components/matches/PlaceCell";
-import { toggleEntryAbsent } from "@/app/(app)/matches/[id]/actions";
+import { toggleEntryAbsent } from "@/app/[locale]/(app)/matches/[id]/actions";
 
 /**
  * Fila del ranking público de un match. El cómputo de los flags
