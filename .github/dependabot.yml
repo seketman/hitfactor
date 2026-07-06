@@ -4,10 +4,13 @@
 # Estrategia para mantenedor único:
 #  - Agrupamos updates en pocas PRs (en vez de una PR por paquete que
 #    sería abrumador) para que revisar dependencias sea una tarea
-#    semanal de 10min en lugar de 50 PRs sueltas.
+#    puntual de 10min en lugar de 50 PRs sueltas.
 #  - Solo patch/minor automático — los majors pueden ser breaking, los
 #    revisamos a mano cuando toque.
-#  - npm semanal, GitHub Actions mensual (cambian poco).
+#  - npm y GitHub Actions mensual: los micro-bumps semanales generaban mucho
+#    ruido (y cada regeneración del lockfile podía romper el `npm ci` del CI,
+#    ver override de `@swc/helpers` en package.json). Mensual + agrupado deja
+#    una sola tanda de revisión por mes.
 #
 # Nota: las "Dependabot security updates" (alertas críticas de CVE) son
 # automáticas y van por canal aparte — siempre se abren incluso para
@@ -18,8 +21,8 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 3
     groups:
       production-dependencies:
         dependency-type: "production"
