@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.21.1](https://github.com/seketman/hitfactor/compare/v1.21.0...v1.21.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* **deps:** pin @swc/helpers via overrides to keep npm ci deterministic ([#157](https://github.com/seketman/hitfactor/issues/157)) ([0cffb4b](https://github.com/seketman/hitfactor/commit/0cffb4bf589061ab04768658591b7a6b034c303d))
+* **parsers:** support ESS "Overall Stage Results" (single-dash) stage PDFs ([#156](https://github.com/seketman/hitfactor/issues/156)) ([1bf7519](https://github.com/seketman/hitfactor/commit/1bf7519f1f1c37a9f19c6c86b264ab88cdf99f5c))
+
 ## [1.21.0](https://github.com/seketman/hitfactor/compare/v1.20.7...v1.21.0) (2026-06-29)
 
 
