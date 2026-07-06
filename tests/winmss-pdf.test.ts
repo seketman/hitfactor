@@ -426,6 +426,64 @@ Printed May 11, 2026 21:34:08 ESS`;
   });
 });
 
+describe("parseWinmssText — formato ESS 'Overall Stage Results' (guion simple)", () => {
+  // Cuarto formato (caso TFVM - 1er Social 2026 - Handgun): PDF de stages ESS
+  // que usa header de GUION SIMPLE "CLASSIC - Overall Stage Results" (no `--`
+  // ni "Results by Stage") + subheader PELADO "Stage 01" (cero-padded, sin
+  // "Etapa" ni "Stage <div> - Stage NN"). Las filas son de 8 columnas como el
+  // WinMSS clásico: place, points, time, hitFactor, stagePts, stage%, bib,
+  // nombre; decimales con punto.
+  const essOverallStage01 = `TFVM - 1er Social 2026 - Handgun
+Printed: Jul 05, 2026 22:07:22
+CLASSIC - Overall Stage Results
+Stage 01
+Points Time Hit Factor Stage Pts Stage % # Competitor Name
+1 87 20.52 4.2398 105.0000 100.00 21 LOBOS, Santiago Francisco
+Printed Jul 05, 2026 22:07:22 ESS - Electronic Scoring System 1 of 36`;
+
+  const essOverallStage02 = `TFVM - 1er Social 2026 - Handgun
+Printed: Jul 05, 2026 22:07:22
+PRODUCTION - Overall Stage Results
+Stage 02
+Points Time Hit Factor Stage Pts Stage % # Competitor Name
+1 104 22.66 4.5896 120.0000 100.00 1 BAILONE, Jonathan David
+2 97 23.96 4.0484 105.8505 88.21 11 VILLANUEVA, Enrique
+Printed Jul 05, 2026 22:07:22 ESS - Electronic Scoring System 8 of 36`;
+
+  it("detecta el formato como WinMSS válido", () => {
+    expect(isWinmssFormat(essOverallStage01)).toBe(true);
+  });
+
+  it("extrae nombre y fecha del match (no tira 'no se pudo extraer el nombre')", () => {
+    const parsed = parseWinmssText(pages(essOverallStage01));
+    expect(parsed.name).toBe("TFVM - 1er Social 2026 - Handgun");
+    expect(parsed.date).toBe("2026-07-05");
+  });
+
+  it("extrae el stage_number del subheader pelado 'Stage 01'", () => {
+    const parsed = parseWinmssText(pages(essOverallStage01, essOverallStage02));
+    expect(parsed.stages.map((s) => s.stageNumber)).toEqual([1, 2]);
+  });
+
+  it("mapea la división del header de guion simple", () => {
+    const parsed = parseWinmssText(pages(essOverallStage01, essOverallStage02));
+    expect(parsed.stages[0]?.results[0]?.divisionCode).toBe("CL");
+    expect(parsed.stages[1]?.results[0]?.divisionCode).toBe("P");
+  });
+
+  it("parsea las 8 columnas del stage (points/time/factor/stagePts/%)", () => {
+    const parsed = parseWinmssText(pages(essOverallStage01));
+    const r = parsed.stages[0]?.results[0];
+    expect(r?.shooter.fullName).toBe("LOBOS, Santiago Francisco");
+    expect(r?.points).toBe(87);
+    expect(r?.timeSeconds).toBe(20.52);
+    expect(r?.hitFactor).toBe(4.2398);
+    expect(r?.stagePoints).toBe(105);
+    expect(r?.stagePercentage).toBe(100);
+    expect(r?.place).toBe(1);
+  });
+});
+
 describe("parseWinmssText — overall", () => {
   it("extrae nombre y fecha del match", () => {
     const parsed = parseWinmssText(pages(overallClassicPage));

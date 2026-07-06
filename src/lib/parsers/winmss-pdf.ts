@@ -315,16 +315,21 @@ function parsePage(
     };
   }
 
-  // Tres formatos de páginas con ranking:
+  // Formatos de páginas con ranking:
   //  - WinMSS clásico: "X -- Overall (Match|Stage) Results" + filas 8-col en stages.
   //  - ESS overall: "X - Results Overall"
   //  - ESS by-stage: "X - Results by Stage" + subheader "Stage <Div> - Stage NN"
   //    con filas 5-col (mismo shape que overall — no hay raw hits/time/factor).
+  //  - ESS stage (guion simple): "X - Overall Stage Results" + subheader
+  //    "Stage NN" (pelado, cero-padded) + filas 8-col como el WinMSS clásico.
   const overallMatch =
     /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Match\s+Results/i.exec(text) ??
     /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Overall(?!\s+Stage)/i.exec(text);
   const stageHeaderMatch =
     /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Stage\s+Results/i.exec(text) ??
+    // Variante ESS de guion simple ("CLASSIC - Overall Stage Results"). Va
+    // después del clásico `--` para que ese gane cuando ambos podrían aplicar.
+    /([A-Z][A-Z\s]*?)\s+-\s*Overall\s+Stage\s+Results/i.exec(text) ??
     /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Stage\s+\d+/i.exec(text);
   const essByStageMatch =
     /([A-Z][A-Z\s]*?)\s+-\s*Results\s+by\s+Stage/i.exec(text);
@@ -411,7 +416,9 @@ function extractMatchName(text: string): string {
   const candidates: string[] = [];
   for (const raw of lines) {
     const stripped = raw
-      .replace(/[A-Z][A-Z0-9\s]*?\s*--\s*Overall\s+(Match|Stage)\s+Results/gi, "")
+      // Acepta guion doble (WinMSS clásico) o simple (ESS: "CLASSIC - Overall
+      // Stage Results"), para que ese header nunca gane como título.
+      .replace(/[A-Z][A-Z0-9\s]*?\s*-{1,2}\s*Overall\s+(Match|Stage)\s+Results/gi, "")
       .replace(/Stage\s+\d+\s*--\s*Etapa\s*\d*/gi, "")
       .replace(
         /Printed\s+[a-záéíóúñ]+\s+\d{1,2},?(\s+\d{4}(\s+at\s+[\d:]+)?)?/gi,
@@ -571,6 +578,12 @@ function extractStageNumber(text: string): number | null {
   // viene en el segundo "Stage NN").
   const ess = /Stage\s+[A-Za-z][A-Za-z\s]*?\s+-\s*Stage\s+(\d+)/i.exec(text);
   if (ess) return parseInt(ess[1]!, 10);
+  // ESS stage (guion simple): subheader pelado "Stage 01" (cero-padded). Va
+  // ÚLTIMO para no pisar los formatos de arriba que tienen un "Stage" previo
+  // (ej. "Stage Classic - Stage 01"): en esos, este fallback igual devolvería
+  // el número correcto, pero preferimos las regex específicas primero.
+  const bare = /Stage\s+0*(\d+)\b/i.exec(text);
+  if (bare) return parseInt(bare[1]!, 10);
   return null;
 }
 
