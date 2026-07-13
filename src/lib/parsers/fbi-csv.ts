@@ -13,6 +13,7 @@ import {
   pickMostCommon,
   stripNameSuffixes,
 } from "./shared";
+import { resolveDivisionCode } from "./division-registry";
 
 /**
  * Parser para resultados de Tiro FBI exportados desde Google Sheets como CSV.
@@ -56,18 +57,11 @@ const REQUIRED_HEADERS = [
   HEADER_PUNTOS,
 ];
 
-/**
- * Mapa de la columna "Disciplina" del CSV al `code` de la tabla `divisions`
- * (ver migración 0004_fbi.sql).
- */
-const DIVISION_CODE: Record<string, string> = {
-  pistola: "PIS",
-  revolver: "REV",
-  revólver: "REV",
-  minirifle: "MINI",
-  pcc: "PCC",
-  classic: "CLASSIC",
-};
+// El mapeo de la columna "Disciplina" del CSV al `code` de `divisions` vive
+// en el registry compartido (`division-registry.ts`), igual que el resto de
+// los parsers. Antes este archivo tenía su propio mapa, que divergía del
+// registry (tenía `classic`, que al registry le faltaba) — exactamente la
+// clase de bug que el registry único vino a evitar.
 
 /**
  * Stages esperados en el orden y nombre canónico que se persiste en DB.
@@ -159,11 +153,16 @@ export function parseFbiCsv(content: string): ParsedMatch {
 
   // Agrupamos por división para computar place + match_percentage.
   const byDivision = new Map<string, RawEntry[]>();
+  // Filas descartadas por división desconocida. Antes se salteaban en
+  // silencio y el usuario perdía tiradores sin enterarse; ahora las contamos
+  // y las devolvemos como `warnings` del ParsedMatch.
+  const skippedByDivision = new Map<string, number>();
   for (const cells of dataRows) {
     const disciplinaRaw = (cells[idxDisciplina] ?? "").trim();
-    const divisionCode = DIVISION_CODE[normalize(disciplinaRaw)];
+    const divisionCode = resolveDivisionCode(DISCIPLINE.FBI, disciplinaRaw);
     if (!divisionCode) {
-      // División desconocida: la saltamos en lugar de romper el import.
+      const label = disciplinaRaw || "(vacía)";
+      skippedByDivision.set(label, (skippedByDivision.get(label) ?? 0) + 1);
       continue;
     }
     const puntos = parseIntOrNull(cells[idxPuntos]);
@@ -270,6 +269,13 @@ export function parseFbiCsv(content: string): ParsedMatch {
     pickMostCommon(matchEntries.map((e) => e.shooter.region)) ??
     extractClubFromTitle(matchName);
 
+  // Avisos para el usuario: qué filas se descartaron y por qué. Sin esto el
+  // import "funcionaba" pero perdía tiradores en silencio.
+  const warnings = [...skippedByDivision.entries()].map(
+    ([division, count]) =>
+      `Se ignoraron ${count} fila(s) con división desconocida "${division}".`,
+  );
+
   return {
     discipline: DISCIPLINE.FBI,
     source: "fbi_csv",
@@ -279,6 +285,7 @@ export function parseFbiCsv(content: string): ParsedMatch {
     matchEntries,
     stages,
     generatedBy: null,
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }
 

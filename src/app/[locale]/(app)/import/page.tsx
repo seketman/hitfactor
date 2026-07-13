@@ -32,6 +32,12 @@ export default async function ImportPage({
     stages?: string;
     stageResults?: string;
     existed?: string;
+    /**
+     * Avisos no-fatales del parser (ej. filas descartadas por división
+     * desconocida), separados por `\n`. Se muestran en un Alert aparte para
+     * que el usuario no pierda datos en silencio.
+     */
+    warnings?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -106,6 +112,15 @@ export default async function ImportPage({
                 {params.existed === "1" && (
                   <li>{t("resultExisted")}</li>
                 )}
+              </ul>
+            </Alert>
+          )}
+          {params.ok === "1" && params.warnings && (
+            <Alert tone="warning" title={t("warningsTitle")} className="mb-6">
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                {params.warnings.split("\n").map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
               </ul>
             </Alert>
           )}
