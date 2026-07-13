@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.2](https://github.com/seketman/hitfactor/compare/v1.21.1...v1.21.2) (2026-07-13)
+
+
+### Bug Fixes
+
+* **parsers:** import FBI "Optic" division + stop dropping rows silently ([#163](https://github.com/seketman/hitfactor/issues/163)) ([ea6f044](https://github.com/seketman/hitfactor/commit/ea6f04453f613cb5aa553c010360731a26d4c816))
+
 ## [1.21.1](https://github.com/seketman/hitfactor/compare/v1.21.0...v1.21.1) (2026-07-06)
 
 
