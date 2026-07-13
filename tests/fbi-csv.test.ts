@@ -68,6 +68,45 @@ describe("parseFbiCsv — Social 4", () => {
     );
   });
 
+  it("mapea Optic a OPTIC (división extendida de TFALP)", () => {
+    // Caso real (Social 6 - 12/07/26): el club corre una división "Optic"
+    // (pistola con óptica). Sin la entrada en el registry, el parser
+    // descartaba esas filas EN SILENCIO y se perdían tiradores.
+    const csv = [
+      "Social X - 12/07/26",
+      "Tirador,Club,Categoría,Disciplina,Impactos,Puntos",
+      "Trezza Ulises,TFALP,A,Optic,40,198",
+      "Amigo Cristian,TFALP,B,Optic,28,110",
+    ].join("\n");
+    const result = parseFbiCsv(csv);
+    expect(result.matchEntries).toHaveLength(2);
+    expect(result.matchEntries.every((e) => e.divisionCode === "OPTIC")).toBe(
+      true,
+    );
+    // Rankea dentro de la división (hits-based: más impactos gana).
+    expect(result.matchEntries[0]?.shooter.fullName).toBe("Trezza Ulises");
+    expect(result.matchEntries[0]?.place).toBe(1);
+    expect(result.warnings).toBeUndefined();
+  });
+
+  it("avisa (no descarta en silencio) las filas con división desconocida", () => {
+    const csv = [
+      "Social X - 12/07/26",
+      "Tirador,Club,Categoría,Disciplina,Impactos,Puntos",
+      "Foo Bar,TFALP,B,Pistola,30,120",
+      "Baz Qux,TFALP,B,Bazooka,10,40",
+      "Qux Quux,TFALP,B,Bazooka,12,45",
+    ].join("\n");
+    const result = parseFbiCsv(csv);
+    // La fila válida entra; las dos desconocidas se descartan…
+    expect(result.matchEntries).toHaveLength(1);
+    expect(result.matchEntries[0]?.divisionCode).toBe("PIS");
+    // …pero ahora quedan reportadas en `warnings` (antes se perdían mudas).
+    expect(result.warnings).toHaveLength(1);
+    expect(result.warnings?.[0]).toContain("Bazooka");
+    expect(result.warnings?.[0]).toContain("2");
+  });
+
   it("preserva nombres con coma embebida (CSV con comillas)", () => {
     const names = parsed.matchEntries.map((e) => e.shooter.fullName);
     expect(names).toContain("Mariperisena, Matías");

@@ -325,6 +325,7 @@
     "resultStages": "{count} stage(s) nuevos",
     "resultStageResults": "{count} resultados de stages",
     "resultExisted": "El match ya existía — solo se agregaron stages.",
+    "warningsTitle": "Se ignoraron algunas filas",
     "candidatesTitle": "¿Sos alguno de estos tiradores?",
     "candidatesBodyBefore": "Encontramos",
     "candidatesOne": "una coincidencia",

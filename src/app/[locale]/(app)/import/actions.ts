@@ -314,6 +314,11 @@ function redirectToResult(result: ImportResult): never {
     stageResults: String(result.insertedStageResults),
     existed: result.existedAlready ? "1" : "0",
   });
+  // Avisos no-fatales del parser (ej. filas descartadas). Van en la URL para
+  // que la página los muestre; si no hay, no ensuciamos la query string.
+  if (result.warnings?.length) {
+    params.set("warnings", result.warnings.join("\n"));
+  }
   redirect(`/import?${params.toString()}`);
 }
 

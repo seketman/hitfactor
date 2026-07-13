@@ -110,4 +110,11 @@ export interface ParsedMatch {
   stages: ParsedStage[];
   /** Texto del pie de página (PractiScore version, etc.) */
   generatedBy: string | null;
+  /**
+   * Avisos no-fatales del parser para mostrarle al usuario: filas o secciones
+   * que se descartaron (ej. una división desconocida) y que de otro modo se
+   * perderían en silencio. El importer los persiste en `matches.import_notes`
+   * y el flow de import los muestra al terminar.
+   */
+  warnings?: string[];
 }

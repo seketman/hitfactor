@@ -30,6 +30,12 @@ export interface ImportResult {
   insertedStageResults: number;
   /** True si el match ya existía y solo agregamos stages */
   existedAlready: boolean;
+  /**
+   * Avisos no-fatales del parser (ej. filas descartadas por división
+   * desconocida). El flow de import los muestra al terminar para que el
+   * usuario no pierda datos en silencio.
+   */
+  warnings?: string[];
 }
 
 /**
@@ -207,6 +213,7 @@ async function importMatchOverall(
       insertedStages: stagesCount,
       insertedStageResults: resultsCount,
       existedAlready: true,
+      warnings: parsed.warnings,
     };
   }
 
@@ -265,6 +272,12 @@ async function importMatchOverall(
       source_filename: filename,
       imported_by_user_id: importerUserId,
       min_shots: minShots,
+      // Avisos no-fatales del parser (ej. filas descartadas por división
+      // desconocida). Quedan persistidos para poder auditar después qué se
+      // ignoró en este import.
+      import_notes: parsed.warnings?.length
+        ? parsed.warnings.join("\n")
+        : null,
     })
     .select("id")
     .single();
@@ -312,6 +325,7 @@ async function importMatchOverall(
     insertedStages,
     insertedStageResults,
     existedAlready: false,
+    warnings: parsed.warnings,
   };
 }
 

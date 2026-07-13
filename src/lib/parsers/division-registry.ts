@@ -59,9 +59,14 @@ const DIVISION_CODE_BY_DISCIPLINE: Record<
   },
   [DISCIPLINE.FBI]: {
     PISTOLA: "PIS",
+    // "Revólver" con acento lo cubre `normalizeDivisionName` (saca tildes).
     REVOLVER: "REV",
     MINIRIFLE: "MINI",
     PCC: "PCC",
+    // Divisiones que corren algunos clubes además de las cuatro base.
+    // Ver migraciones 0016 (Classic) y 0019 (Optic).
+    CLASSIC: "CLASSIC",
+    OPTIC: "OPTIC",
   },
   [DISCIPLINE.STEEL]: {
     PISTOLA: "PISTOLA",

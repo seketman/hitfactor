@@ -60,6 +60,16 @@ describe("resolveDivisionCode — FBI / Steel", () => {
     expect(resolveDivisionCode(DISCIPLINE.FBI, "Revólver")).toBe("REV");
     expect(resolveDivisionCode(DISCIPLINE.FBI, "Minirifle")).toBe("MINI");
     expect(resolveDivisionCode(DISCIPLINE.FBI, "PCC")).toBe("PCC");
+    // Divisiones extendidas que corren algunos clubes (migraciones 0016/0019).
+    expect(resolveDivisionCode(DISCIPLINE.FBI, "Classic")).toBe("CLASSIC");
+    expect(resolveDivisionCode(DISCIPLINE.FBI, "Optic")).toBe("OPTIC");
+  });
+
+  it("no mezcla el OPTIC de FBI con el de Steel (unique es por disciplina)", () => {
+    expect(resolveDivisionCode(DISCIPLINE.FBI, "Optic")).toBe("OPTIC");
+    expect(resolveDivisionCode(DISCIPLINE.STEEL, "Optic")).toBe("OPTIC");
+    // …pero Steel no conoce las de FBI.
+    expect(resolveDivisionCode(DISCIPLINE.STEEL, "Minirifle")).toBeNull();
   });
 
   it("Steel usa el nombre como code", () => {

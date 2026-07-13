@@ -325,6 +325,7 @@
     "resultStages": "{count} new stage(s)",
     "resultStageResults": "{count} stage results",
     "resultExisted": "The match already existed — only stages were added.",
+    "warningsTitle": "Some rows were skipped",
     "candidatesTitle": "Are you one of these shooters?",
     "candidatesBodyBefore": "We found",
     "candidatesOne": "one match",
