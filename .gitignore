@@ -45,6 +45,7 @@ next-env.d.ts
 .claude/
 .idea/
 .vscode/
+.atl/
 
 # supabase cli local state
 /supabase/.temp/
