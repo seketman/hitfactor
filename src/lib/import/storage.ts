@@ -147,16 +147,92 @@ export function formatMb(bytes: number): string {
 }
 
 /**
+ * Antigüedad a partir de la cual un archivo del staging se considera
+ * basura. Un import tarda segundos; cualquier cosa de más de un día es de
+ * un intento que quedó por la mitad.
+ */
+export const STALE_UPLOAD_MS = 24 * 60 * 60 * 1000;
+
+/** Cuántos huérfanos barremos por import. Ver `purgeStaleUploads`. */
+const PURGE_BATCH = 100;
+
+/**
+ * Barre los archivos viejos de la carpeta del usuario.
+ *
+ * Existe porque `cleanupImportFiles` no puede cubrir todo: si el usuario
+ * cierra la pestaña a mitad del upload, o si un batch multi-archivo falla
+ * después de subir algunos, esos objetos quedan sin dueño y nadie los
+ * borra.
+ *
+ * Por qué acá y no en un cron de Postgres, que es lo que decía el issue
+ * #169: **borrar de `storage.objects` con SQL no borra el archivo**. Saca
+ * la fila de metadata y deja el blob huérfano en S3, contando contra la
+ * cuota — y encima sin la metadata ya no hay forma de encontrarlo para
+ * limpiarlo después. La única forma correcta de borrar es la API de
+ * Storage, que es la que usa `.remove()`.
+ * Ver https://supabase.com/docs/guides/storage/management/delete-objects
+ *
+ * Corre con la sesión del usuario, aprovechando las policies que ya
+ * existen: cada uno limpia su propia carpeta. El costo es un `list` por
+ * import, y el caso típico —alguien que reintenta después de que le
+ * falló— se limpia solo.
+ *
+ * Limitación conocida: alguien que nunca vuelve a importar deja sus
+ * huérfanos ahí. Para cobertura total hace falta un barrido central (una
+ * Edge Function con service role), que es una decisión de infra aparte.
+ *
+ * Nunca tira: esto es mantenimiento oportunista, no puede hacer fallar un
+ * import.
+ */
+export async function purgeStaleUploads(
+  supabase: TypedSupabaseClient,
+  userId: string,
+  now: number = Date.now(),
+): Promise<number> {
+  try {
+    const { data, error } = await supabase.storage
+      .from(IMPORT_BUCKET)
+      .list(userId, { limit: PURGE_BATCH });
+
+    if (error || !data) return 0;
+
+    const stale = data
+      .filter((obj) => {
+        const created = Date.parse(obj.created_at ?? "");
+        return Number.isFinite(created) && now - created > STALE_UPLOAD_MS;
+      })
+      .map((obj) => `${userId}/${obj.name}`);
+
+    if (stale.length === 0) return 0;
+
+    const { error: removeError } = await supabase.storage
+      .from(IMPORT_BUCKET)
+      .remove(stale);
+
+    if (removeError) {
+      console.error(`[import] purge falló: ${removeError.message}`);
+      return 0;
+    }
+
+    console.log(`[import] purge: ${stale.length} huérfanos borrados`);
+    return stale.length;
+  } catch (e) {
+    console.error("[import] purge tiró:", e);
+    return 0;
+  }
+}
+
+/**
  * Borra los archivos de staging. Se llama siempre que terminamos con
  * ellos — importó bien, falló el parseo, o el formato no se reconoció.
  *
  * Nunca tira: si la limpieza falla, el import ya fue y no queremos
  * convertir un éxito en un error por un archivo temporal que quedó.
  *
- * OJO: hoy no hay ningún barrido automático de huérfanos. El job de
- * `pg_cron` está escrito y comentado en la migración 0020 pero NO está
- * activo (issue #169). O sea que lo que no se borre acá queda para
- * siempre — por eso logueamos el fallo en vez de tragarlo en silencio.
+ * Lo que no se borre acá lo levanta `purgeStaleUploads` en el próximo
+ * import del mismo usuario. Igual logueamos el fallo: si esto empieza a
+ * fallar seguido, el barrido oportunista no alcanza y hay que ir por el
+ * central.
  */
 export async function cleanupImportFiles(
   supabase: TypedSupabaseClient,

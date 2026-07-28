@@ -17,6 +17,7 @@ import {
   cleanupImportFiles,
   downloadImportFiles,
   parseUploadedRef,
+  purgeStaleUploads,
   MAX_IMPORT_FILES,
   type UploadedImportFile,
 } from "@/lib/import/storage";
@@ -95,6 +96,11 @@ export async function importHtml(
   // cliente de Supabase — sin él, cualquier salida temprana dejaba los
   // objetos que el browser ya subió tirados en el bucket para siempre.
   const { supabase, user } = await requireUser();
+
+  // Mantenimiento oportunista: barremos los huérfanos viejos de este
+  // usuario antes de arrancar. Filtra por antigüedad (24h), así que nunca
+  // toca lo que se acaba de subir para este import. Nunca tira.
+  await purgeStaleUploads(supabase, user.id);
 
   const { uploads, filename, allPdfs } = await resolveUploads(
     supabase,

@@ -74,18 +74,20 @@ using (
 -- ---------------------------------------------------------------------
 -- Limpieza de huérfanos
 -- ---------------------------------------------------------------------
--- El happy path borra el objeto apenas termina el parseo. Para los que
--- quedan colgados (pestaña cerrada a mitad de camino), conviene barrer
--- periódicamente. Si el proyecto tiene pg_cron habilitado:
+-- El happy path borra el objeto apenas termina el parseo. Los que quedan
+-- colgados (pestaña cerrada a mitad de camino, batch multi-archivo donde
+-- uno falla) los barre `purgeStaleUploads` en `src/lib/import/storage.ts`,
+-- que corre al principio de cada import y limpia lo de más de un día de la
+-- carpeta de ese usuario.
 --
---   select cron.schedule(
---     'purge-stale-match-imports',
---     '0 4 * * *',
---     $$ delete from storage.objects
---        where bucket_id = 'match-imports'
---          and created_at < now() - interval '1 day' $$
---   );
+-- NO intentar hacer esto desde SQL. Una versión previa de este comentario
+-- proponía un job de pg_cron con:
 --
--- Se deja documentado y no ejecutado: pg_cron no está habilitado en este
--- proyecto hoy y activarlo es una decisión de infra, no de esta
--- migración.
+--   delete from storage.objects where bucket_id = 'match-imports' ...
+--
+-- Eso está mal: borrar de `storage.objects` saca la fila de metadata pero
+-- NO borra el archivo del bucket. El blob queda huérfano en S3, sigue
+-- contando contra la cuota, y encima sin metadata ya no hay forma de
+-- encontrarlo para limpiarlo. La única forma correcta de borrar es la API
+-- de Storage (`.remove()`), que es la que usa el código de la app.
+-- Ver https://supabase.com/docs/guides/storage/management/delete-objects

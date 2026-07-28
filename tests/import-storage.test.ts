@@ -3,7 +3,9 @@ import {
   cleanupImportFiles,
   downloadImportFiles,
   parseUploadedRef,
+  purgeStaleUploads,
   MAX_IMPORT_TOTAL_BYTES,
+  STALE_UPLOAD_MS,
   type UploadedImportFile,
 } from "@/lib/import/storage";
 import type { TypedSupabaseClient } from "@/lib/supabase/types";
@@ -83,6 +85,10 @@ describe("parseUploadedRef", () => {
 function fakeSupabase(opts: {
   download?: (path: string) => { data: Blob | null; error: { message: string } | null };
   remove?: () => { error: { message: string } | null } | never;
+  list?: () => {
+    data: Array<{ name: string; created_at: string }> | null;
+    error: { message: string } | null;
+  };
 }): { client: TypedSupabaseClient; removed: string[][] } {
   const removed: string[][] = [];
   const client = {
@@ -94,6 +100,7 @@ function fakeSupabase(opts: {
           removed.push(paths);
           return opts.remove?.() ?? { error: null };
         },
+        list: async () => opts.list?.() ?? { data: [], error: null },
       }),
     },
   } as unknown as TypedSupabaseClient;
@@ -193,3 +200,86 @@ describe("cleanupImportFiles", () => {
     spy.mockRestore();
   });
 });
+
+describe("purgeStaleUploads", () => {
+  const NOW = Date.parse("2026-07-28T12:00:00Z");
+  const viejo = new Date(NOW - STALE_UPLOAD_MS - 60_000).toISOString();
+  const reciente = new Date(NOW - 30_000).toISOString();
+
+  it("borra solo lo que pasó el umbral de antigüedad", async () => {
+    const { client, removed } = fakeSupabase({
+      list: () => ({
+        data: [
+          { name: "viejo.pdf", created_at: viejo },
+          { name: "recien-subido.pdf", created_at: reciente },
+        ],
+        error: null,
+      }),
+    });
+
+    const n = await purgeStaleUploads(client, UID, NOW);
+
+    expect(n).toBe(1);
+    expect(removed).toEqual([[`${UID}/viejo.pdf`]]);
+  });
+
+  // El barrido corre al principio del import, cuando el usuario ya subió
+  // los archivos de ESTE import. Si tocara algo reciente, se comería lo que
+  // está por parsearse.
+  it("no toca los archivos recién subidos", async () => {
+    const { client, removed } = fakeSupabase({
+      list: () => ({
+        data: [{ name: "recien-subido.pdf", created_at: reciente }],
+        error: null,
+      }),
+    });
+
+    expect(await purgeStaleUploads(client, UID, NOW)).toBe(0);
+    expect(removed).toEqual([]);
+  });
+
+  it("no llama a remove si no hay nada viejo", async () => {
+    const { client, removed } = fakeSupabase({
+      list: () => ({ data: [], error: null }),
+    });
+
+    expect(await purgeStaleUploads(client, UID, NOW)).toBe(0);
+    expect(removed).toEqual([]);
+  });
+
+  it("no tira si el list falla — es mantenimiento, no puede romper el import", async () => {
+    const { client } = fakeSupabase({
+      list: () => ({ data: null, error: { message: "denied" } }),
+    });
+
+    await expect(purgeStaleUploads(client, UID, NOW)).resolves.toBe(0);
+  });
+
+  it("no tira si el remove falla", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { client } = fakeSupabase({
+      list: () => ({
+        data: [{ name: "viejo.pdf", created_at: viejo }],
+        error: null,
+      }),
+      remove: () => ({ error: { message: "denied" } }),
+    });
+
+    await expect(purgeStaleUploads(client, UID, NOW)).resolves.toBe(0);
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
+  });
+
+  it("ignora entradas con created_at ilegible en vez de borrarlas", async () => {
+    const { client, removed } = fakeSupabase({
+      list: () => ({
+        data: [{ name: "raro.pdf", created_at: "no-es-una-fecha" }],
+        error: null,
+      }),
+    });
+
+    expect(await purgeStaleUploads(client, UID, NOW)).toBe(0);
+    expect(removed).toEqual([]);
+  });
+});
+
