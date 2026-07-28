@@ -188,6 +188,52 @@ Printed May 11, 2026 21:33:24 ESS - Electronic Scoring System 2 of 8`;
   });
 });
 
+describe("parseWinmssText — puntos con separador de miles", () => {
+  // Regresión del match "CENTRO REPUBLICA CHALLENGE 2026 BY GR PCC Edition".
+  // Con 24 stages el overall pasa los 1000 puntos y ESS lo formatea como
+  // "2,061.3283". El regex de fila pedía `\d+[.,]\d+`, así que NINGUNA fila
+  // con puntaje de 4 dígitos matcheaba — y como las filas DQ van por otro
+  // regex (sin columna de puntos), el match se importaba con el DQ como
+  // único tirador. El import no fallaba: entraba casi vacío.
+  const pccOverall = `CENTRO REPUBLICA CHALLENGE 2026 BY GR PCC Edition - Handgun
+Printed: Jul 27, 2026 12:20:57
+PC OPTICS - Results Overall
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 2,061.3283 129 MAFFEI, Diego Andres S ARG OC
+2 93.08 1,918.6773 91 REVOL, José Augusto ARG
+10 52.41 1,080.4331 136 PACHECO, Maximiliano Andres ARG OC
+89 MIGUELES CORDOBA, Max DQ
+Printed Jul 27, 2026 12:20:57 ESS - Electronic Scoring System 1 of 1`;
+
+  it("parsea las filas con puntaje de miles, no solo la del DQ", () => {
+    const parsed = parseWinmssText(pages(pccOverall));
+    expect(parsed.matchEntries).toHaveLength(4);
+    expect(parsed.matchEntries.filter((e) => e.isDq)).toHaveLength(1);
+  });
+
+  it("interpreta la coma como separador de miles cuando hay punto decimal", () => {
+    const parsed = parseWinmssText(pages(pccOverall));
+    const maffei = parsed.matchEntries.find((e) =>
+      e.shooter.fullName.includes("MAFFEI"),
+    );
+    expect(maffei?.matchPoints).toBeCloseTo(2061.3283, 4);
+    expect(maffei?.matchPercentage).toBeCloseTo(100, 2);
+    // Con el bug, matchPoints daba 0 y la entry quedaba marcada como ausente.
+    expect(maffei?.isAbsent).toBe(false);
+  });
+
+  it("no rompe el formato WinMSS clásico con coma decimal", () => {
+    const parsed = parseWinmssText(pages(overallOpenPage));
+    expect(parsed.matchEntries[0]?.matchPoints).toBeCloseTo(482.0527, 4);
+    expect(parsed.matchEntries[0]?.matchPercentage).toBeCloseTo(100, 2);
+  });
+
+  it("resuelve PC OPTICS a la división PCCO", () => {
+    const parsed = parseWinmssText(pages(pccOverall));
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PCCO");
+  });
+});
+
 describe("parseWinmssText — footer 'User Defined Classification used'", () => {
   // Bug encontrado con el PDF de NOCTURNO ABRIL ATGQ 2026 (Quilmes): el
   // club usa una tabla de clasificación custom y el footer pasa a ser
