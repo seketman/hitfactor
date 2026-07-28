@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.4](https://github.com/seketman/hitfactor/compare/v1.21.3...v1.21.4) (2026-07-28)
+
+
+### Bug Fixes
+
+* **parsers:** leer puntajes WinMSS con separador de miles ([#171](https://github.com/seketman/hitfactor/issues/171)) ([998b9c4](https://github.com/seketman/hitfactor/commit/998b9c45afcd440d9de70d09f5e2888b11ab1645))
+
 ## [1.21.3](https://github.com/seketman/hitfactor/compare/v1.21.2...v1.21.3) (2026-07-28)
 
 
