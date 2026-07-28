@@ -36,6 +36,25 @@ export interface WinmssPage {
   text: string;
 }
 
+/**
+ * Un número de las tablas, como fragmento de regex.
+ *
+ * Cubre las tres formas que aparecen en los PDFs que soportamos:
+ *  - `100.00` / `525,0000` — separador decimal solo (ESS en-US, WinMSS es-AR)
+ *  - `2,061.3283` — ESS con separador de miles cuando el valor pasa los 1000
+ *  - `2.061,3283` — la misma idea en es-AR
+ *
+ * El separador de miles importa: un torneo de 24 stages acumula más de 1000
+ * puntos en el overall, y hasta que esto existió el regex de fila no
+ * matcheaba NINGUNA fila de esos matches. Se importaba el match con los
+ * tiradores DQ solamente (esos van por otro regex, sin columna de puntos),
+ * o sea que el import "funcionaba" y entraba casi vacío.
+ *
+ * Se exige al menos un grupo separador para no confundir un número con el
+ * dorsal (que es un entero pelado).
+ */
+const NUMBER_RE_SRC = String.raw`\d+(?:[.,]\d+)+`;
+
 const SPANISH_MONTHS: Record<string, number> = {
   enero: 1,
   febrero: 2,
@@ -594,8 +613,11 @@ function extractStageNumber(text: string): number | null {
 function parseOverallRows(
   text: string,
 ): Array<Omit<ParsedMatchEntry, "divisionCode">> {
-  // Acepta decimales con coma (WinMSS, es-AR) o punto (ESS, en-US).
-  const ROW_RE = /^\s*(\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+)\s+(.+?)\s*$/;
+  // Acepta decimales con coma (WinMSS, es-AR) o punto (ESS, en-US), y
+  // separador de miles (ver NUMBER_RE_SRC).
+  const ROW_RE = new RegExp(
+    String.raw`^\s*(\d+)\s+(${NUMBER_RE_SRC})\s+(${NUMBER_RE_SRC})\s+(\d+)\s+(.+?)\s*$`,
+  );
   // Filas DQ del formato ESS: no traen columnas de %/points/place — solo
   // dorsal, nombre y el marker "DQ" al final. Ej: "39 SGUERA, Santino DQ".
   const DQ_ROW_RE = /^\s*(\d+)\s+(.+?)\s+DQ\s*$/;
@@ -669,9 +691,11 @@ function parseOverallRows(
 function parseStageRows(
   text: string,
 ): Array<Omit<ParsedStageResult, "divisionCode">> {
-  // Acepta decimales con coma (WinMSS, es-AR) o punto (ESS, en-US).
-  const ROW_RE =
-    /^\s*(\d+)\s+(\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+)\s+(.+?)\s*$/;
+  // Acepta decimales con coma (WinMSS, es-AR) o punto (ESS, en-US), y
+  // separador de miles (ver NUMBER_RE_SRC).
+  const ROW_RE = new RegExp(
+    String.raw`^\s*(\d+)\s+(\d+)\s+(${NUMBER_RE_SRC})\s+(${NUMBER_RE_SRC})\s+(${NUMBER_RE_SRC})\s+(${NUMBER_RE_SRC})\s+(\d+)\s+(.+?)\s*$`,
+  );
   const out: Array<Omit<ParsedStageResult, "divisionCode">> = [];
   for (const line of text.split(/\n/)) {
     const m = ROW_RE.exec(line);
@@ -722,7 +746,9 @@ function parseStageRows(
 function parseEssStageRows(
   text: string,
 ): Array<Omit<ParsedStageResult, "divisionCode">> {
-  const ROW_RE = /^\s*(\d+)\s+(\d+[.,]\d+)\s+(\d+[.,]\d+)\s+(\d+)\s+(.+?)\s*$/;
+  const ROW_RE = new RegExp(
+    String.raw`^\s*(\d+)\s+(${NUMBER_RE_SRC})\s+(${NUMBER_RE_SRC})\s+(\d+)\s+(.+?)\s*$`,
+  );
   const DQ_ROW_RE = /^\s*(\d+)\s+(.+?)\s+DQ\s*$/;
   const out: Array<Omit<ParsedStageResult, "divisionCode">> = [];
   for (const line of text.split(/\n/)) {
@@ -845,9 +871,36 @@ function parseDqPageRows(text: string): ParsedMatchEntry[] {
   return out;
 }
 
+/**
+ * Normaliza un número de las tablas a `number`.
+ *
+ * Los dos formatos que emiten los generadores son espejo uno del otro:
+ * WinMSS usa coma decimal (es-AR: `525,0000`) y ESS usa punto (en-US:
+ * `100.00`). Cuando el valor pasa los 1000 aparece además el separador de
+ * miles — `2,061.3283` en ESS.
+ *
+ * Desambiguación: si están los dos separadores, el ÚLTIMO es el decimal y
+ * el otro es de miles. Si hay uno solo lo tratamos como decimal, que es lo
+ * que hacen ambos formatos en la práctica (ESS siempre emite los 4
+ * decimales, así que un `2,061` suelto no existe).
+ *
+ * Antes esto hacía `value.replace(",", ".")` — con `2,061.3283` quedaba
+ * `2.061.3283`, que es NaN, y el valor terminaba en 0.
+ */
 function parseDecimalComma(value: string): number {
-  // WinMSS usa coma decimal (formato es-AR): "100,00" → 100, "525,0000" → 525.
-  const n = Number(value.replace(",", "."));
+  const lastDot = value.lastIndexOf(".");
+  const lastComma = value.lastIndexOf(",");
+
+  let normalized: string;
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimalSep = lastDot > lastComma ? "." : ",";
+    const thousandsSep = decimalSep === "." ? "," : ".";
+    normalized = value.split(thousandsSep).join("").replace(decimalSep, ".");
+  } else {
+    normalized = value.replace(",", ".");
+  }
+
+  const n = Number(normalized);
   return Number.isFinite(n) ? n : 0;
 }
 
