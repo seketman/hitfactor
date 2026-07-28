@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.21.5](https://github.com/seketman/hitfactor/compare/v1.21.4...v1.21.5) (2026-07-28)
+
+
+### Bug Fixes
+
+* **parsers:** frenar el import cuando quedan filas sin leer ([#175](https://github.com/seketman/hitfactor/issues/175)) ([095c8d2](https://github.com/seketman/hitfactor/commit/095c8d226847798cdb36cfca7854a8a290a2a0f4)), closes [#173](https://github.com/seketman/hitfactor/issues/173)
+
+
+### Documentation
+
+* **development:** completar la tabla de migraciones y evitar que se desincronice ([#174](https://github.com/seketman/hitfactor/issues/174)) ([95a3257](https://github.com/seketman/hitfactor/commit/95a32576735ba203ff76a6274a4cd241ab7a5ead))
+
 ## [1.21.4](https://github.com/seketman/hitfactor/compare/v1.21.3...v1.21.4) (2026-07-28)
 
 
