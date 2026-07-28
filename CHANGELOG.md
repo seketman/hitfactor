@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.6](https://github.com/seketman/hitfactor/compare/v1.21.5...v1.21.6) (2026-07-28)
+
+
+### Bug Fixes
+
+* **import:** barrer los huérfanos del bucket con la API de Storage ([#177](https://github.com/seketman/hitfactor/issues/177)) ([c3ccc14](https://github.com/seketman/hitfactor/commit/c3ccc141d97d28284f629f5da82614bc9370d7a9)), closes [#169](https://github.com/seketman/hitfactor/issues/169)
+
 ## [1.21.5](https://github.com/seketman/hitfactor/compare/v1.21.4...v1.21.5) (2026-07-28)
 
 
