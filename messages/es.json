@@ -372,6 +372,14 @@
       "importing": "Importando...",
       "import": "Importar",
       "dontClose": "No cierres la pestaña hasta que termine.",
+      "uploadErrorTitle": "No se pudo subir el archivo",
+      "uploadError": {
+        "not_authenticated": "Se cerró tu sesión. Volvé a entrar e intentá de nuevo.",
+        "too_large": "El archivo supera el límite de {size}.",
+        "too_many": "No se pueden importar más de {max} archivos a la vez.",
+        "bucket_missing": "El almacenamiento de imports no está configurado en el servidor. No es un problema tuyo — avisale a quien administra la app.",
+        "upload_failed": "Falló la subida. Revisá tu conexión e intentá de nuevo."
+      },
       "needsDateTitle": "Falta la fecha del torneo",
       "needsDateBodyBefore": "Los rankings oficiales de la FAT no incluyen la fecha. Leímos",
       "needsDateEntries": "{count, plural, one {# resultado} other {# resultados}}",

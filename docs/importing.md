@@ -92,6 +92,58 @@ Algoritmo de matching ([`src/lib/import/match-claim.ts`](../src/lib/import/match
 5. **Subir Stage Results** *(IPSC solo)* uno por archivo, uno por stage.
 6. **Dashboard** → KPIs y evolución actualizados.
 
+## Cómo llega el archivo al server
+
+El archivo **no viaja en el body del server action**. El browser lo sube
+directo a Supabase Storage y el server action recibe solo una referencia
+`{ path, filename }`; después lo baja server-side, lo parsea y borra el
+objeto de staging.
+
+```
+browser ──upload──> Storage (bucket `match-imports`)
+   │                        │
+   └──{path,filename}──> server action ──download──> parser ──> DB
+                                 └──remove──> Storage
+```
+
+Por qué, y no el camino obvio de mandarlo en el FormData: **Vercel corta
+el request body de una Function en 4.5 MB** a nivel plataforma y devuelve
+`413 FUNCTION_PAYLOAD_TOO_LARGE` antes de invocar el código. Los PDFs de
+stages WinMSS pasan ese límite (vimos uno de 8 MB con 144 páginas).
+`experimental.serverActions.bodySizeLimit` **no** puede levantar ese
+techo — es un límite de Next, no de Vercel, y solo aplica en dev local.
+
+Piezas:
+
+| Archivo | Rol |
+|---|---|
+| `supabase/migrations/0020_import_uploads_storage.sql` | Bucket + policies de RLS |
+| `src/lib/import/upload-to-storage.ts` | Upload desde el browser |
+| `src/lib/import/storage.ts` | Validación del path, download y limpieza server-side |
+| `ImportForm.tsx` (`uploadThenImport`) | Wrapper cliente: sube y después llama al server action |
+
+Los objetos van a `<user_id>/<uuid>.<ext>` y las policies exigen que el
+primer segmento sea el uid del JWT — es lo que impide leer o escribir la
+carpeta de otro usuario. `parseUploadedRef` valida la forma del path
+antes de tocar Storage (tests en `tests/import-storage.test.ts`).
+
+**Límites, y por qué son explícitos.** El server action acepta hasta
+`MAX_IMPORT_FILES` referencias, descarta las repetidas, y corta la
+descarga si los bytes acumulados pasan `MAX_IMPORT_TOTAL_BYTES`. No es
+paranoia: antes del bucket, el techo de 4.5 MB de Vercel acotaba esto sin
+que nadie lo decidiera. Ahora las referencias son JSON de ~100 bytes y
+entran miles en un request, así que la cota tiene que estar escrita.
+
+**La limpieza no tiene red de contención todavía.** `cleanupImportFiles`
+corre en todos los caminos de salida del server action, pero es
+best-effort y hay huérfanos que no puede cubrir: el usuario que cierra la
+pestaña a mitad del upload, o un batch multi-archivo donde uno falla y
+los demás ya subieron. El barrido automático está pendiente (issue #169).
+
+El `filename` original viaja aparte del path a propósito: los parsers de
+FAT y Steel Challenge lo usan como dato de entrada (fecha del torneo,
+orden de stages), y el path es un uuid.
+
 ## Errores conocidos (códigos)
 
 | Code | Cuándo se tira |
@@ -109,6 +161,20 @@ Algoritmo de matching ([`src/lib/import/match-claim.ts`](../src/lib/import/match
 | `MATCH_ENTRIES_INSERT_FAILED` | Error insertando los match_entries |
 | `SHOOTER_INSERT_FAILED` | Error insertando un shooter |
 
+### Errores de subida (antes de llegar al server)
+
+Estos no son `ImportError`: pasan en el browser, mientras sube al bucket,
+así que el server action ni se entera. Se muestran dentro del form y las
+traducciones viven en `messages/*.json` bajo `import.form.uploadError`.
+
+| Code | Cuándo se tira |
+|---|---|
+| `not_authenticated` | No hay sesión válida al momento de subir (o falló el `getUser`) |
+| `too_large` | Un archivo supera `MAX_IMPORT_FILE_BYTES` |
+| `too_many` | Más de `MAX_IMPORT_FILES` archivos en un mismo import |
+| `bucket_missing` | El bucket no existe — típicamente se deployó sin correr la migración 0020 |
+| `upload_failed` | Cualquier otra falla del upload (red, permisos) |
+
 ## Tests
 
 | Test | Cubre |
@@ -116,3 +182,4 @@ Algoritmo de matching ([`src/lib/import/match-claim.ts`](../src/lib/import/match
 | `tests/import-match.test.ts` | Reglas anteriores con un mock minimal de Supabase. Incluye el regression test del race condition con tirador repetido. |
 | `tests/match-claim.test.ts` | Algoritmo de matching de nombres + escenarios multi-identidad. |
 | `tests/stage-resolution.test.ts` | Fuzzy match de nombre de match al subir un stage. |
+| `tests/import-storage.test.ts` | Validación del path que manda el cliente (`parseUploadedRef`), presupuesto de bytes de la descarga, y el contrato de "la limpieza nunca tira". |

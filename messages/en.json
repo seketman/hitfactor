@@ -372,6 +372,14 @@
       "importing": "Importing...",
       "import": "Import",
       "dontClose": "Don't close the tab until it finishes.",
+      "uploadErrorTitle": "Couldn't upload the file",
+      "uploadError": {
+        "not_authenticated": "Your session expired. Sign in again and retry.",
+        "too_large": "The file is over the {size} limit.",
+        "too_many": "You can't import more than {max} files at once.",
+        "bucket_missing": "Import storage isn't configured on the server. This isn't on you — let whoever administers the app know.",
+        "upload_failed": "Upload failed. Check your connection and try again."
+      },
       "needsDateTitle": "The match date is missing",
       "needsDateBodyBefore": "Official FAT rankings don't include the date. We read",
       "needsDateEntries": "{count, plural, one {# result} other {# results}}",
