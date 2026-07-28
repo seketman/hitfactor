@@ -92,6 +92,45 @@ Algoritmo de matching ([`src/lib/import/match-claim.ts`](../src/lib/import/match
 5. **Subir Stage Results** *(IPSC solo)* uno por archivo, uno por stage.
 6. **Dashboard** → KPIs y evolución actualizados.
 
+## Cómo llega el archivo al server
+
+El archivo **no viaja en el body del server action**. El browser lo sube
+directo a Supabase Storage y el server action recibe solo una referencia
+`{ path, filename }`; después lo baja server-side, lo parsea y borra el
+objeto de staging.
+
+```
+browser ──upload──> Storage (bucket `match-imports`)
+   │                        │
+   └──{path,filename}──> server action ──download──> parser ──> DB
+                                 └──remove──> Storage
+```
+
+Por qué, y no el camino obvio de mandarlo en el FormData: **Vercel corta
+el request body de una Function en 4.5 MB** a nivel plataforma y devuelve
+`413 FUNCTION_PAYLOAD_TOO_LARGE` antes de invocar el código. Los PDFs de
+stages WinMSS pasan ese límite (vimos uno de 8 MB con 144 páginas).
+`experimental.serverActions.bodySizeLimit` **no** puede levantar ese
+techo — es un límite de Next, no de Vercel, y solo aplica en dev local.
+
+Piezas:
+
+| Archivo | Rol |
+|---|---|
+| `supabase/migrations/0020_import_uploads_storage.sql` | Bucket + policies de RLS |
+| `src/lib/import/upload-to-storage.ts` | Upload desde el browser |
+| `src/lib/import/storage.ts` | Validación del path, download y limpieza server-side |
+| `ImportForm.tsx` (`uploadThenImport`) | Wrapper cliente: sube y después llama al server action |
+
+Los objetos van a `<user_id>/<uuid>.<ext>` y las policies exigen que el
+primer segmento sea el uid del JWT — es lo que impide leer o escribir la
+carpeta de otro usuario. `parseUploadedRef` valida la forma del path
+antes de tocar Storage (tests en `tests/import-storage.test.ts`).
+
+El `filename` original viaja aparte del path a propósito: los parsers de
+FAT y Steel Challenge lo usan como dato de entrada (fecha del torneo,
+orden de stages), y el path es un uuid.
+
 ## Errores conocidos (códigos)
 
 | Code | Cuándo se tira |
