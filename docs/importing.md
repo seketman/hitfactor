@@ -134,11 +134,22 @@ paranoia: antes del bucket, el techo de 4.5 MB de Vercel acotaba esto sin
 que nadie lo decidiera. Ahora las referencias son JSON de ~100 bytes y
 entran miles en un request, así que la cota tiene que estar escrita.
 
-**La limpieza no tiene red de contención todavía.** `cleanupImportFiles`
-corre en todos los caminos de salida del server action, pero es
-best-effort y hay huérfanos que no puede cubrir: el usuario que cierra la
-pestaña a mitad del upload, o un batch multi-archivo donde uno falla y
-los demás ya subieron. El barrido automático está pendiente (issue #169).
+**Limpieza en dos niveles.** `cleanupImportFiles` corre en todos los
+caminos de salida del server action, pero es best-effort y hay huérfanos
+que no puede cubrir: el usuario que cierra la pestaña a mitad del upload, o
+un batch multi-archivo donde uno falla y los demás ya subieron. Para esos,
+`purgeStaleUploads` barre al principio de cada import lo que tenga más de
+un día en la carpeta de ese usuario.
+
+Ojo con la tentación de resolverlo con un cron de Postgres: **borrar de
+`storage.objects` con SQL no borra el archivo**. Saca la fila de metadata y
+deja el blob huérfano en S3 contando contra la cuota, sin forma de
+encontrarlo después. Hay que usar la API de Storage
+([doc](https://supabase.com/docs/guides/storage/management/delete-objects)).
+
+Queda un caso sin cubrir: alguien que sube un archivo, abandona, y **nunca
+vuelve a importar**. Para eso hace falta un barrido central con service
+role (una Edge Function agendada), que es una decisión de infra aparte.
 
 El `filename` original viaja aparte del path a propósito: los parsers de
 FAT y Steel Challenge lo usan como dato de entrada (fecha del torneo,

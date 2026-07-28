@@ -91,9 +91,9 @@ export async function uploadImportFiles(
   // es independiente.
   //
   // Si uno falla, `Promise.all` rechaza y el usuario reintenta el import
-  // completo — los que ya subieron quedan huérfanos. Hoy NO hay barrido
-  // automático que los limpie (issue #169), así que cada reintento de un
-  // batch multi-archivo deja basura en el bucket.
+  // completo — los que ya subieron quedan huérfanos. Los levanta
+  // `purgeStaleUploads` (ver `./storage`) en el próximo import de este
+  // mismo usuario, un día después.
   return Promise.all(
     files.map(async (file) => {
       const path = `${userId}/${crypto.randomUUID()}${extensionOf(file.name)}`;
