@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.3](https://github.com/seketman/hitfactor/compare/v1.21.2...v1.21.3) (2026-07-28)
+
+
+### Bug Fixes
+
+* **import:** subir los reportes a Storage en vez del body del server action ([#167](https://github.com/seketman/hitfactor/issues/167)) ([bfc3e83](https://github.com/seketman/hitfactor/commit/bfc3e83b857a89907a968f350956385c2546d425))
+
 ## [1.21.2](https://github.com/seketman/hitfactor/compare/v1.21.1...v1.21.2) (2026-07-13)
 
 
