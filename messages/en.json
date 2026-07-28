@@ -372,6 +372,12 @@
       "importing": "Importing...",
       "import": "Import",
       "dontClose": "Don't close the tab until it finishes.",
+      "uploadErrorTitle": "Couldn't upload the file",
+      "uploadError": {
+        "not_authenticated": "Your session expired. Sign in again and retry.",
+        "too_large": "The file is over the 20 MB limit.",
+        "upload_failed": "Upload failed. Check your connection and try again."
+      },
       "needsDateTitle": "The match date is missing",
       "needsDateBodyBefore": "Official FAT rankings don't include the date. We read",
       "needsDateEntries": "{count, plural, one {# result} other {# results}}",

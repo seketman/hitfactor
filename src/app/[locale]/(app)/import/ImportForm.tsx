@@ -9,9 +9,57 @@ import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Input } from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
+import {
+  ImportUploadError,
+  uploadImportFiles,
+} from "@/lib/import/upload-to-storage";
 import { importHtml, type ImportFormState } from "./actions";
 
 const INITIAL_STATE: ImportFormState = { status: "idle" };
+
+/**
+ * Acción del form: sube los archivos a Storage y recién ahí llama al
+ * server action con las referencias.
+ *
+ * El upload va del browser directo al bucket, sin pasar por la Function
+ * de Vercel — que corta cualquier body de más de 4.5 MB y hacía fallar
+ * los PDFs de stages WinMSS con un 413. Ver `@/lib/import/upload-to-storage`.
+ *
+ * Es una función cliente envolviendo un server action, así que el
+ * `pending` de `useActionState` cubre las dos etapas: mientras sube y
+ * mientras importa el usuario ve el mismo spinner.
+ */
+async function uploadThenImport(
+  prevState: ImportFormState,
+  formData: FormData,
+): Promise<ImportFormState> {
+  // Segundo submit del flujo FAT: no hay archivos nuevos que subir, el
+  // `ParsedMatch` ya viaja en el estado. Va derecho al server action.
+  if (prevState.status === "needsDate") {
+    return importHtml(prevState, formData);
+  }
+
+  const files = formData
+    .getAll("file")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+
+  // Sacamos los binarios del FormData: lo único que cruza al server son
+  // las referencias `{ path, filename }` del bucket.
+  formData.delete("file");
+
+  try {
+    for (const uploaded of await uploadImportFiles(files)) {
+      formData.append("upload", JSON.stringify(uploaded));
+    }
+  } catch (e) {
+    if (e instanceof ImportUploadError) {
+      return { status: "uploadFailed", code: e.code, filename: e.filename };
+    }
+    throw e;
+  }
+
+  return importHtml(prevState, formData);
+}
 
 interface ImportFormProps {
   /** True si en esta vista ya estamos mostrando el resultado de un import previo. */
@@ -39,7 +87,7 @@ interface ImportFormProps {
  */
 export function ImportForm({ hasPreviousResult, lastFile }: ImportFormProps) {
   const [state, formAction, pending] = useActionState(
-    importHtml,
+    uploadThenImport,
     INITIAL_STATE,
   );
 
@@ -53,6 +101,7 @@ export function ImportForm({ hasPreviousResult, lastFile }: ImportFormProps) {
             hasPreviousResult={!!hasPreviousResult}
             lastFile={lastFile ?? null}
             pending={pending}
+            uploadError={state.status === "uploadFailed" ? state : null}
           />
         )}
       </form>
@@ -72,10 +121,12 @@ function UploadBody({
   hasPreviousResult,
   lastFile,
   pending,
+  uploadError,
 }: {
   hasPreviousResult: boolean;
   lastFile: string | null;
   pending: boolean;
+  uploadError: Extract<ImportFormState, { status: "uploadFailed" }> | null;
 }) {
   // `multiple` para soportar Steel Challenge (un PDF por stage). Para el
   // resto de los formatos un solo archivo alcanza — el server action
@@ -95,6 +146,20 @@ function UploadBody({
 
   return (
     <fieldset disabled={pending} className="space-y-6 disabled:opacity-60">
+      {/*
+        El upload a Storage falló, así que el import ni se intentó. Va
+        acá dentro y no por el querystring como los errores del server
+        action: nunca hubo navegación, seguimos en el mismo render.
+      */}
+      {uploadError && (
+        <Alert tone="danger" title={t("uploadErrorTitle")}>
+          {t(`uploadError.${uploadError.code}`)}
+          {uploadError.filename && (
+            <span className="font-mono"> ({uploadError.filename})</span>
+          )}
+        </Alert>
+      )}
+
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2 text-xs font-medium uppercase tracking-wider text-fg-muted">
           <span>{t("filesToImport")}</span>

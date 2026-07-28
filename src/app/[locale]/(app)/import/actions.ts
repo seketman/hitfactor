@@ -13,6 +13,13 @@ import {
   type ImportOptions,
   type ImportResult,
 } from "@/lib/import/import-match";
+import {
+  cleanupImportFiles,
+  downloadImportFiles,
+  parseUploadedRef,
+  type UploadedImportFile,
+} from "@/lib/import/storage";
+import type { UploadErrorCode } from "@/lib/import/upload-to-storage";
 
 /**
  * Estado del form de import (`useActionState`).
@@ -29,6 +36,20 @@ import {
  */
 export type ImportFormState =
   | { status: "idle" }
+  | {
+      /**
+       * Falló la subida del archivo a Storage, así que el server action
+       * ni se llamó. Es el único estado que produce el cliente (ver el
+       * wrapper `uploadThenImport` en `ImportForm`): los archivos ya no
+       * viajan en el FormData, los sube el browser directo al bucket.
+       *
+       * Viaja el `code` y no el mensaje ya armado porque las traducciones
+       * viven en `messages/`, no acá.
+       */
+      status: "uploadFailed";
+      code: UploadErrorCode;
+      filename: string | null;
+    }
   | {
       status: "needsDate";
       parsed: ParsedMatch;
@@ -68,30 +89,41 @@ export async function importHtml(
   const startedAt = new Date();
   const t0 = Date.now();
 
+  // Los archivos ya no viajan en el FormData: el browser los subió a
+  // Supabase Storage y acá recibimos solo las referencias (path +
+  // nombre original). Es lo que nos saca del techo de 4.5 MB que Vercel
+  // impone al body de una Function — ver `@/lib/import/storage`.
+  //
   // Multi-file: el input acepta `multiple`, principalmente para Steel
   // Challenge donde cada stage viene en su propio PDF. El path de un solo
   // archivo (HTML/CSV/PDF) sigue funcionando idéntico.
-  const rawFiles = formData.getAll("file");
-  const files = rawFiles.filter(
-    (f): f is File => f instanceof File && f.size > 0,
-  );
-  if (files.length === 0) {
+  const rawUploads = formData.getAll("upload").map(String);
+  if (rawUploads.length === 0) {
     redirectWithError("/import", "Elegí un archivo");
+  }
+
+  const uploads: UploadedImportFile[] = [];
+  for (const raw of rawUploads) {
+    const ref = parseUploadedRef(raw);
+    if (!ref) {
+      redirectWithError("/import", "Elegí un archivo");
+    }
+    uploads.push(ref);
   }
 
   // Para reportes y errores: nombre del primer archivo si hay uno solo,
   // o un resumen "N archivos" si son varios.
   const filename =
-    files.length === 1
-      ? files[0]!.name
-      : `${files.length} archivos (${files[0]!.name}, …)`;
+    uploads.length === 1
+      ? uploads[0]!.filename
+      : `${uploads.length} archivos (${uploads[0]!.filename}, …)`;
 
   // Validación de extensiones — todos los archivos deben respetar el set
   // soportado. Si son varios, exigimos que todos sean PDF (es el único
   // formato que admite multi-file hoy: Steel Challenge).
-  for (const f of files) {
-    const isPdfFile = /\.pdf$/i.test(f.name);
-    const isTextFile = /\.(html?|csv)$/i.test(f.name);
+  for (const u of uploads) {
+    const isPdfFile = /\.pdf$/i.test(u.filename);
+    const isTextFile = /\.(html?|csv)$/i.test(u.filename);
     if (!isPdfFile && !isTextFile) {
       redirectImportError(
         "Solo se aceptan archivos HTML, CSV o PDF",
@@ -99,8 +131,8 @@ export async function importHtml(
       );
     }
   }
-  const allPdfs = files.every((f) => /\.pdf$/i.test(f.name));
-  if (files.length > 1 && !allPdfs) {
+  const allPdfs = uploads.every((u) => /\.pdf$/i.test(u.filename));
+  if (uploads.length > 1 && !allPdfs) {
     redirectImportError(
       "Para subir varios archivos a la vez todos tienen que ser PDFs " +
         "(es el formato multi-archivo soportado, típicamente Steel Challenge).",
@@ -112,40 +144,54 @@ export async function importHtml(
   // positivo, queda null (el importer aplica 45 si es FBI; resto queda null).
   const minShots = parseMinShotsField(formData.get("min_shots"));
 
-  const totalSize = files.reduce((acc, f) => acc + f.size, 0);
   console.log(
-    `[import] start ${startedAt.toISOString()} files=${files.length} ` +
-      `first=${files[0]!.name} totalSize=${totalSize}b`,
+    `[import] start ${startedAt.toISOString()} files=${uploads.length} ` +
+      `first=${uploads[0]!.filename}`,
   );
 
   const { supabase, user } = await requireUser();
+
+  // Bajamos del bucket con la sesión del usuario: la policy de SELECT
+  // exige que el path esté bajo su carpeta, así que un path ajeno falla
+  // acá aunque haya pasado la validación de forma.
+  const tDownloadStart = Date.now();
+  let downloaded;
+  try {
+    downloaded = await downloadImportFiles(supabase, uploads);
+  } catch (e) {
+    await cleanupImportFiles(supabase, uploads);
+    const msg =
+      e instanceof Error ? e.message : "No pudimos leer el archivo subido.";
+    redirectImportError(msg, filename);
+  }
+  const tDownload = Date.now() - tDownloadStart;
+  const totalSize = downloaded.reduce((acc, d) => acc + d.data.byteLength, 0);
 
   // PDFs van como binario (single o batch); HTML/CSV como texto (single only).
   let parsed: ParsedMatch;
   const tParseStart = Date.now();
   try {
-    if (allPdfs && files.length > 1) {
-      const buffers = await Promise.all(
-        files.map(async (f) => ({
-          data: new Uint8Array(await f.arrayBuffer()),
-          filename: f.name,
-        })),
-      );
-      parsed = await parsePdfBatch(buffers);
+    if (allPdfs && downloaded.length > 1) {
+      parsed = await parsePdfBatch(downloaded);
     } else if (allPdfs) {
-      const f = files[0]!;
-      const buffer = new Uint8Array(await f.arrayBuffer());
-      parsed = await parsePdf(buffer, f.name);
+      const f = downloaded[0]!;
+      parsed = await parsePdf(f.data, f.filename);
     } else {
-      // HTML / CSV: un solo archivo, se procesa como texto.
-      const content = await files[0]!.text();
+      // HTML / CSV: un solo archivo, se procesa como texto. TextDecoder
+      // asume UTF-8, igual que el `File.text()` que usábamos antes.
+      const content = new TextDecoder().decode(downloaded[0]!.data);
       parsed = parseFile(content);
     }
   } catch (e) {
+    await cleanupImportFiles(supabase, uploads);
     const msg = e instanceof Error ? e.message : "Error parseando el archivo";
     redirectImportError(msg, filename);
   }
   const tParse = Date.now() - tParseStart;
+
+  // Desde acá trabajamos sobre el `ParsedMatch`; los archivos de staging
+  // ya no hacen falta ni siquiera en el camino de "falta la fecha".
+  await cleanupImportFiles(supabase, uploads);
 
   if (!parsed.name) {
     redirectImportError(
@@ -182,7 +228,8 @@ export async function importHtml(
 
   const tTotal = Date.now() - t0;
   console.log(
-    `[import] done file=${filename} parse=${tParse}ms total=${tTotal}ms ` +
+    `[import] done file=${filename} bytes=${totalSize} ` +
+      `download=${tDownload}ms parse=${tParse}ms total=${tTotal}ms ` +
       `(${formatDurationHuman(tTotal)})`,
   );
 

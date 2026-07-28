@@ -372,6 +372,12 @@
       "importing": "Importando...",
       "import": "Importar",
       "dontClose": "No cierres la pestaña hasta que termine.",
+      "uploadErrorTitle": "No se pudo subir el archivo",
+      "uploadError": {
+        "not_authenticated": "Se cerró tu sesión. Volvé a entrar e intentá de nuevo.",
+        "too_large": "El archivo supera los 20 MB permitidos.",
+        "upload_failed": "Falló la subida. Revisá tu conexión e intentá de nuevo."
+      },
       "needsDateTitle": "Falta la fecha del torneo",
       "needsDateBodyBefore": "Los rankings oficiales de la FAT no incluyen la fecha. Leímos",
       "needsDateEntries": "{count, plural, one {# resultado} other {# resultados}}",
