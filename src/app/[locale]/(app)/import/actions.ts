@@ -17,6 +17,7 @@ import {
   cleanupImportFiles,
   downloadImportFiles,
   parseUploadedRef,
+  MAX_IMPORT_FILES,
   type UploadedImportFile,
 } from "@/lib/import/storage";
 import type { UploadErrorCode } from "@/lib/import/upload-to-storage";
@@ -89,56 +90,16 @@ export async function importHtml(
   const startedAt = new Date();
   const t0 = Date.now();
 
-  // Los archivos ya no viajan en el FormData: el browser los subió a
-  // Supabase Storage y acá recibimos solo las referencias (path +
-  // nombre original). Es lo que nos saca del techo de 4.5 MB que Vercel
-  // impone al body de una Function — ver `@/lib/import/storage`.
-  //
-  // Multi-file: el input acepta `multiple`, principalmente para Steel
-  // Challenge donde cada stage viene en su propio PDF. El path de un solo
-  // archivo (HTML/CSV/PDF) sigue funcionando idéntico.
-  const rawUploads = formData.getAll("upload").map(String);
-  if (rawUploads.length === 0) {
-    redirectWithError("/import", "Elegí un archivo");
-  }
+  // Autenticamos ANTES de validar nada. Dos razones: no hacemos trabajo
+  // para un request sin sesión, y `cleanupImportFiles` necesita el
+  // cliente de Supabase — sin él, cualquier salida temprana dejaba los
+  // objetos que el browser ya subió tirados en el bucket para siempre.
+  const { supabase, user } = await requireUser();
 
-  const uploads: UploadedImportFile[] = [];
-  for (const raw of rawUploads) {
-    const ref = parseUploadedRef(raw);
-    if (!ref) {
-      redirectWithError("/import", "Elegí un archivo");
-    }
-    uploads.push(ref);
-  }
-
-  // Para reportes y errores: nombre del primer archivo si hay uno solo,
-  // o un resumen "N archivos" si son varios.
-  const filename =
-    uploads.length === 1
-      ? uploads[0]!.filename
-      : `${uploads.length} archivos (${uploads[0]!.filename}, …)`;
-
-  // Validación de extensiones — todos los archivos deben respetar el set
-  // soportado. Si son varios, exigimos que todos sean PDF (es el único
-  // formato que admite multi-file hoy: Steel Challenge).
-  for (const u of uploads) {
-    const isPdfFile = /\.pdf$/i.test(u.filename);
-    const isTextFile = /\.(html?|csv)$/i.test(u.filename);
-    if (!isPdfFile && !isTextFile) {
-      redirectImportError(
-        "Solo se aceptan archivos HTML, CSV o PDF",
-        filename,
-      );
-    }
-  }
-  const allPdfs = uploads.every((u) => /\.pdf$/i.test(u.filename));
-  if (uploads.length > 1 && !allPdfs) {
-    redirectImportError(
-      "Para subir varios archivos a la vez todos tienen que ser PDFs " +
-        "(es el formato multi-archivo soportado, típicamente Steel Challenge).",
-      filename,
-    );
-  }
+  const { uploads, filename, allPdfs } = await resolveUploads(
+    supabase,
+    formData,
+  );
 
   // `min_shots`: opcional en el form. Si está vacío o no parsea como int
   // positivo, queda null (el importer aplica 45 si es FBI; resto queda null).
@@ -148,8 +109,6 @@ export async function importHtml(
     `[import] start ${startedAt.toISOString()} files=${uploads.length} ` +
       `first=${uploads[0]!.filename}`,
   );
-
-  const { supabase, user } = await requireUser();
 
   // Bajamos del bucket con la sesión del usuario: la policy de SELECT
   // exige que el path esté bajo su carpeta, así que un path ajeno falla
@@ -162,6 +121,12 @@ export async function importHtml(
     await cleanupImportFiles(supabase, uploads);
     const msg =
       e instanceof Error ? e.message : "No pudimos leer el archivo subido.";
+    // Log explícito: una falla de download (bucket, RLS, red, presupuesto
+    // de bytes) es un problema de infra y hay que poder distinguirla de
+    // un archivo con formato raro en los logs de producción.
+    console.error(
+      `[import] download falló file=${filename} files=${uploads.length}: ${msg}`,
+    );
     redirectImportError(msg, filename);
   }
   const tDownload = Date.now() - tDownloadStart;
@@ -185,6 +150,13 @@ export async function importHtml(
   } catch (e) {
     await cleanupImportFiles(supabase, uploads);
     const msg = e instanceof Error ? e.message : "Error parseando el archivo";
+    // Incluimos el tamaño: es la señal que necesitamos para saber si los
+    // fallos correlacionan con archivos grandes (timeout de la Function)
+    // o con formatos que el parser no reconoce.
+    console.error(
+      `[import] parse falló file=${filename} bytes=${totalSize} ` +
+        `download=${tDownload}ms: ${msg}`,
+    );
     redirectImportError(msg, filename);
   }
   const tParse = Date.now() - tParseStart;
@@ -234,6 +206,91 @@ export async function importHtml(
   );
 
   redirectToResult(result);
+}
+
+/**
+ * Resuelve y valida las referencias de archivos que mandó el cliente.
+ *
+ * Los archivos ya no viajan en el FormData: el browser los subió a
+ * Supabase Storage y acá recibimos solo `{ path, filename }`. Es lo que
+ * nos saca del techo de 4.5 MB que Vercel impone al body de una Function
+ * — ver `@/lib/import/storage`.
+ *
+ * Cada salida por error limpia los objetos ya subidos antes de redirigir.
+ * Esto no es opcional: para cuando este código corre, el browser ya
+ * escribió en el bucket, y hoy no hay barrido automático de huérfanos
+ * (issue #169). Un usuario que mezcla un CSV en un batch de Steel es un
+ * error de tipeo, no debería dejar basura permanente.
+ */
+async function resolveUploads(
+  supabase: TypedSupabaseClient,
+  formData: FormData,
+): Promise<{
+  uploads: UploadedImportFile[];
+  filename: string;
+  allPdfs: boolean;
+}> {
+  const rawUploads = formData.getAll("upload").map(String);
+  if (rawUploads.length === 0) {
+    redirectWithError("/import", "Elegí un archivo");
+  }
+
+  const uploads: UploadedImportFile[] = [];
+  const seenPaths = new Set<string>();
+  for (const raw of rawUploads) {
+    const ref = parseUploadedRef(raw);
+    if (!ref) {
+      // No hay nada validado que limpiar todavía más allá de lo que ya
+      // juntamos, pero sí puede haber refs previas válidas.
+      await cleanupImportFiles(supabase, uploads);
+      redirectWithError("/import", "Elegí un archivo");
+    }
+    // Referencias repetidas: el mismo objeto N veces multiplicaba la
+    // descarga sin subir nada nuevo. Es la forma más barata de abusar
+    // del endpoint, y no tiene ningún uso legítimo.
+    if (seenPaths.has(ref.path)) continue;
+    seenPaths.add(ref.path);
+    uploads.push(ref);
+  }
+
+  // Para reportes y errores: nombre del primer archivo si hay uno solo,
+  // o un resumen "N archivos" si son varios.
+  const filename =
+    uploads.length === 1
+      ? uploads[0]!.filename
+      : `${uploads.length} archivos (${uploads[0]!.filename}, …)`;
+
+  if (uploads.length > MAX_IMPORT_FILES) {
+    await cleanupImportFiles(supabase, uploads);
+    redirectImportError(
+      `No se pueden importar más de ${MAX_IMPORT_FILES} archivos a la vez.`,
+      filename,
+    );
+  }
+
+  // Validación de extensiones — todos los archivos deben respetar el set
+  // soportado. Si son varios, exigimos que todos sean PDF (es el único
+  // formato que admite multi-file hoy: Steel Challenge).
+  for (const u of uploads) {
+    const isPdfFile = /\.pdf$/i.test(u.filename);
+    const isTextFile = /\.(html?|csv)$/i.test(u.filename);
+    if (!isPdfFile && !isTextFile) {
+      await cleanupImportFiles(supabase, uploads);
+      redirectImportError("Solo se aceptan archivos HTML, CSV o PDF", filename);
+    }
+  }
+
+  const allPdfs = uploads.every((u) => /\.pdf$/i.test(u.filename));
+  if (uploads.length > 1 && !allPdfs) {
+    await cleanupImportFiles(supabase, uploads);
+    redirectImportError(
+      "Para subir varios archivos a la vez todos tienen que ser PDFs " +
+        "(es el formato multi-archivo soportado, típicamente Steel Challenge).",
+      filename,
+    );
+  }
+
+  return { uploads, filename, allPdfs };
 }
 
 /**

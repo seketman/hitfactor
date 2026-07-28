@@ -13,6 +13,11 @@ import {
   ImportUploadError,
   uploadImportFiles,
 } from "@/lib/import/upload-to-storage";
+import {
+  formatMb,
+  MAX_IMPORT_FILES,
+  MAX_IMPORT_FILE_BYTES,
+} from "@/lib/import/storage";
 import { importHtml, type ImportFormState } from "./actions";
 
 const INITIAL_STATE: ImportFormState = { status: "idle" };
@@ -55,7 +60,12 @@ async function uploadThenImport(
     if (e instanceof ImportUploadError) {
       return { status: "uploadFailed", code: e.code, filename: e.filename };
     }
-    throw e;
+    // Cualquier otra cosa (falla de red cruda, error del SDK) también
+    // tiene que caer en el estado de error del form. Si la re-tirábamos,
+    // escapaba del wrapper y el usuario veía un crash de render en vez de
+    // un mensaje con opción de reintentar.
+    console.error("[import] upload falló con un error inesperado:", e);
+    return { status: "uploadFailed", code: "upload_failed", filename: null };
   }
 
   return importHtml(prevState, formData);
@@ -153,7 +163,16 @@ function UploadBody({
       */}
       {uploadError && (
         <Alert tone="danger" title={t("uploadErrorTitle")}>
-          {t(`uploadError.${uploadError.code}`)}
+          {/*
+            Los límites salen de las constantes, no hardcodeados en
+            `messages/`: si cambia el tamaño del bucket, el copy de los
+            dos locales lo sigue solo. Los valores que el mensaje elegido
+            no use, ICU los ignora.
+          */}
+          {t(`uploadError.${uploadError.code}`, {
+            size: formatMb(MAX_IMPORT_FILE_BYTES),
+            max: MAX_IMPORT_FILES,
+          })}
           {uploadError.filename && (
             <span className="font-mono"> ({uploadError.filename})</span>
           )}

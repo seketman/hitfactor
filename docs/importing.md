@@ -127,6 +127,19 @@ primer segmento sea el uid del JWT — es lo que impide leer o escribir la
 carpeta de otro usuario. `parseUploadedRef` valida la forma del path
 antes de tocar Storage (tests en `tests/import-storage.test.ts`).
 
+**Límites, y por qué son explícitos.** El server action acepta hasta
+`MAX_IMPORT_FILES` referencias, descarta las repetidas, y corta la
+descarga si los bytes acumulados pasan `MAX_IMPORT_TOTAL_BYTES`. No es
+paranoia: antes del bucket, el techo de 4.5 MB de Vercel acotaba esto sin
+que nadie lo decidiera. Ahora las referencias son JSON de ~100 bytes y
+entran miles en un request, así que la cota tiene que estar escrita.
+
+**La limpieza no tiene red de contención todavía.** `cleanupImportFiles`
+corre en todos los caminos de salida del server action, pero es
+best-effort y hay huérfanos que no puede cubrir: el usuario que cierra la
+pestaña a mitad del upload, o un batch multi-archivo donde uno falla y
+los demás ya subieron. El barrido automático está pendiente (issue #169).
+
 El `filename` original viaja aparte del path a propósito: los parsers de
 FAT y Steel Challenge lo usan como dato de entrada (fecha del torneo,
 orden de stages), y el path es un uuid.
@@ -148,6 +161,20 @@ orden de stages), y el path es un uuid.
 | `MATCH_ENTRIES_INSERT_FAILED` | Error insertando los match_entries |
 | `SHOOTER_INSERT_FAILED` | Error insertando un shooter |
 
+### Errores de subida (antes de llegar al server)
+
+Estos no son `ImportError`: pasan en el browser, mientras sube al bucket,
+así que el server action ni se entera. Se muestran dentro del form y las
+traducciones viven en `messages/*.json` bajo `import.form.uploadError`.
+
+| Code | Cuándo se tira |
+|---|---|
+| `not_authenticated` | No hay sesión válida al momento de subir (o falló el `getUser`) |
+| `too_large` | Un archivo supera `MAX_IMPORT_FILE_BYTES` |
+| `too_many` | Más de `MAX_IMPORT_FILES` archivos en un mismo import |
+| `bucket_missing` | El bucket no existe — típicamente se deployó sin correr la migración 0020 |
+| `upload_failed` | Cualquier otra falla del upload (red, permisos) |
+
 ## Tests
 
 | Test | Cubre |
@@ -155,3 +182,4 @@ orden de stages), y el path es un uuid.
 | `tests/import-match.test.ts` | Reglas anteriores con un mock minimal de Supabase. Incluye el regression test del race condition con tirador repetido. |
 | `tests/match-claim.test.ts` | Algoritmo de matching de nombres + escenarios multi-identidad. |
 | `tests/stage-resolution.test.ts` | Fuzzy match de nombre de match al subir un stage. |
+| `tests/import-storage.test.ts` | Validación del path que manda el cliente (`parseUploadedRef`), presupuesto de bytes de la descarga, y el contrato de "la limpieza nunca tira". |

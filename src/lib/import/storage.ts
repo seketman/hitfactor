@@ -16,10 +16,45 @@ import type { TypedSupabaseClient } from "@/lib/supabase/types";
 /** Bucket de staging. Ver `supabase/migrations/0020_import_uploads_storage.sql`. */
 export const IMPORT_BUCKET = "match-imports";
 
-/** Límite del bucket, replicado para poder validar antes de subir. */
+/**
+ * Límite por archivo del bucket, replicado para validar antes de subir.
+ *
+ * Si cambiás esto, cambiá también `file_size_limit` en la migración 0020
+ * y el `{size}` de `import.form.uploadError.too_large` sale solo (se
+ * deriva de esta constante, no está hardcodeado en `messages/`).
+ */
 export const MAX_IMPORT_FILE_BYTES = 20 * 1024 * 1024;
 
-/** Referencia a un archivo ya subido: path en el bucket + nombre original. */
+/**
+ * Máximo de archivos por import.
+ *
+ * El caso legítimo más grande es Steel Challenge con un PDF por stage;
+ * un torneo largo ronda los 24. 32 deja margen sin volverse una vía de
+ * abuso.
+ *
+ * Ojo con por qué esto existe: antes del bucket, el techo de 4.5 MB que
+ * Vercel impone al body acotaba esto sin que nadie lo decidiera. Ahora
+ * las referencias son JSON de ~100 bytes y entran miles en un request,
+ * así que el límite tiene que ser explícito.
+ */
+export const MAX_IMPORT_FILES = 32;
+
+/**
+ * Techo de bytes acumulados por import. Cortamos la descarga apenas se
+ * cruza, para que un usuario no pueda hacer que la Function se traiga
+ * cientos de MB en una sola invocación.
+ */
+export const MAX_IMPORT_TOTAL_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Referencia a un archivo ya subido: path en el bucket + nombre original.
+ *
+ * El `filename` viaja aparte del `path` a propósito. Los parsers lo usan
+ * como dato de entrada — el de la FAT deriva nombre y fecha del torneo
+ * del nombre del archivo, y el de Steel Challenge lo usa para ordenar
+ * los stages. El path es un uuid: si mandáramos solo eso, romperíamos
+ * esos formatos.
+ */
 export interface UploadedImportFile {
   path: string;
   filename: string;
@@ -69,25 +104,46 @@ export async function downloadImportFiles(
   supabase: TypedSupabaseClient,
   uploads: UploadedImportFile[],
 ): Promise<DownloadedImportFile[]> {
-  return Promise.all(
-    uploads.map(async ({ path, filename }) => {
-      const { data, error } = await supabase.storage
-        .from(IMPORT_BUCKET)
-        .download(path);
+  // Secuencial y no `Promise.all`: así el presupuesto de bytes corta
+  // apenas se cruza, en vez de tener N descargas grandes ya en vuelo. El
+  // caso común es un solo archivo, donde no hay diferencia; el peor caso
+  // legítimo son ~24 PDFs de Steel de un par de cientos de KB, que en
+  // serie siguen siendo despreciables al lado del parseo.
+  const downloaded: DownloadedImportFile[] = [];
+  let totalBytes = 0;
 
-      if (error || !data) {
-        throw new Error(
-          `No pudimos leer "${filename}" del almacenamiento. ` +
-            "Volvé a subirlo e intentá de nuevo.",
-        );
-      }
+  for (const { path, filename } of uploads) {
+    const { data, error } = await supabase.storage
+      .from(IMPORT_BUCKET)
+      .download(path);
 
-      return {
-        data: new Uint8Array(await data.arrayBuffer()),
-        filename,
-      };
-    }),
-  );
+    if (error || !data) {
+      throw new Error(
+        `No pudimos leer "${filename}" del almacenamiento. ` +
+          "Volvé a subirlo e intentá de nuevo.",
+      );
+    }
+
+    totalBytes += data.size;
+    if (totalBytes > MAX_IMPORT_TOTAL_BYTES) {
+      throw new Error(
+        `El import supera el máximo de ${formatMb(MAX_IMPORT_TOTAL_BYTES)} ` +
+          "entre todos los archivos. Subilos en tandas más chicas.",
+      );
+    }
+
+    downloaded.push({
+      data: new Uint8Array(await data.arrayBuffer()),
+      filename,
+    });
+  }
+
+  return downloaded;
+}
+
+/** `20 MB` a partir de un valor en bytes. Para mensajes al usuario. */
+export function formatMb(bytes: number): string {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
 /**
@@ -95,8 +151,12 @@ export async function downloadImportFiles(
  * ellos — importó bien, falló el parseo, o el formato no se reconoció.
  *
  * Nunca tira: si la limpieza falla, el import ya fue y no queremos
- * convertir un éxito en un error por un archivo temporal que quedó. Los
- * huérfanos los barre el job del bucket.
+ * convertir un éxito en un error por un archivo temporal que quedó.
+ *
+ * OJO: hoy no hay ningún barrido automático de huérfanos. El job de
+ * `pg_cron` está escrito y comentado en la migración 0020 pero NO está
+ * activo (issue #169). O sea que lo que no se borre acá queda para
+ * siempre — por eso logueamos el fallo en vez de tragarlo en silencio.
  */
 export async function cleanupImportFiles(
   supabase: TypedSupabaseClient,
@@ -104,10 +164,19 @@ export async function cleanupImportFiles(
 ): Promise<void> {
   if (uploads.length === 0) return;
   try {
-    await supabase.storage
+    const { error } = await supabase.storage
       .from(IMPORT_BUCKET)
       .remove(uploads.map((u) => u.path));
-  } catch {
-    // Best-effort a propósito. Ver el doc-comment.
+    if (error) {
+      console.error(
+        `[import] cleanup falló (${uploads.length} objetos huérfanos): ` +
+          error.message,
+      );
+    }
+  } catch (e) {
+    console.error(
+      `[import] cleanup tiró (${uploads.length} objetos huérfanos):`,
+      e,
+    );
   }
 }

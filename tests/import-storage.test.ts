@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { parseUploadedRef } from "@/lib/import/storage";
+import { describe, expect, it, vi } from "vitest";
+import {
+  cleanupImportFiles,
+  downloadImportFiles,
+  parseUploadedRef,
+  MAX_IMPORT_TOTAL_BYTES,
+  type UploadedImportFile,
+} from "@/lib/import/storage";
+import type { TypedSupabaseClient } from "@/lib/supabase/types";
 
 /**
  * `parseUploadedRef` es la puerta de entrada del server action a input
@@ -64,5 +71,125 @@ describe("parseUploadedRef", () => {
     expect(
       parseUploadedRef(ref(`${UID}/${OBJ}.pdf`, "a".repeat(256))),
     ).toBeNull();
+  });
+});
+
+/**
+ * Fake mínimo del cliente de Supabase: solo la superficie de Storage que
+ * usan estos helpers (`download` y `remove`). El mock compartido de
+ * `tests/helpers/supabase-mock.ts` cubre `from()` para tablas y no tiene
+ * Storage, y extenderlo para dos tests sería más ruido que valor.
+ */
+function fakeSupabase(opts: {
+  download?: (path: string) => { data: Blob | null; error: { message: string } | null };
+  remove?: () => { error: { message: string } | null } | never;
+}): { client: TypedSupabaseClient; removed: string[][] } {
+  const removed: string[][] = [];
+  const client = {
+    storage: {
+      from: () => ({
+        download: async (path: string) =>
+          opts.download?.(path) ?? { data: null, error: { message: "boom" } },
+        remove: async (paths: string[]) => {
+          removed.push(paths);
+          return opts.remove?.() ?? { error: null };
+        },
+      }),
+    },
+  } as unknown as TypedSupabaseClient;
+  return { client, removed };
+}
+
+function upload(n: number): UploadedImportFile {
+  return { path: `${UID}/${OBJ}`, filename: `stage-${n}.pdf` };
+}
+
+describe("downloadImportFiles", () => {
+  it("devuelve los bytes y preserva el orden de entrada", async () => {
+    const { client } = fakeSupabase({
+      download: () => ({ data: new Blob(["hola"]), error: null }),
+    });
+
+    const out = await downloadImportFiles(client, [
+      upload(1),
+      upload(2),
+      upload(3),
+    ]);
+
+    expect(out.map((d) => d.filename)).toEqual([
+      "stage-1.pdf",
+      "stage-2.pdf",
+      "stage-3.pdf",
+    ]);
+    expect(new TextDecoder().decode(out[0]!.data)).toBe("hola");
+  });
+
+  it("tira un error nombrando el archivo si falla la descarga", async () => {
+    const { client } = fakeSupabase({
+      download: () => ({ data: null, error: { message: "not found" } }),
+    });
+
+    await expect(downloadImportFiles(client, [upload(1)])).rejects.toThrow(
+      /stage-1\.pdf/,
+    );
+  });
+
+  it("corta cuando se pasa del presupuesto total de bytes", async () => {
+    // Cada archivo pesa poco más de la mitad del techo: el primero entra,
+    // el segundo lo cruza. Es el escenario de mandar la misma referencia
+    // muchas veces para hacer que el server se traiga cientos de MB.
+    const half = Math.ceil(MAX_IMPORT_TOTAL_BYTES / 2) + 1;
+    const blob = { size: half, arrayBuffer: async () => new ArrayBuffer(0) };
+    const { client } = fakeSupabase({
+      download: () => ({ data: blob as unknown as Blob, error: null }),
+    });
+
+    await expect(
+      downloadImportFiles(client, [upload(1), upload(2)]),
+    ).rejects.toThrow(/máximo/i);
+  });
+});
+
+describe("cleanupImportFiles", () => {
+  it("no llama a remove si no hay nada que limpiar", async () => {
+    const { client, removed } = fakeSupabase({});
+    await cleanupImportFiles(client, []);
+    expect(removed).toEqual([]);
+  });
+
+  it("borra todos los paths en una sola llamada", async () => {
+    const { client, removed } = fakeSupabase({});
+    await cleanupImportFiles(client, [upload(1), upload(2)]);
+    expect(removed).toEqual([[`${UID}/${OBJ}`, `${UID}/${OBJ}`]]);
+  });
+
+  // Contrato explícito del helper: "nunca tira". Si esto se rompe, un
+  // import exitoso se convierte en error por un archivo temporal.
+  it("no tira si remove devuelve error, pero lo loguea", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { client } = fakeSupabase({
+      remove: () => ({ error: { message: "denied" } }),
+    });
+
+    await expect(
+      cleanupImportFiles(client, [upload(1)]),
+    ).resolves.toBeUndefined();
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
+  });
+
+  it("no tira si remove explota", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { client } = fakeSupabase({
+      remove: () => {
+        throw new Error("network down");
+      },
+    });
+
+    await expect(
+      cleanupImportFiles(client, [upload(1)]),
+    ).resolves.toBeUndefined();
+    expect(spy).toHaveBeenCalledOnce();
+    spy.mockRestore();
   });
 });

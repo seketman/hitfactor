@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import {
   IMPORT_BUCKET,
+  MAX_IMPORT_FILES,
   MAX_IMPORT_FILE_BYTES,
   type UploadedImportFile,
 } from "./storage";
@@ -20,17 +21,22 @@ import {
  * hacemos ninguna interpretación del contenido.
  */
 
-/**
- * El `filename` viaja aparte del `path` a propósito. Los parsers lo usan
- * como dato de entrada — el de la FAT deriva nombre y fecha del torneo
- * del nombre del archivo, y el de Steel Challenge lo usa para ordenar
- * los stages. Si mandáramos solo el path (que es un uuid), romperíamos
- * esos formatos.
- */
 export type { UploadedImportFile };
 
-/** Códigos de error del upload. La UI los traduce; ver `ImportForm`. */
-export type UploadErrorCode = "not_authenticated" | "too_large" | "upload_failed";
+/**
+ * Códigos de error del upload. La UI los traduce; ver `ImportForm`.
+ *
+ * `bucket_missing` existe para separar "se rompió la red" de "el bucket
+ * no está" — este último pasa si se deploya el código sin correr la
+ * migración 0020, y confundirlo con un problema de conexión manda al
+ * usuario a revisar su wifi por una falla de configuración del server.
+ */
+export type UploadErrorCode =
+  | "not_authenticated"
+  | "too_large"
+  | "too_many"
+  | "bucket_missing"
+  | "upload_failed";
 
 export class ImportUploadError extends Error {
   constructor(
@@ -56,11 +62,23 @@ export async function uploadImportFiles(
 ): Promise<UploadedImportFile[]> {
   const supabase = createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  // `getUser()` pega a la red, así que puede tirar por su cuenta. Sin
+  // este try el error escapaba del wrapper del form y reventaba como
+  // error de render en vez de mostrar el estado de "falló la subida".
+  let userId: string;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new ImportUploadError("not_authenticated");
+    userId = user.id;
+  } catch (e) {
+    if (e instanceof ImportUploadError) throw e;
     throw new ImportUploadError("not_authenticated");
+  }
+
+  if (files.length > MAX_IMPORT_FILES) {
+    throw new ImportUploadError("too_many");
   }
 
   for (const file of files) {
@@ -70,12 +88,15 @@ export async function uploadImportFiles(
   }
 
   // En paralelo: son pocos archivos (1, o N stages de Steel) y cada uno
-  // es independiente. Si uno falla, `Promise.all` rechaza y el usuario
-  // reintenta el import completo — los que sí subieron quedan huérfanos
-  // y los barre la limpieza del bucket.
+  // es independiente.
+  //
+  // Si uno falla, `Promise.all` rechaza y el usuario reintenta el import
+  // completo — los que ya subieron quedan huérfanos. Hoy NO hay barrido
+  // automático que los limpie (issue #169), así que cada reintento de un
+  // batch multi-archivo deja basura en el bucket.
   return Promise.all(
     files.map(async (file) => {
-      const path = `${user.id}/${crypto.randomUUID()}${extensionOf(file.name)}`;
+      const path = `${userId}/${crypto.randomUUID()}${extensionOf(file.name)}`;
       const { error } = await supabase.storage
         .from(IMPORT_BUCKET)
         .upload(path, file, {
@@ -86,7 +107,12 @@ export async function uploadImportFiles(
         });
 
       if (error) {
-        throw new ImportUploadError("upload_failed", file.name);
+        // Un bucket inexistente es una falla de configuración del server
+        // (falta correr la migración), no un problema del usuario.
+        const code: UploadErrorCode = /bucket not found/i.test(error.message)
+          ? "bucket_missing"
+          : "upload_failed";
+        throw new ImportUploadError(code, file.name);
       }
 
       return { path, filename: file.name };
