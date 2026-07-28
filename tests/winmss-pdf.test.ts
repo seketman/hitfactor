@@ -234,6 +234,71 @@ Printed Jul 27, 2026 12:20:57 ESS - Electronic Scoring System 1 of 1`;
   });
 });
 
+describe("parseWinmssText — frenar imports parciales", () => {
+  // El modo de falla que dejó el match del PCC con un solo tirador: el
+  // parser leyó ALGO, así que ninguna de las guardas existentes saltó, y el
+  // import terminó con pantalla de éxito y el match casi vacío.
+  //
+  // Fila con forma de resultado pero shape que no soportamos (le falta la
+  // columna de puntos): place, %, dorsal, nombre.
+  const conFilaIlegible = `TORNEO DE PRUEBA - Handgun
+Printed: Jul 27, 2026 12:20:57
+PC OPTICS - Results Overall
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 500.0000 129 MAFFEI, Diego Andres S ARG
+2 95.50 91 REVOL, José Augusto ARG
+Printed Jul 27, 2026 12:20:57 ESS - Electronic Scoring System 1 of 1`;
+
+  it("tira si quedaron filas de datos sin leer, en vez de importar a medias", () => {
+    expect(() => parseWinmssText(pages(conFilaIlegible))).toThrow(
+      /no pudimos leer/i,
+    );
+  });
+
+  it("el error dice qué página y cuántas filas se perdieron", () => {
+    expect(() => parseWinmssText(pages(conFilaIlegible))).toThrow(
+      /página 1: leímos 1 de 2 filas/,
+    );
+  });
+
+  // Guarda contra la heurística ingenua de "la página trajo solo DQs".
+  // Una división con un solo tirador que se fue DQ es rara pero legítima, y
+  // frenar ahí sería un falso positivo. Las filas DQ no tienen forma de
+  // fila de datos (después del dorsal viene una letra), así que no cuentan.
+  const soloDq = `TORNEO CHICO - Handgun
+Printed: Jul 27, 2026 12:20:57
+PC OPTICS - Results Overall
+% Points Competitor Cat Reg Cls Tag ICS
+89 MIGUELES CORDOBA, Max DQ
+Printed Jul 27, 2026 12:20:57 ESS - Electronic Scoring System 1 of 1`;
+
+  it("no frena una división cuyo único tirador se fue DQ", () => {
+    const parsed = parseWinmssText(pages(soloDq));
+    expect(parsed.matchEntries).toHaveLength(1);
+    expect(parsed.matchEntries[0]?.isDq).toBe(true);
+  });
+
+  it("no frena un archivo que se lee entero", () => {
+    expect(() => parseWinmssText(pages(overallOpenPage))).not.toThrow();
+    expect(() => parseWinmssText(pages(stageOpenStage1Page))).not.toThrow();
+  });
+
+  // Un título que arranca con dos números pasa el primer filtro ("2026 3")
+  // sin ser una fila. Si contara como candidato, un torneo con nombre así
+  // rompería el import entero — por eso además se exige la coma.
+  const tituloNumerico = `2026 3RA FECHA COPA SOCIAL - Handgun
+Printed: Jul 27, 2026 12:20:57
+PC OPTICS - Results Overall
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 500.0000 129 MAFFEI, Diego Andres S ARG
+Printed Jul 27, 2026 12:20:57 ESS - Electronic Scoring System 1 of 1`;
+
+  it("no confunde un título que arranca con dos números con una fila perdida", () => {
+    expect(() => parseWinmssText(pages(tituloNumerico))).not.toThrow();
+    expect(parseWinmssText(pages(tituloNumerico)).matchEntries).toHaveLength(1);
+  });
+});
+
 describe("parseWinmssText — footer 'User Defined Classification used'", () => {
   // Bug encontrado con el PDF de NOCTURNO ABRIL ATGQ 2026 (Quilmes): el
   // club usa una tabla de clasificación custom y el footer pasa a ser

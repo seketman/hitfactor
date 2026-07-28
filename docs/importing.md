@@ -144,6 +144,36 @@ El `filename` original viaja aparte del path a propósito: los parsers de
 FAT y Steel Challenge lo usan como dato de entrada (fecha del torneo,
 orden de stages), y el path es un uuid.
 
+## Imports parciales: el parser frena, no importa a medias
+
+Si el parser de WinMSS lee **algunas** filas de una página pero se le
+escapan otras, tira y no se importa nada.
+
+No es paranoia: el match *CENTRO REPUBLICA CHALLENGE 2026 BY GR PCC
+Edition* entró con **un solo tirador de once**. Los puntajes traían
+separador de miles, el regex de fila no lo contemplaba, y las filas DQ
+—que van por otro regex, sin columna de puntos— pasaban igual. Ninguna de
+las guardas de entonces saltó, porque todas preguntaban "¿parseamos algo?"
+y la respuesta era sí. El import terminó con pantalla de éxito.
+
+La detección compara, por página, las líneas **con forma de fila** contra
+las que efectivamente se parsearon. Una línea cuenta como fila si arranca
+con `<número> <número>` **y** tiene una coma. Las dos condiciones importan:
+
+- Sin la primera, entrarían headers y footers.
+- Sin la segunda, un título como `2026 3RA FECHA COPA SOCIAL` contaría como
+  fila perdida y rompería el import de ese torneo.
+
+Las filas DQ del formato ESS (`89 APELLIDO, Max DQ`) no matchean la primera
+condición —después del dorsal viene una letra—, así que una división cuyo
+único tirador se fue DQ pasa sin ruido. Ese caso es raro pero legítimo.
+
+**Consecuencia a tener en cuenta:** un PDF con una fila ilegible que antes
+importaba parcialmente ahora falla entero. Es deliberado — datos
+incompletos en una base compartida son peores que un error visible— pero
+si aparece un formato nuevo, el síntoma va a ser "no importa nada" en vez
+de "importa poco". El mensaje de error dice qué página y cuántas filas.
+
 ## Errores conocidos (códigos)
 
 | Code | Cuándo se tira |

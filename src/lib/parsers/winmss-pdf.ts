@@ -162,6 +162,7 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
 
   const matchEntries: ParsedMatchEntry[] = [];
   const stagesByNum = new Map<number, ParsedStageResult[]>();
+  const dropped: string[] = [];
 
   let matchName = "";
   let matchDate = "";
@@ -182,6 +183,21 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
 
     matchName = matchName || parsed.matchName;
     matchDate = matchDate || parsed.date;
+
+    // Chequeo de sanidad por página. Va antes de acumular para que el
+    // mensaje pueda nombrar la página exacta.
+    const parsedRows =
+      parsed.kind === "overall"
+        ? parsed.entries.length
+        : parsed.kind === "stage"
+          ? parsed.results.length
+          : parsed.entries.length;
+    const missing = countUnparsedDataRows(page.text, parsedRows);
+    if (missing > 0) {
+      dropped.push(
+        `página ${page.num}: leímos ${parsedRows} de ${parsedRows + missing} filas`,
+      );
+    }
 
     if (parsed.kind === "overall") {
       if (parsed.entries.length === 0) {
@@ -256,6 +272,23 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
     );
   }
 
+  // Import parcial: leímos ALGO pero se nos escaparon filas. Frenamos en
+  // vez de importar de a pedazos.
+  //
+  // Este es el modo de falla que dejó el match del PCC con un solo tirador
+  // (el DQ): los puntajes traían separador de miles, el regex de fila no lo
+  // contemplaba, y las filas DQ —que van por otro regex— pasaban igual. El
+  // import terminaba con pantalla de éxito y nadie miraba un match que
+  // había salido "bien". Un error ruidoso es mejor que datos incompletos en
+  // una base compartida.
+  if (dropped.length > 0) {
+    throw new Error(
+      `El archivo tiene filas que no pudimos leer (${dropped.join("; ")}). ` +
+        "Puede ser un formato que todavía no soportamos. No importamos nada " +
+        "para no dejar el match a medias — avisame con el nombre del torneo.",
+    );
+  }
+
   const stages: ParsedStage[] = Array.from(stagesByNum.entries())
     .sort(([a], [b]) => a - b)
     .map(([num, results]) => ({
@@ -312,6 +345,38 @@ interface DqPageResult {
   matchName: string;
   date: string;
   entries: ParsedMatchEntry[];
+}
+
+/**
+ * Cuántas líneas con forma de fila de resultado quedaron sin parsear.
+ *
+ * La señal tiene dos partes, y las dos hacen falta:
+ *
+ *  1. Arranca con el place seguido de otro número (`1 100.00 …`,
+ *     `1 110 20,78 …`). Es el mismo test que usa `extractMatchName` para
+ *     descartar filas de datos.
+ *  2. Contiene una coma. Todas las filas traen el nombre como "Apellido,
+ *     Nombre", y las que perdimos por el bug del separador de miles traen
+ *     coma también en el puntaje (`2,061.3283`).
+ *
+ * La coma existe para no contar títulos que arrancan con dos números —
+ * "2026 3RA FECHA COPA SOCIAL" pasa el punto 1 y no es una fila. Sin ese
+ * segundo filtro, un torneo con nombre así rompería el import entero.
+ *
+ * Por qué este criterio y no "la página trajo solo DQs": una división con
+ * un único tirador que se fue DQ es rara pero posible, y frenar ahí sería
+ * un falso positivo. Las filas DQ del formato ESS (`89 APELLIDO, Max DQ`)
+ * NO matchean el punto 1 —después del dorsal viene una letra, no un
+ * número— así que ese caso legítimo pasa sin ruido. Lo que sí detecta es
+ * que el texto tenga filas de datos que el parser no supo leer, que es
+ * exactamente el bug que queremos atajar.
+ */
+function countUnparsedDataRows(text: string, parsedRows: number): number {
+  let candidates = 0;
+  for (const line of text.split(/\n/)) {
+    if (/^\s*\d+\s+\d/.test(line) && line.includes(",")) candidates++;
+  }
+  return Math.max(0, candidates - parsedRows);
 }
 
 function parsePage(
