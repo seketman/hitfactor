@@ -2,8 +2,19 @@
 -- HitFactor — esquema consolidado
 -- =====================================================================
 -- Este archivo es el resultado de aplastar (squash) las 20 migraciones
--- incrementales 0001–0020 en un único script de bootstrap. Representa el
--- estado final del esquema, no la historia de cómo se llegó a él.
+-- incrementales que existían hasta el PR #15 (mayo 2026) en un único
+-- script de bootstrap. Representa el estado del esquema en ese momento, no
+-- la historia de cómo se llegó a él.
+--
+-- OJO, ESTO NO ALCANZA PARA LEVANTAR LA DB. Después del squash la
+-- numeración arrancó de nuevo, así que los archivos 0002+ de esta misma
+-- carpeta son POSTERIORES a este y NO están incluidos acá. Sin ellos te
+-- faltan, entre otras cosas, `is_absent`, `min_shots`, `qr_code`,
+-- `is_admin`, las tablas de municiones y de uso de armas, y el bucket de
+-- Storage para los imports.
+--
+-- Para levantar una base de cero: correr este archivo y después TODOS los
+-- 0002+ en orden numérico. La lista completa está en `docs/development.md`.
 --
 -- Por qué consolidar: para poder recrear la DB de cero en otra plataforma
 -- con un solo script, en vez de reproducir 20 migraciones parciales con
