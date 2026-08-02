@@ -12,6 +12,13 @@ describe("normalizeDivisionName", () => {
       "PRODUCTION OPTICS",
     );
   });
+
+  // Los clubes abrevian con y sin punto de forma intercambiable. Sin esto
+  // haría falta una clave por variante ortográfica.
+  it("saca los puntos de las abreviaturas", () => {
+    expect(normalizeDivisionName("Pistola Prod.")).toBe("PISTOLA PROD");
+    expect(normalizeDivisionName("Pistola P. Optic")).toBe("PISTOLA P OPTIC");
+  });
 });
 
 describe("resolveDivisionCode — IPSC", () => {
@@ -40,6 +47,16 @@ describe("resolveDivisionCode — IPSC", () => {
     ["Pistola", "PIS"],
     ["Pistola P. Optic", "PO"], // Production Optics, label PractiScore AR
     ["Pistola Production Optic", "PO"],
+    // Rótulos de TFALP (PractiScore Android). "Pistola Prod." es Production
+    // a secas — el club lo abrevia y la columna `Div` de esas filas dice
+    // "PP", que no es un code de la DB.
+    ["Pistola Prod.", "P"],
+    ["Pistola Prod", "P"],
+    ["Pistola Produccion", "P"],
+    ["Pistola Producción", "P"],
+    ["Pistola Production", "P"],
+    ["Pistola Optic", "PO"],
+    ["Pistola Optics", "PO"],
   ];
   it.each(cases)("'%s' → %s", (name, code) => {
     expect(resolveDivisionCode(DISCIPLINE.IPSC, name)).toBe(code);
