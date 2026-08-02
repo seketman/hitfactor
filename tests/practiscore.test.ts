@@ -253,3 +253,50 @@ describe("parsePractiscoreHtml — section header overrides row Div code", () =>
     expect(byName("Foo, Delta")?.divisionCode).toBe("O");
   });
 });
+
+describe("parsePractiscoreHtml — rótulos de división de TFALP", () => {
+  // Regresión del import que fallaba con `División no reconocida: "PP"`.
+  //
+  // El parser resuelve la división por el TÍTULO de la sección y solo cae a
+  // la columna `Div` si el título no está en el registry. "Pistola Prod." no
+  // estaba, así que caía a `Div` = "PP", que no es un code de la DB.
+  //
+  // Lo que hace peligrosa a esa columna está en este mismo archivo: la
+  // sección "Pcc" trae `Div` = "P", y "P" es Production. Si el título de esa
+  // sección tampoco resolviera, los tiradores de PCC entrarían como
+  // Production sin que nada lo avisara.
+  const html = read("tp-escopeta-2026-08-02-divisiones-ar.html");
+  const result = parsePractiscoreHtml(html);
+
+  const divisionDe = (apellido: string) =>
+    result.matchEntries.find((e) => e.shooter.fullName.includes(apellido))
+      ?.divisionCode;
+
+  it("mapea 'Pistola Prod.' a Production, no a la columna Div", () => {
+    expect(divisionDe("MONTOTO FLORES")).toBe("P");
+    expect(divisionDe("ALZATTO")).toBe("P");
+  });
+
+  it("mapea 'Pistola Optic' a Production Optics por título", () => {
+    expect(divisionDe("Nishimura")).toBe("PO");
+  });
+
+  // El caso que justifica no confiar en la columna.
+  it("no importa los de 'Pcc' como Production pese a que su Div dice 'P'", () => {
+    expect(divisionDe("LANZILLOTTA")).toBe("PCC");
+  });
+
+  it("sigue resolviendo Classic por título aunque su Div diga 'C'", () => {
+    expect(divisionDe("CINQUETTI")).toBe("CL");
+  });
+
+  it("no deja ninguna entry con un código que no sea de la DB", () => {
+    const codigosValidos = new Set([
+      "O", "P", "PO", "PCC", "PCCO", "S", "SM", "CO", "R", "CL", "CM", "MS", "PIS",
+    ]);
+    const invalidos = result.matchEntries
+      .map((e) => e.divisionCode)
+      .filter((c) => !codigosValidos.has(c));
+    expect(invalidos).toEqual([]);
+  });
+});

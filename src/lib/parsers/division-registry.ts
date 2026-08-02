@@ -23,13 +23,25 @@ const DIVISION_CODE_BY_DISCIPLINE: Record<
     "SG OPEN": "O",
     PRODUCTION: "P",
     "PRODUCTION OPTICS": "PO",
+    // Los clubes argentinos rotulan Production como "Pistola Production" y
+    // lo abrevian de varias formas. Los puntos los saca
+    // `normalizeDivisionName`, así que "Pistola Prod." entra por la clave
+    // sin punto.
+    "PISTOLA PROD": "P",
+    "PISTOLA PRODUCCION": "P",
+    "PISTOLA PRODUCTION": "P",
     // PractiScore (clubes argentinos) etiqueta Production Optics como
     // "Pistola P. Optic" / "Pistola Production Optic" — la misma división PO
     // de IPSC (pistola Production con óptica). Ver PR #137.
-    "PISTOLA P. OPTIC": "PO",
+    //
+    // "PISTOLA P OPTIC" cubre también "Pistola P. Optic": el punto se saca
+    // al normalizar, así que las dos formas colapsan en esta clave.
     "PISTOLA P OPTIC": "PO",
     "PISTOLA PRODUCTION OPTIC": "PO",
     "PISTOLA PRODUCTION OPTICS": "PO",
+    // Sin la palabra "Production" en el medio — es como lo rotula TFALP.
+    "PISTOLA OPTIC": "PO",
+    "PISTOLA OPTICS": "PO",
     STANDARD: "S",
     "SG STANDARD": "S",
     "STANDARD MANUAL": "SM",
@@ -81,16 +93,22 @@ const DIVISION_CODE_BY_DISCIPLINE: Record<
 };
 
 /**
- * Normaliza un nombre de división para el lookup: saca tildes, pasa a
- * MAYÚSCULAS, colapsa espacios repetidos y trimea. Es la normalización
- * más permisiva de todos los parsers (superset) — solo hace matchear MÁS,
- * nunca menos.
+ * Normaliza un nombre de división para el lookup: saca tildes y puntos,
+ * pasa a MAYÚSCULAS, colapsa espacios repetidos y trimea. Es la
+ * normalización más permisiva de todos los parsers (superset) — solo hace
+ * matchear MÁS, nunca menos.
+ *
+ * Los puntos se sacan porque los clubes abrevian con y sin ellos de forma
+ * intercambiable: "Pistola Prod." y "Pistola Prod", "Pistola P. Optic" y
+ * "Pistola P Optic" son la misma división. Sin esto haría falta una clave
+ * por variante ortográfica, que es como el registry venía creciendo.
  */
 export function normalizeDivisionName(raw: string): string {
   return raw
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toUpperCase()
+    .replace(/\./g, "")
     .replace(/\s+/g, " ")
     .trim();
 }
