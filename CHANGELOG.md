@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.7](https://github.com/seketman/hitfactor/compare/v1.21.6...v1.21.7) (2026-08-02)
+
+
+### Bug Fixes
+
+* **parsers:** reconocer los rótulos de división "Pistola Prod." y "Pistola Optic" ([#183](https://github.com/seketman/hitfactor/issues/183)) ([e79c1f4](https://github.com/seketman/hitfactor/commit/e79c1f49944449084adcf4b599ec42b5fb25d524))
+
 ## [1.21.6](https://github.com/seketman/hitfactor/compare/v1.21.5...v1.21.6) (2026-07-28)
 
 
