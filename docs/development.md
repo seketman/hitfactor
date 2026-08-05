@@ -1,22 +1,22 @@
-# Desarrollo local
+# Local development
 
-## Requisitos
+## Requirements
 
-- Node 20+ (probado con 25)
+- Node 20+ (tested with 25)
 - npm 11+
-- Una cuenta de Supabase (free tier alcanza)
+- A Supabase account (the free tier is enough)
 
-## Setup inicial
+## Initial setup
 
 ```bash
 git clone <repo>
 cd HitFactor
 npm install
 cp .env.example .env.local
-# editar .env.local con tus credenciales de Supabase
+# edit .env.local with your Supabase credentials
 ```
 
-Variables esperadas en `.env.local`:
+Variables expected in `.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
@@ -26,82 +26,81 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 ### `NEXT_PUBLIC_SITE_URL`
 
-URL absoluta del sitio. Es la fuente de verdad para toda la metadata SEO:
-canonical, sitemap, robots, Open Graph y JSON-LD. Si no está definida, el
-default en local es `http://localhost:3000`.
+The absolute URL of the site. It is the source of truth for all SEO metadata:
+canonical, sitemap, robots, Open Graph and JSON-LD. If it is not defined, the
+local default is `http://localhost:3000`.
 
-En Vercel se setea por environment (Production / Preview / Development) con el
-dominio real de cada uno — así el canonical y los previews apuntan al host
-correcto en cada deploy.
+On Vercel it is set per environment (Production / Preview / Development) with
+each one's real domain — that way the canonical URL and previews point to the
+right host on every deploy.
 
-## Levantar la DB
+## Setting up the database
 
-Aplicar **todas** las migraciones en Supabase, en orden numérico:
+Apply **all** the migrations in Supabase, in numeric order:
 
-1. Abrir el SQL Editor del proyecto.
-2. Pegar y ejecutar los archivos en orden:
+1. Open the project's SQL Editor.
+2. Paste and run the files in order:
 
-> La 0001 es un **squash de la historia previa a mayo 2026**, no un
-> bootstrap completo. Después de consolidarla la numeración arrancó de
-> nuevo, así que las 0002+ son posteriores y hacen falta igual: sin ellas
-> te quedás sin `is_absent`, `min_shots`, `qr_code`, `is_admin`, las tablas
-> de municiones y uso de armas, y el bucket de Storage de los imports.
-> Corré **todas**, en orden.
+> 0001 is a **squash of the history prior to May 2026**, not a full bootstrap.
+> After consolidating it the numbering started over, so 0002+ come after it
+> and are still required: without them you have no `is_absent`, `min_shots`,
+> `qr_code`, `is_admin`, the ammunition and firearm usage tables, or the
+> Storage bucket for imports. Run **all** of them, in order.
 
-| # | Archivo | Qué hace |
+| # | File | What it does |
 |---|---|---|
-| 0001 | [`0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) | Esquema base consolidado: profiles, disciplines, divisions, shooters, matches, stages, match_entries, stage_results, firearms, match_firearm_log, clubs, audit_log, feedback + índices, triggers, RLS y seeds |
-| 0002 | [`0002_my_discipline_counts.sql`](../supabase/migrations/0002_my_discipline_counts.sql) | RPC `my_discipline_counts(p_user_id)` — agrega en Postgres el conteo de participaciones por disciplina del usuario (lo consume el sidebar) |
-| 0003 | [`0003_security_advisor_fixes.sql`](../supabase/migrations/0003_security_advisor_fixes.sql) | Fixes del Security Advisor de Supabase: `search_path` fijo en las funciones y demás warnings del linter |
-| 0004 | [`0004_fat_pdf_source.sql`](../supabase/migrations/0004_fat_pdf_source.sql) | Amplía el CHECK de `matches.source_type` con `fat_pdf` (rankings oficiales en PDF de la FAT) |
-| 0005 | [`0005_profiles_admin.sql`](../supabase/migrations/0005_profiles_admin.sql) | `profiles.is_admin` — habilita las vistas de diagnóstico restringidas a administradores |
-| 0006 | [`0006_match_dedup_utilities.sql`](../supabase/migrations/0006_match_dedup_utilities.sql) | Utilidades de auditoría y limpieza de entries duplicadas por re-import (`merge_duplicate_shooters` y afines) |
-| 0007 | [`0007_match_entries_absent.sql`](../supabase/migrations/0007_match_entries_absent.sql) | `match_entries.is_absent` — distingue "no compitió" de "compitió y le fue mal" |
-| 0008 | [`0008_match_entries_update_extended.sql`](../supabase/migrations/0008_match_entries_update_extended.sql) | Amplía la RLS de UPDATE sobre `match_entries`: además del importador, admins y el propio tirador |
-| 0009 | [`0009_backfill_is_absent.sql`](../supabase/migrations/0009_backfill_is_absent.sql) | Backfill de `is_absent` en los matches importados antes de la 0007 (evita re-importar) |
-| 0010 | [`0010_ammunition_types.sql`](../supabase/migrations/0010_ammunition_types.sql) | Catálogo de municiones por tirador, factory y reload (#46) |
-| 0011 | [`0011_firearm_usage_log.sql`](../supabase/migrations/0011_firearm_usage_log.sql) | Log de uso de armas fuera de torneos — entrenamiento y práctica (#47) |
-| 0012 | [`0012_firearm_qr_codes.sql`](../supabase/migrations/0012_firearm_qr_codes.sql) | Código corto por arma + ruta `/q/{code}`, para que el QR pegado al arma sea chico (#58) |
-| 0013 | [`0013_firearm_qr_code_default.sql`](../supabase/migrations/0013_firearm_qr_code_default.sql) | Reemplaza el trigger que generaba `qr_code` por un DEFAULT de columna, para que `gen types` lo vea opcional |
-| 0014 | [`0014_match_min_shots.sql`](../supabase/migrations/0014_match_min_shots.sql) | `matches.min_shots` — base del KPI de "disparos extra" contra `rounds_fired` (#75) |
-| 0015 | [`0015_steel_pdf_source.sql`](../supabase/migrations/0015_steel_pdf_source.sql) | Amplía el CHECK de `source_type` con `practiscore_steel_pdf` (PDFs de Steel Challenge) |
-| 0016 | [`0016_fbi_classic_division.sql`](../supabase/migrations/0016_fbi_classic_division.sql) | División `CLASSIC` para Tiro FBI |
-| 0017 | [`0017_ipsc_classic_manual_division.sql`](../supabase/migrations/0017_ipsc_classic_manual_division.sql) | División `CM` (Classic Manual) para IPSC — escopeta exportada de PractiScore |
-| 0018 | [`0018_update_ui_prefs_rpc.sql`](../supabase/migrations/0018_update_ui_prefs_rpc.sql) | RPC `update_ui_prefs` — merge atómico de `ui_prefs`, evita lost updates (#126) |
-| 0019 | [`0019_fbi_optic_division.sql`](../supabase/migrations/0019_fbi_optic_division.sql) | División `OPTIC` para Tiro FBI |
-| 0020 | [`0020_import_uploads_storage.sql`](../supabase/migrations/0020_import_uploads_storage.sql) | Bucket privado `match-imports` + policies RLS por usuario, para el staging de archivos de import |
+| 0001 | [`0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) | Consolidated base schema: profiles, disciplines, divisions, shooters, matches, stages, match_entries, stage_results, firearms, match_firearm_log, clubs, audit_log, feedback + indexes, triggers, RLS and seeds |
+| 0002 | [`0002_my_discipline_counts.sql`](../supabase/migrations/0002_my_discipline_counts.sql) | `my_discipline_counts(p_user_id)` RPC — aggregates the user's participation count per discipline in Postgres (consumed by the sidebar) |
+| 0003 | [`0003_security_advisor_fixes.sql`](../supabase/migrations/0003_security_advisor_fixes.sql) | Supabase Security Advisor fixes: fixed `search_path` on functions and the remaining linter warnings |
+| 0004 | [`0004_fat_pdf_source.sql`](../supabase/migrations/0004_fat_pdf_source.sql) | Extends the `matches.source_type` CHECK with `fat_pdf` (official FAT rankings in PDF) |
+| 0005 | [`0005_profiles_admin.sql`](../supabase/migrations/0005_profiles_admin.sql) | `profiles.is_admin` — enables the diagnostic views restricted to administrators |
+| 0006 | [`0006_match_dedup_utilities.sql`](../supabase/migrations/0006_match_dedup_utilities.sql) | Audit and cleanup utilities for entries duplicated by re-import (`merge_duplicate_shooters` and friends) |
+| 0007 | [`0007_match_entries_absent.sql`](../supabase/migrations/0007_match_entries_absent.sql) | `match_entries.is_absent` — distinguishes "did not compete" from "competed and did poorly" |
+| 0008 | [`0008_match_entries_update_extended.sql`](../supabase/migrations/0008_match_entries_update_extended.sql) | Widens the UPDATE RLS on `match_entries`: besides the importer, admins and the shooter themselves |
+| 0009 | [`0009_backfill_is_absent.sql`](../supabase/migrations/0009_backfill_is_absent.sql) | Backfills `is_absent` on matches imported before 0007 (avoids re-importing) |
+| 0010 | [`0010_ammunition_types.sql`](../supabase/migrations/0010_ammunition_types.sql) | Per-shooter ammunition catalog, factory and reload (#46) |
+| 0011 | [`0011_firearm_usage_log.sql`](../supabase/migrations/0011_firearm_usage_log.sql) | Firearm usage log outside matches — training and practice (#47) |
+| 0012 | [`0012_firearm_qr_codes.sql`](../supabase/migrations/0012_firearm_qr_codes.sql) | Short code per firearm + `/q/{code}` route, so the QR stuck on the firearm stays small (#58) |
+| 0013 | [`0013_firearm_qr_code_default.sql`](../supabase/migrations/0013_firearm_qr_code_default.sql) | Replaces the trigger that generated `qr_code` with a column DEFAULT, so `gen types` sees it as optional |
+| 0014 | [`0014_match_min_shots.sql`](../supabase/migrations/0014_match_min_shots.sql) | `matches.min_shots` — the basis of the "extra rounds" KPI against `rounds_fired` (#75) |
+| 0015 | [`0015_steel_pdf_source.sql`](../supabase/migrations/0015_steel_pdf_source.sql) | Extends the `source_type` CHECK with `practiscore_steel_pdf` (Steel Challenge PDFs) |
+| 0016 | [`0016_fbi_classic_division.sql`](../supabase/migrations/0016_fbi_classic_division.sql) | `CLASSIC` division for Tiro FBI |
+| 0017 | [`0017_ipsc_classic_manual_division.sql`](../supabase/migrations/0017_ipsc_classic_manual_division.sql) | `CM` (Classic Manual) division for IPSC — shotgun exported from PractiScore |
+| 0018 | [`0018_update_ui_prefs_rpc.sql`](../supabase/migrations/0018_update_ui_prefs_rpc.sql) | `update_ui_prefs` RPC — atomic merge of `ui_prefs`, avoids lost updates (#126) |
+| 0019 | [`0019_fbi_optic_division.sql`](../supabase/migrations/0019_fbi_optic_division.sql) | `OPTIC` division for Tiro FBI |
+| 0020 | [`0020_import_uploads_storage.sql`](../supabase/migrations/0020_import_uploads_storage.sql) | Private `match-imports` bucket + per-user RLS policies, for staging import files |
 
-Si agregás una migración, agregá su fila acá: hay un test
-(`tests/migrations-doc.test.ts`) que falla si el directorio y esta tabla se
-desincronizan. Esa tabla estuvo desactualizada 18 migraciones seguidas
-justamente porque nada lo verificaba.
+If you add a migration, add its row here: there is a test
+(`tests/migrations-doc.test.ts`) that fails if the directory and this table
+drift apart. This table was 18 migrations out of date precisely because
+nothing verified it.
 
-Para desarrollo se recomienda **deshabilitar la confirmación por email** en
-Supabase → *Authentication → Sign In / Providers → Email* — así podés crear
-cuentas de prueba sin tener que confirmar.
+For development we recommend **disabling email confirmation** in Supabase →
+*Authentication → Sign In / Providers → Email* — that way you can create test
+accounts without having to confirm them.
 
-## Comandos
+## Commands
 
 ```bash
 npm run dev          # dev server (localhost:3000)
-npm run build        # build de producción
-npm test             # corre tests una vez
-npm run test:watch   # tests en watch mode
-npm run db:types     # regenera src/lib/supabase/database.types.ts desde la DB
+npm run build        # production build
+npm test             # run the tests once
+npm run test:watch   # tests in watch mode
+npm run db:types     # regenerate src/lib/supabase/database.types.ts from the DB
 ```
 
-`db:types` necesita un `SUPABASE_ACCESS_TOKEN` en el entorno (o `supabase
-login` previo). Correlo después de aplicar una migración que cambie el
-schema, así el cliente Supabase tipado queda sincronizado.
+`db:types` needs a `SUPABASE_ACCESS_TOKEN` in the environment (or a prior
+`supabase login`). Run it after applying a migration that changes the schema,
+so the typed Supabase client stays in sync.
 
-## Estructura del proyecto
+## Project structure
 
-Ver [`architecture.md`](./architecture.md).
+See [`architecture.md`](./architecture.md).
 
-## Verificación rápida después de cambios
+## Quick check after making changes
 
 ```bash
 npm test && npx tsc --noEmit && npm run build
 ```
 
-Los tres tienen que pasar. Hoy: 243 tests verdes, typecheck limpio.
+All three have to pass. Currently: 479 tests green, typecheck clean.

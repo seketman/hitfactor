@@ -1,67 +1,66 @@
-# Contribuir a HitFactor
+# Contributing to HitFactor
 
-¡Gracias por querer aportar! HitFactor es una app open-source para tiradores
-deportivos, y cualquier ayuda — bug reports, sugerencias, código, traducciones,
-docs — es bienvenida.
+Thanks for wanting to help! HitFactor is an open-source app for practical
+shooters, and any contribution — bug reports, suggestions, code, translations,
+docs — is welcome.
 
-Este documento te explica cómo levantar el proyecto en local, las
-convenciones que seguimos, y el flujo de Pull Request.
+This document explains how to run the project locally, the conventions we
+follow, and the Pull Request flow.
 
-## Setup local
+## Local setup
 
-Necesitás:
+You'll need:
 
-- Node.js 20+ y npm
-- Una cuenta de [Supabase](https://supabase.com) (free tier alcanza) — vas a
-  necesitar URL del proyecto + anon key
-- Un cliente para correr migraciones SQL (el SQL Editor de Supabase mismo
-  funciona)
+- Node.js 20+ and npm
+- A [Supabase](https://supabase.com) account (the free tier is enough) — you'll
+  need the project URL + anon key
+- A client to run SQL migrations (Supabase's own SQL Editor works fine)
 
-Pasos:
+Steps:
 
 ```bash
 git clone https://github.com/seketman/hitfactor.git
 cd hitfactor
 npm install
-cp .env.example .env.local           # completar con credenciales de Supabase
-# aplicar TODAS las migraciones de supabase/migrations/ en orden numérico
-# en el SQL Editor de tu proyecto Supabase
+cp .env.example .env.local           # fill in your Supabase credentials
+# apply ALL the migrations in supabase/migrations/ in numeric order
+# from your Supabase project's SQL Editor
 npm run dev                          # http://localhost:3000
 ```
 
-Más detalle en [docs/development.md](../docs/development.md).
+More detail in [docs/development.md](../docs/development.md).
 
-## Antes de mandar el PR
+## Before sending the PR
 
-Tu PR tiene que pasar el CI, que corre:
+Your PR has to pass CI, which runs:
 
 ```bash
-npx tsc --noEmit       # type-check, sin errores
-npm test               # vitest, todos los tests verdes
-npm run build          # build de producción funciona (en CI, no local obligatorio)
+npx tsc --noEmit       # type-check, no errors
+npm test               # vitest, all tests green
+npm run build          # production build works (in CI, not mandatory locally)
 ```
 
-Si tu cambio toca lógica de negocio (parsers, importer, stats, claim), por
-favor agregá o actualizá el test correspondiente en `tests/`. Hay fixtures
-reales de PractiScore, FBI CSV y WinMSS PDF para reproducir casos.
+If your change touches business logic (parsers, importer, stats, claim),
+please add or update the matching test in `tests/`. There are real fixtures for
+PractiScore, FBI CSV and WinMSS PDF to reproduce cases.
 
-## Convenciones de commit
+## Commit conventions
 
-Usamos **conventional commits** porque
-[release-please](https://github.com/googleapis/release-please) los lee para
-calcular la próxima versión y armar el CHANGELOG automáticamente:
+We use **conventional commits** because
+[release-please](https://github.com/googleapis/release-please) reads them to
+compute the next version and build the CHANGELOG automatically:
 
-| Prefijo | Cuándo usarlo | Efecto en versión |
+| Prefix | When to use it | Version effect |
 |---|---|---|
-| `feat:` | Nueva funcionalidad visible para el usuario | minor (1.0.0 → 1.1.0) |
+| `feat:` | New user-visible functionality | minor (1.0.0 → 1.1.0) |
 | `fix:` | Bugfix | patch (1.0.0 → 1.0.1) |
-| `perf:` | Mejora de performance sin cambio de API | patch |
-| `refactor:` | Refactor interno sin cambio de comportamiento | patch |
-| `docs:` | Solo documentación | patch |
-| `chore:` / `test:` / `style:` / `ci:` / `build:` | Mantenimiento, tests, formato, CI, build | sin bump |
-| `feat!:` o `BREAKING CHANGE:` en body | Cambio incompatible | major (1.0.0 → 2.0.0) |
+| `perf:` | Performance improvement with no API change | patch |
+| `refactor:` | Internal refactor with no behavior change | patch |
+| `docs:` | Documentation only | patch |
+| `chore:` / `test:` / `style:` / `ci:` / `build:` | Maintenance, tests, formatting, CI, build | no bump |
+| `feat!:` or `BREAKING CHANGE:` in the body | Incompatible change | major (1.0.0 → 2.0.0) |
 
-Ejemplo:
+Example:
 
 ```
 feat(import): support WinMSS PDF format with by-stage layout
@@ -72,49 +71,49 @@ followed by a "Stage <Division> - Stage NN" subheader, and rows are
 5-column (place, %, points, bib, name) — no raw hits/time/factor.
 ```
 
-## Flujo de Pull Request
+## Pull Request flow
 
-1. **Hacé fork** del repo desde GitHub.
-2. **Branch a partir de `main`** con un nombre descriptivo:
+1. **Fork** the repo from GitHub.
+2. **Branch off `main`** with a descriptive name:
    `feat/winmss-by-stage-parser`, `fix/duplicate-shooters-on-reupload`, etc.
-3. **Commits con conventional commits** (ver arriba). Mejor 3 commits chicos
-   y atómicos que un commit gigante.
-4. **Corré los checks en local** antes de pushear (`tsc`, tests, opcional
+3. **Commit with conventional commits** (see above). Three small, atomic
+   commits beat one giant commit.
+4. **Run the checks locally** before pushing (`tsc`, tests, optionally
    `npm run build`).
-5. **Abrí el PR contra `main`** del repo original. Llená el template — sobre
-   todo el "test plan", para que se vea qué probaste.
-6. **Esperá review**. Como mantenedor solo hay uno por ahora, puede demorar
-   unos días. Si hay cambios pedidos, los aplicás en commits adicionales
-   (no fuerza-pushees el branch — preservar la historia ayuda a revisar).
-7. **Squash & merge** lo hago yo desde GitHub al aprobar — vos no tenés que
-   reorganizar nada.
+5. **Open the PR against `main`** on the original repo. Fill in the template —
+   especially the "test plan", so it's clear what you tested.
+6. **Wait for review**. There is only one maintainer for now, so it may take a
+   few days. If changes are requested, apply them in additional commits (don't
+   force-push the branch — preserving the history helps reviewing).
+7. **Squash & merge** is done by me from GitHub on approval — you don't have to
+   reorganize anything.
 
-## Reportar bugs
+## Reporting bugs
 
-Abrí un [issue](https://github.com/seketman/hitfactor/issues/new/choose)
-con el template de bug. Incluí:
+Open an [issue](https://github.com/seketman/hitfactor/issues/new/choose) with
+the bug template. Include:
 
-- Versión que estás corriendo (la ves al pie del sidebar, ej `v1.2.0`)
-- Pasos para reproducir
-- Qué esperabas vs qué pasó
-- Si es un import roto, **adjuntá el archivo** (PDF / HTML / CSV) que falla
-  — sin él no podemos reproducir
+- The version you're running (it's at the bottom of the sidebar, e.g. `v1.2.0`)
+- Steps to reproduce
+- What you expected vs what happened
+- If an import is broken, **attach the file** (PDF / HTML / CSV) that fails —
+  without it we can't reproduce
 
-## Sugerir features
+## Suggesting features
 
-Mismo lugar, template de feature request. Antes de invertir tiempo
-codeando algo grande, abrí primero el issue para discutirlo — así
-nos ahorramos retrabajos.
+Same place, feature request template. Before investing time coding something
+big, open the issue first to discuss it — it saves rework on both sides.
 
-## Licencia
+## License
 
-Al contribuir aceptás que tu código se distribuye bajo
-[AGPL v3 o posterior](../LICENSE), la misma licencia del proyecto. En
-particular: si alguien aloja HitFactor (o un fork) como servicio
-público, está obligado a publicar el código fuente — incluido el tuyo.
+By contributing you accept that your code is distributed under
+[AGPL v3 or later](../LICENSE), the same license as the project. In
+particular: if someone hosts HitFactor (or a fork) as a public service, they
+are required to publish the source code — including yours.
 
-## Código de conducta
+## Code of conduct
 
-Tratá a la comunidad como te gustaría ser tratado. Comentarios discriminatorios,
-acoso, o ataques personales se moderan sin previo aviso. Si tenés que reportar
-algo, mandame un mail privado (lo encontrás en mi perfil de GitHub).
+Treat the community the way you'd like to be treated. Discriminatory comments,
+harassment, or personal attacks are moderated without warning. If you need to
+report something, send me a private email (you'll find it on my GitHub
+profile).

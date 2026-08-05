@@ -1,103 +1,122 @@
-# Flujo de importación
+# Import flow
 
-## Reglas de negocio
+## Business rules
 
-1. **Cualquier usuario autenticado puede importar.** Los matches son datos
-   compartidos: todos los autenticados los ven.
+1. **Any authenticated user can import.** Matches are shared data: every
+   authenticated user sees them.
 
-2. **Solo el importador puede borrar el match.** No hay edit — si está mal,
-   se elimina y se reimporta.
+2. **Only the importer can delete the match.** There is no edit — if it's
+   wrong, delete it and re-import.
 
-3. **Deduplicación automática.** El UNIQUE de `matches` es
-   `(discipline_id, name, date, region) NULLS NOT DISTINCT`, así que dos
-   imports con region NULL **sí** se consideran iguales (necesario para FBI,
-   que no tiene region por torneo). Si alguien intenta reimportar, se
-   devuelve `MATCH_ALREADY_EXISTS`.
+3. **Automatic deduplication.** The UNIQUE on `matches` is
+   `(discipline_id, name, date, region) NULLS NOT DISTINCT`, so two imports
+   with a NULL region **are** considered equal (necessary for Tiro FBI, which
+   has no region per match). If someone tries to re-import, it returns
+   `MATCH_ALREADY_EXISTS`.
 
-4. **Match overall primero, stages después** *(IPSC)*. Los archivos de
-   `Stage Results` requieren que el match overall ya exista (matcheo por
-   `name + date`, con fuzzy fallback si el sufijo del stage es desconocido).
-   Si no, `MATCH_NOT_FOUND`.
+4. **Match overall first, stages after** *(IPSC)*. `Stage Results` files
+   require the overall match to exist already (matched on `name + date`, with
+   a fuzzy fallback when the stage suffix is unknown). Otherwise,
+   `MATCH_NOT_FOUND`.
 
-5. **Steel Challenge y FBI traen stages embebidos en un solo archivo.** El
-   importer detecta y los inserta en la misma operación que el match overall.
+5. **Steel Challenge and Tiro FBI carry stages embedded in a single file.**
+   The importer detects them and inserts them in the same operation as the
+   overall match.
 
-6. **Solo el importador del match puede agregarle stages.** `NOT_MATCH_OWNER`
-   si no.
+6. **Only the match's importer can add stages to it.** `NOT_MATCH_OWNER`
+   otherwise.
 
-7. **Re-importar un stage es idempotente.** Los `stage_results` se hacen con
-   `upsert` sobre `(stage_id, match_entry_id)`, así no se duplican.
+7. **Re-importing a stage is idempotent.** `stage_results` are written with an
+   `upsert` on `(stage_id, match_entry_id)`, so they don't duplicate.
 
-8. **Resolución de shooters** *(crítico — race condition fix)*. Por cada
-   tirador del archivo:
-   - Buscar por `(full_name ILIKE, member_number)`.
-   - Si existe, reusar.
-   - Si no, crear nuevo `shooter` (sin claim).
-   
-   La resolución es **secuencial y cacheada** dentro del import: una sola
-   llamada a `findOrCreateShooter` por tirador único. Antes esto se hacía
-   con `Promise.all` y producía duplicados cuando el mismo tirador aparecía
-   en varias divisiones del CSV (típico FBI).
+8. **Shooter resolution** *(critical — race condition fix)*. For each shooter
+   in the file:
+   - Look up by `(full_name ILIKE, member_number)`.
+   - If it exists, reuse it.
+   - If not, create a new `shooter` (unclaimed).
 
-## Formatos soportados
+   Resolution is **sequential and cached** within the import: a single
+   `findOrCreateShooter` call per unique shooter. This used to be done with
+   `Promise.all` and produced duplicates when the same shooter appeared in
+   several divisions of the CSV (typical for Tiro FBI).
 
-| Disciplina | Formato | Single file? | Stages embebidos? |
+## Supported formats
+
+| Discipline | Format | Single file? | Stages embedded? |
 |---|---|---|---|
-| IPSC | PractiScore HTML | No | No (archivo aparte por stage) |
-| Steel Challenge | PractiScore HTML | Sí | Sí |
-| Tiro FBI | CSV de Google Sheets | Sí | No (FBI no expone stages) |
+| IPSC | PractiScore HTML | No | No (a separate file per stage) |
+| IPSC | PractiScore PDF | Yes | Depends on the report |
+| IPSC | WinMSS PDF (ipsc.org.ar) | Yes | No (a separate overall and stages PDF) |
+| IPSC | FAT PDF (official rankings) | Yes | No |
+| Steel Challenge | PractiScore HTML | Yes | Yes |
+| Steel Challenge | PractiScore PDF (iPhone) | No — N stage PDFs at once | Yes |
+| Tiro FBI | Google Sheets CSV | Yes | No (FBI does not expose stages) |
 
-Detección automática en [`src/lib/parsers/index.ts`](../src/lib/parsers/index.ts):
-HTML vs CSV → Steel vs IPSC dentro de HTML.
+Format selection lives in
+[`src/lib/parsers/index.ts`](../src/lib/parsers/index.ts) and is a **registry
+of descriptors**, not a hardcoded if-ladder (issue #119). Each format declares
+`{ detect, parse }` and is added by pushing an entry to the list, so the
+dispatcher is closed to modification. Order matters: the first `detect` that
+returns true wins, so the more specific heuristics go first.
 
-## Multi-identidad
+- Text (`parseFile`): FBI CSV is checked first, then HTML — inside HTML, Steel
+  Challenge is checked and PractiScore IPSC is the catch-all.
+- PDF (`parsePdfBatch`): Steel Challenge (multi-file) is checked first, then
+  the single-file registry — PractiScore PDF, WinMSS, FAT.
 
-Un usuario puede tener varios `shooters` linkeados (uno por cada variante de
-su nombre que usaron las distintas planillas). El sistema lo soporta de punta
-a punta:
+Steel Challenge is the only format that accepts several PDFs in one import;
+everything else rejects more than one file.
 
-- `findClaimCandidates` usa los nombres de los shooters ya linkeados como
-  **aliases adicionales** para sugerir nuevos claims. Si ya claimaste
-  "Demarziani, Diego D." en IPSC, ese nombre alimenta el matching de "Demarziani Diego" en FBI.
-- `claimShooter` no exige que el usuario tenga 0 shooters previos.
-- El dashboard agrega entries de **todas** las identidades.
-- `/matches/[id]/me` busca cuál de tus identidades participó en ese match.
+## Multiple identities
+
+A user can have several `shooters` linked (one per spelling of their name used
+by the different reports). The system supports this end to end:
+
+- `findClaimCandidates` uses the names of already-linked shooters as
+  **additional aliases** when suggesting new claims. If you already claimed
+  "Demarziani, Diego D." in IPSC, that name feeds the matching for
+  "Demarziani Diego" in Tiro FBI.
+- `claimShooter` does not require the user to have 0 previous shooters.
+- The dashboard aggregates entries from **all** identities.
+- `/matches/[id]/me` looks up which of your identities took part in that match.
 
 Tests: `tests/match-claim.test.ts`.
 
-## Auto-detección de claim
+## Claim auto-detection
 
-Después de importar, [`src/app/(app)/import/page.tsx`](../src/app/(app)/import/page.tsx)
-muestra un panel "¿Sos alguno de estos tiradores?" con los shooters del match
-que parecen ser el usuario logueado.
+After importing,
+[`src/app/[locale]/(app)/import/page.tsx`](<../src/app/[locale]/(app)/import/page.tsx>)
+shows an
+"Are you one of these shooters?" panel with the match's shooters that look like
+the logged-in user.
 
-Algoritmo de matching ([`src/lib/import/match-claim.ts`](../src/lib/import/match-claim.ts)):
+Matching algorithm
+([`src/lib/import/match-claim.ts`](../src/lib/import/match-claim.ts)):
 
-- **Por número de socio**: coincidencia exacta del `member_number` contra
-  cualquiera de los aliases (profile + shooters ya linkeados).
-- **Por nombre**: tokens normalizados (lowercase, sin acentos, sin
-  puntuación), requiriendo que el set más chico esté contenido en el más
-  grande y tenga al menos 2 tokens distintos. Esto evita falsos positivos
-  por apellidos comunes.
+- **By member number**: exact match of `member_number` against any of the
+  aliases (profile + already-linked shooters).
+- **By name**: normalized tokens (lowercase, no accents, no punctuation),
+  requiring the smaller set to be contained in the larger one and to have at
+  least 2 distinct tokens. This avoids false positives from common surnames.
 
-## Flujo del usuario
+## User flow
 
-1. **Subir el archivo** (Match Results de PractiScore, planilla Steel, o CSV
-   FBI).
-2. **Si hay sugerencias de claim**, dale "Soy yo" para linkear.
-3. **Si no aparecieron sugerencias**, andá al match (`/matches/[id]`) y dale
-   "Soy yo" en tu fila manualmente.
-4. **(Opcional) Asignar arma usada** en `/matches/[id]/me` con el
+1. **Upload the file** (PractiScore Match Results, a Steel report, or an FBI
+   CSV).
+2. **If there are claim suggestions**, hit "That's me" to link.
+3. **If no suggestions appeared**, go to the match (`/matches/[id]`) and hit
+   "That's me" on your row manually.
+4. **(Optional) Assign the firearm used** in `/matches/[id]/me` with the
    `FirearmSelector`.
-5. **Subir Stage Results** *(IPSC solo)* uno por archivo, uno por stage.
-6. **Dashboard** → KPIs y evolución actualizados.
+5. **Upload Stage Results** *(IPSC only)*, one file per stage.
+6. **Dashboard** → KPIs and progress updated.
 
-## Cómo llega el archivo al server
+## How the file reaches the server
 
-El archivo **no viaja en el body del server action**. El browser lo sube
-directo a Supabase Storage y el server action recibe solo una referencia
-`{ path, filename }`; después lo baja server-side, lo parsea y borra el
-objeto de staging.
+The file **does not travel in the server action's body**. The browser uploads
+it straight to Supabase Storage and the server action receives only a
+`{ path, filename }` reference; it then downloads the file server-side, parses
+it, and deletes the staging object.
 
 ```
 browser ──upload──> Storage (bucket `match-imports`)
@@ -106,121 +125,121 @@ browser ──upload──> Storage (bucket `match-imports`)
                                  └──remove──> Storage
 ```
 
-Por qué, y no el camino obvio de mandarlo en el FormData: **Vercel corta
-el request body de una Function en 4.5 MB** a nivel plataforma y devuelve
-`413 FUNCTION_PAYLOAD_TOO_LARGE` antes de invocar el código. Los PDFs de
-stages WinMSS pasan ese límite (vimos uno de 8 MB con 144 páginas).
-`experimental.serverActions.bodySizeLimit` **no** puede levantar ese
-techo — es un límite de Next, no de Vercel, y solo aplica en dev local.
+Why this, and not the obvious route of sending it in the FormData: **Vercel
+caps a Function's request body at 4.5 MB** at the platform level and returns
+`413 FUNCTION_PAYLOAD_TOO_LARGE` before invoking the code. WinMSS stage PDFs
+go past that limit (we saw an 8 MB one with 144 pages).
+`experimental.serverActions.bodySizeLimit` **cannot** raise that ceiling — it
+is a Next limit, not a Vercel one, and only applies in local dev.
 
-Piezas:
+The pieces:
 
-| Archivo | Rol |
+| File | Role |
 |---|---|
-| `supabase/migrations/0020_import_uploads_storage.sql` | Bucket + policies de RLS |
-| `src/lib/import/upload-to-storage.ts` | Upload desde el browser |
-| `src/lib/import/storage.ts` | Validación del path, download y limpieza server-side |
-| `ImportForm.tsx` (`uploadThenImport`) | Wrapper cliente: sube y después llama al server action |
+| `supabase/migrations/0020_import_uploads_storage.sql` | Bucket + RLS policies |
+| `src/lib/import/upload-to-storage.ts` | Upload from the browser |
+| `src/lib/import/storage.ts` | Path validation, download and server-side cleanup |
+| `ImportForm.tsx` (`uploadThenImport`) | Client wrapper: uploads, then calls the server action |
 
-Los objetos van a `<user_id>/<uuid>.<ext>` y las policies exigen que el
-primer segmento sea el uid del JWT — es lo que impide leer o escribir la
-carpeta de otro usuario. `parseUploadedRef` valida la forma del path
-antes de tocar Storage (tests en `tests/import-storage.test.ts`).
+Objects go to `<user_id>/<uuid>.<ext>` and the policies require the first
+segment to be the JWT's uid — that is what prevents reading or writing another
+user's folder. `parseUploadedRef` validates the shape of the path before
+touching Storage (tests in `tests/import-storage.test.ts`).
 
-**Límites, y por qué son explícitos.** El server action acepta hasta
-`MAX_IMPORT_FILES` referencias, descarta las repetidas, y corta la
-descarga si los bytes acumulados pasan `MAX_IMPORT_TOTAL_BYTES`. No es
-paranoia: antes del bucket, el techo de 4.5 MB de Vercel acotaba esto sin
-que nadie lo decidiera. Ahora las referencias son JSON de ~100 bytes y
-entran miles en un request, así que la cota tiene que estar escrita.
+**Limits, and why they are explicit.** The server action accepts up to
+`MAX_IMPORT_FILES` references, discards duplicates, and aborts the download if
+the accumulated bytes exceed `MAX_IMPORT_TOTAL_BYTES`. This is not paranoia:
+before the bucket, Vercel's 4.5 MB ceiling bounded this without anyone deciding
+it. Now the references are ~100-byte JSON blobs and thousands fit in one
+request, so the bound has to be written down.
 
-**Limpieza en dos niveles.** `cleanupImportFiles` corre en todos los
-caminos de salida del server action, pero es best-effort y hay huérfanos
-que no puede cubrir: el usuario que cierra la pestaña a mitad del upload, o
-un batch multi-archivo donde uno falla y los demás ya subieron. Para esos,
-`purgeStaleUploads` barre al principio de cada import lo que tenga más de
-un día en la carpeta de ese usuario.
+**Two-level cleanup.** `cleanupImportFiles` runs on every exit path of the
+server action, but it is best-effort and there are orphans it cannot cover: a
+user who closes the tab mid-upload, or a multi-file batch where one fails after
+the others already uploaded. For those, `purgeStaleUploads` sweeps anything
+older than a day from that user's folder at the start of every import.
 
-Ojo con la tentación de resolverlo con un cron de Postgres: **borrar de
-`storage.objects` con SQL no borra el archivo**. Saca la fila de metadata y
-deja el blob huérfano en S3 contando contra la cuota, sin forma de
-encontrarlo después. Hay que usar la API de Storage
-([doc](https://supabase.com/docs/guides/storage/management/delete-objects)).
+Beware the temptation to solve this with a Postgres cron: **deleting from
+`storage.objects` with SQL does not delete the file**. It removes the metadata
+row and leaves the blob orphaned in S3, still counting against the quota, with
+no way to find it afterwards. You have to use the Storage API
+([docs](https://supabase.com/docs/guides/storage/management/delete-objects)).
 
-Queda un caso sin cubrir: alguien que sube un archivo, abandona, y **nunca
-vuelve a importar**. Para eso hace falta un barrido central con service
-role (una Edge Function agendada), que es una decisión de infra aparte.
+One case remains uncovered: someone who uploads a file, abandons it, and
+**never imports again**. That needs a central sweep with the service role (a
+scheduled Edge Function), which is a separate infrastructure decision.
 
-El `filename` original viaja aparte del path a propósito: los parsers de
-FAT y Steel Challenge lo usan como dato de entrada (fecha del torneo,
-orden de stages), y el path es un uuid.
+The original `filename` travels alongside the path on purpose: the FAT and
+Steel Challenge parsers use it as input data (match date, stage order), and the
+path is a uuid.
 
-## Imports parciales: el parser frena, no importa a medias
+## Partial imports: the parser stops rather than importing half the data
 
-Si el parser de WinMSS lee **algunas** filas de una página pero se le
-escapan otras, tira y no se importa nada.
+If the WinMSS parser reads **some** rows on a page but misses others, it throws
+and nothing is imported.
 
-No es paranoia: el match *CENTRO REPUBLICA CHALLENGE 2026 BY GR PCC
-Edition* entró con **un solo tirador de once**. Los puntajes traían
-separador de miles, el regex de fila no lo contemplaba, y las filas DQ
-—que van por otro regex, sin columna de puntos— pasaban igual. Ninguna de
-las guardas de entonces saltó, porque todas preguntaban "¿parseamos algo?"
-y la respuesta era sí. El import terminó con pantalla de éxito.
+This is not paranoia: the match *CENTRO REPUBLICA CHALLENGE 2026 BY GR PCC
+Edition* came in with **one shooter out of eleven**. The scores carried a
+thousands separator, the row regex did not account for it, and the DQ rows —
+which go through a different regex, with no points column — matched anyway.
+None of the guards at the time fired, because they all asked "did we parse
+anything?" and the answer was yes. The import ended on a success screen.
 
-La detección compara, por página, las líneas **con forma de fila** contra
-las que efectivamente se parsearon. Una línea cuenta como fila si arranca
-con `<número> <número>` **y** tiene una coma. Las dos condiciones importan:
+Detection compares, page by page, the lines **shaped like a row** against the
+ones actually parsed. A line counts as a row if it starts with
+`<number> <number>` **and** contains a comma. Both conditions matter:
 
-- Sin la primera, entrarían headers y footers.
-- Sin la segunda, un título como `2026 3RA FECHA COPA SOCIAL` contaría como
-  fila perdida y rompería el import de ese torneo.
+- Without the first, headers and footers would count.
+- Without the second, a title like `2026 3RA FECHA COPA SOCIAL` would count as
+  a missed row and would break that match's import.
 
-Las filas DQ del formato ESS (`89 APELLIDO, Max DQ`) no matchean la primera
-condición —después del dorsal viene una letra—, así que una división cuyo
-único tirador se fue DQ pasa sin ruido. Ese caso es raro pero legítimo.
+DQ rows in the ESS format (`89 LASTNAME, Max DQ`) do not match the first
+condition — a letter follows the bib number — so a division whose only shooter
+was DQ'd passes without noise. That case is rare but legitimate.
 
-**Consecuencia a tener en cuenta:** un PDF con una fila ilegible que antes
-importaba parcialmente ahora falla entero. Es deliberado — datos
-incompletos en una base compartida son peores que un error visible— pero
-si aparece un formato nuevo, el síntoma va a ser "no importa nada" en vez
-de "importa poco". El mensaje de error dice qué página y cuántas filas.
+**A consequence worth keeping in mind:** a PDF with one unreadable row that
+used to import partially now fails entirely. This is deliberate — incomplete
+data in a shared database is worse than a visible error — but if a new format
+shows up, the symptom will be "nothing imports" rather than "not much imports".
+The error message says which page and how many rows.
 
-## Errores conocidos (códigos)
+## Known errors (codes)
 
-| Code | Cuándo se tira |
+| Code | When it's thrown |
 |---|---|
-| `UNKNOWN_DISCIPLINE` | El parser devolvió una disciplina que no existe en `disciplines` |
-| `DIVISIONS_FETCH_FAILED` | No se pudo cargar la lookup de divisiones |
-| `UNKNOWN_DIVISION` | Aparece una división no registrada — pedir a admin que la agregue |
-| `MATCH_INSERT_FAILED` | Error genérico al insertar el match |
-| `MATCH_ALREADY_EXISTS` | Unique violation: ese match ya existe |
-| `MATCH_NOT_FOUND` | Subiste un stage sin haber subido antes el match overall |
-| `MATCH_LOOKUP_FAILED` | Error de query buscando el match |
-| `NOT_MATCH_OWNER` | Querés agregar stages a un match que no importaste vos |
-| `STAGE_INSERT_FAILED` | Error insertando el stage |
-| `STAGE_RESULTS_INSERT_FAILED` | Error insertando los stage_results |
-| `MATCH_ENTRIES_INSERT_FAILED` | Error insertando los match_entries |
-| `SHOOTER_INSERT_FAILED` | Error insertando un shooter |
+| `UNKNOWN_DISCIPLINE` | The parser returned a discipline that does not exist in `disciplines` |
+| `DIVISIONS_FETCH_FAILED` | The divisions lookup could not be loaded |
+| `UNKNOWN_DIVISION` | An unregistered division showed up — ask an admin to add it |
+| `MATCH_INSERT_FAILED` | Generic error inserting the match |
+| `MATCH_ALREADY_EXISTS` | Unique violation: that match already exists |
+| `MATCH_NOT_FOUND` | You uploaded a stage without uploading the overall match first |
+| `MATCH_LOOKUP_FAILED` | Query error while looking up the match |
+| `NOT_MATCH_OWNER` | You're trying to add stages to a match you did not import |
+| `STAGE_INSERT_FAILED` | Error inserting the stage |
+| `STAGE_RESULTS_INSERT_FAILED` | Error inserting the stage_results |
+| `MATCH_ENTRIES_INSERT_FAILED` | Error inserting the match_entries |
+| `SHOOTER_INSERT_FAILED` | Error inserting a shooter |
 
-### Errores de subida (antes de llegar al server)
+### Upload errors (before reaching the server)
 
-Estos no son `ImportError`: pasan en el browser, mientras sube al bucket,
-así que el server action ni se entera. Se muestran dentro del form y las
-traducciones viven en `messages/*.json` bajo `import.form.uploadError`.
+These are not `ImportError`s: they happen in the browser, while uploading to
+the bucket, so the server action never hears about them. They are shown inside
+the form and their translations live in `messages/*.json` under
+`import.form.uploadError`.
 
-| Code | Cuándo se tira |
+| Code | When it's thrown |
 |---|---|
-| `not_authenticated` | No hay sesión válida al momento de subir (o falló el `getUser`) |
-| `too_large` | Un archivo supera `MAX_IMPORT_FILE_BYTES` |
-| `too_many` | Más de `MAX_IMPORT_FILES` archivos en un mismo import |
-| `bucket_missing` | El bucket no existe — típicamente se deployó sin correr la migración 0020 |
-| `upload_failed` | Cualquier otra falla del upload (red, permisos) |
+| `not_authenticated` | No valid session at upload time (or `getUser` failed) |
+| `too_large` | A file exceeds `MAX_IMPORT_FILE_BYTES` |
+| `too_many` | More than `MAX_IMPORT_FILES` files in a single import |
+| `bucket_missing` | The bucket does not exist — typically deployed without running migration 0020 |
+| `upload_failed` | Any other upload failure (network, permissions) |
 
 ## Tests
 
-| Test | Cubre |
+| Test | Covers |
 |---|---|
-| `tests/import-match.test.ts` | Reglas anteriores con un mock minimal de Supabase. Incluye el regression test del race condition con tirador repetido. |
-| `tests/match-claim.test.ts` | Algoritmo de matching de nombres + escenarios multi-identidad. |
-| `tests/stage-resolution.test.ts` | Fuzzy match de nombre de match al subir un stage. |
-| `tests/import-storage.test.ts` | Validación del path que manda el cliente (`parseUploadedRef`), presupuesto de bytes de la descarga, y el contrato de "la limpieza nunca tira". |
+| `tests/import-match.test.ts` | The rules above with a minimal Supabase mock. Includes the regression test for the race condition with a repeated shooter. |
+| `tests/match-claim.test.ts` | Name matching algorithm + multi-identity scenarios. |
+| `tests/stage-resolution.test.ts` | Fuzzy match on the match name when uploading a stage. |
+| `tests/import-storage.test.ts` | Validation of the path sent by the client (`parseUploadedRef`), the download byte budget, and the "cleanup never throws" contract. |
