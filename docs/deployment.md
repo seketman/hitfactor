@@ -2,46 +2,54 @@
 
 ## Vercel + Supabase (free tier)
 
-### 1. Push a GitHub
+### 1. Push to GitHub
 
 ```bash
 git push origin main
 ```
 
-### 2. Importar el repo en Vercel
+### 2. Import the repo into Vercel
 
-- Andá a https://vercel.com/new
-- Conectá el repo
-- Vercel detecta Next.js automáticamente
+- Go to https://vercel.com/new
+- Connect the repo
+- Vercel detects Next.js automatically
 
-### 3. Variables de entorno
+### 3. Environment variables
 
-En *Settings → Environment Variables* agregá las mismas que en `.env.local`:
+Under *Settings → Environment Variables*, add the same ones you have in
+`.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
+NEXT_PUBLIC_SITE_URL
 ```
 
-### 4. Configurar redirects de Supabase
+Set `NEXT_PUBLIC_SITE_URL` **per environment** (Production / Preview /
+Development) with each one's real domain. It is the source of truth for all
+SEO metadata — canonical, sitemap, robots, Open Graph and JSON-LD — so a wrong
+value points every preview's canonical URL at the wrong host. See
+[`development.md`](./development.md#next_public_site_url).
 
-En el dashboard de Supabase → *Authentication → URL Configuration*:
+### 4. Configure Supabase redirects
 
-- **Site URL**: `https://tu-app.vercel.app`
-- **Redirect URLs**: agregar `https://tu-app.vercel.app/auth/callback`
+In the Supabase dashboard → *Authentication → URL Configuration*:
+
+- **Site URL**: `https://your-app.vercel.app`
+- **Redirect URLs**: add `https://your-app.vercel.app/auth/callback`
 
 ### 5. Deploy
 
-Click en *Deploy*. Vercel buildea y despliega en ~1 min.
+Click *Deploy*. Vercel builds and ships in about a minute.
 
-## Limitaciones del free tier
+## Free tier limits
 
-| Recurso | Límite | Comentario |
+| Resource | Limit | Notes |
 |---|---|---|
-| Vercel bandwidth | 100 GB/mes | Suele alcanzar para apps personales |
-| Vercel ejecuciones | 100 GB-hours | Server actions cuentan acá |
-| Supabase DB | 500 MB | Suficiente para miles de matches |
-| Supabase Auth | 50K MAU | Holgado |
+| Vercel bandwidth | 100 GB/month | Usually enough for personal apps |
+| Vercel executions | 100 GB-hours | Server actions count here |
+| Supabase DB | 500 MB | Enough for thousands of matches |
+| Supabase Auth | 50K MAU | Plenty of headroom |
 
-Si crece la app, el primer paso suele ser pasar a **Supabase Pro ($25/mes)** —
-más DB, más Auth, backups diarios.
+If the app grows, the usual first step is moving to **Supabase Pro ($25/month)**
+— more DB, more Auth, daily backups.
