@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.8](https://github.com/seketman/hitfactor/compare/v1.21.7...v1.21.8) (2026-08-05)
+
+
+### Documentation
+
+* translate the core documentation to English ([#186](https://github.com/seketman/hitfactor/issues/186)) ([fd568e8](https://github.com/seketman/hitfactor/commit/fd568e8cc316f5ebb71158a5eda677c3ffed9dac))
+
 ## [1.21.7](https://github.com/seketman/hitfactor/compare/v1.21.6...v1.21.7) (2026-08-02)
 
 
