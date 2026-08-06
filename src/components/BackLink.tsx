@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 
 /**
  * Link de "Volver" estilo back del navegador: si hay historial dentro de la

@@ -1,7 +1,8 @@
 "use server";
 
+import { getLocale } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect } from "@/i18n/navigation";
 import { redirectWithError } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
@@ -58,13 +59,14 @@ function revalidateAmmoPaths(id?: string) {
 }
 
 export async function createAmmo(formData: FormData) {
+  const locale = await getLocale();
   const name = String(formData.get("name") ?? "").trim();
   const type = parseAmmoType(formData.get("type"));
   if (!name) {
-    redirectWithError("/ammo", "Falta el nombre");
+    redirectWithError("/ammo", "Falta el nombre", locale);
   }
   if (!type) {
-    redirectWithError("/ammo", "Falta el tipo (factory o reload)");
+    redirectWithError("/ammo", "Falta el tipo (factory o reload)", locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -89,7 +91,7 @@ export async function createAmmo(formData: FormData) {
   const { id: createdId, error } = await ammoDb.createAmmo(supabase, payload);
 
   if (error) {
-    redirectWithError("/ammo", error);
+    redirectWithError("/ammo", error, locale);
   }
 
   await logAction(supabase, user.id, {
@@ -105,15 +107,16 @@ export async function createAmmo(formData: FormData) {
   });
 
   revalidateAmmoPaths();
-  redirect("/ammo");
+  redirect({ href: "/ammo", locale });
 }
 
 export async function updateAmmo(formData: FormData) {
+  const locale = await getLocale();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const type = parseAmmoType(formData.get("type"));
   if (!id || !name || !type) {
-    redirectWithError("/ammo", "Datos incompletos");
+    redirectWithError("/ammo", "Datos incompletos", locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -139,7 +142,7 @@ export async function updateAmmo(formData: FormData) {
   const { error } = await ammoDb.updateAmmo(supabase, id, after);
 
   if (error) {
-    redirectWithError(`/ammo/${id}`, error);
+    redirectWithError(`/ammo/${id}`, error, locale);
   }
 
   await logAction(supabase, user.id, {
@@ -154,10 +157,11 @@ export async function updateAmmo(formData: FormData) {
   });
 
   revalidateAmmoPaths(id);
-  redirect("/ammo");
+  redirect({ href: "/ammo", locale });
 }
 
 export async function deleteAmmo(formData: FormData) {
+  const locale = await getLocale();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -171,7 +175,7 @@ export async function deleteAmmo(formData: FormData) {
   const { error } = await ammoDb.deleteAmmo(supabase, id);
 
   if (error) {
-    redirectWithError("/ammo", error);
+    redirectWithError("/ammo", error, locale);
   }
 
   if (snapshot) {
@@ -189,5 +193,5 @@ export async function deleteAmmo(formData: FormData) {
   }
 
   revalidateAmmoPaths();
-  redirect("/ammo");
+  redirect({ href: "/ammo", locale });
 }

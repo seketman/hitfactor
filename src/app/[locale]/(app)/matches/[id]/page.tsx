@@ -20,7 +20,7 @@ import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
 import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
-import { isInternalAppPath } from "@/lib/redirects";
+import { isInternalAppPath } from "@/lib/paths";
 import { canEditMatch } from "@/lib/permissions";
 import { canToggleEntryAbsent } from "@/lib/matches/entry-status";
 import { BackLink } from "@/components/BackLink";

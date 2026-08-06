@@ -1,4 +1,5 @@
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -11,7 +12,9 @@ export default async function AuthLayoutWrapper({
 }) {
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
-  if (data.user) redirect("/dashboard");
+  // `getLocale()` inline por lo mismo que en `require-user`: el redirect es el
+  // caso excepcional (usuario ya logueado entrando a /login), no el común.
+  if (data.user) redirect({ href: "/dashboard", locale: await getLocale() });
 
   return <>{children}</>;
 }

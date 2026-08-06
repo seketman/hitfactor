@@ -1,6 +1,7 @@
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
 import { createClient } from "./server";
-import { isInternalAppPath } from "@/lib/redirects";
+import { isInternalAppPath } from "@/lib/paths";
 import type { User } from "@supabase/supabase-js";
 import type { TypedSupabaseClient } from "./types";
 
@@ -39,10 +40,23 @@ export async function requireUser(
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (!data.user) {
-    const next = isInternalAppPath(opts.returnTo)
-      ? `?next=${encodeURIComponent(opts.returnTo)}`
-      : "";
-    redirect(`/login${next}`);
+    // El redirect va al locale activo: sin esto el usuario que estaba en /en
+    // podía terminar logueándose en /es, porque el middleware resuelve el
+    // locale por cookie/Accept-Language y no por dónde estaba parado.
+    //
+    // `getLocale()` va inline y no hoisteado al principio de la función, al
+    // revés que en los server actions: esta corre en **cada** página
+    // autenticada y el redirect es el camino excepcional. Hoistearlo pagaría
+    // el await en todos los requests que sí tienen sesión.
+    redirect({
+      href: {
+        pathname: "/login",
+        query: isInternalAppPath(opts.returnTo)
+          ? { next: opts.returnTo }
+          : undefined,
+      },
+      locale: await getLocale(),
+    });
   }
   return { supabase, user: data.user };
 }

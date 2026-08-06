@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { PageContainer } from "@/components/layout/PageContainer";
