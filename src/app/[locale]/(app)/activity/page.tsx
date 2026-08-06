@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { listAuditLog } from "@/lib/db/audit";
 import { describeAuditEntry } from "@/lib/audit/render";
 import { formatDateTime } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ page?: string }>;
@@ -14,6 +15,7 @@ interface PageProps {
 const PAGE_SIZE = 50;
 
 export default async function ActivityPage({ searchParams }: PageProps) {
+  const locale = await getLocale();
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
 
@@ -65,7 +67,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
                       </p>
                     )}
                     <p className="mt-1 font-mono text-xs text-fg-subtle">
-                      {formatDateTime(row.created_at)}
+                      {formatDateTime(row.created_at, locale)}
                     </p>
                   </div>
                   {desc.link && (

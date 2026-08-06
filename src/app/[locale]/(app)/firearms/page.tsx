@@ -9,12 +9,14 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { listFirearmUsageStats } from "@/lib/db/firearms";
 import { createFirearm, deleteFirearm } from "@/lib/actions/firearms";
 import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ error?: string; new?: string }>;
 }
 
 export default async function FirearmsPage({ searchParams }: PageProps) {
+  const locale = await getLocale();
   const { error, new: showNew } = await searchParams;
 
   const { supabase, user } = await requireUser();
@@ -109,7 +111,7 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
                   </p>
                   <p className="text-xs text-fg-subtle">
                     {totalMatches} torneo{totalMatches === 1 ? "" : "s"}
-                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate)}`}
+                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate, locale)}`}
                   </p>
                 </div>
                 <form action={deleteFirearm}>

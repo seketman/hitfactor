@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -62,6 +62,7 @@ export function HistoryTable({
   showDisciplineFilter = true,
 }: HistoryTableProps) {
   const t = useTranslations("dashboard.history");
+  const locale = useLocale();
   const clubLookup = useMemo(() => buildClubLookup(clubs), [clubs]);
   const [discipline, setDiscipline] = useState<string>("all");
   const [division, setDivision] = useState<string>("all");
@@ -262,7 +263,7 @@ export function HistoryTable({
                 return (
                   <TR key={e.id}>
                     <TD className="whitespace-nowrap font-mono text-fg-muted">
-                      {formatDate(e.matches?.date)}
+                      {formatDate(e.matches?.date, locale)}
                     </TD>
                     <TD className="text-fg-muted">
                       {disc ? <span title={disc.code}>{disc.name}</span> : "—"}

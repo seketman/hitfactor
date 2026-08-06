@@ -103,4 +103,9 @@ See [`architecture.md`](./architecture.md).
 npm test && npx tsc --noEmit && npm run build
 ```
 
-All three have to pass. Currently: 479 tests green, typecheck clean.
+All three have to pass. Currently: 492 tests green, typecheck clean.
+
+Note that `npx tsc --noEmit` and `npm run build` are **not** interchangeable.
+`next build` also type-checks against the route types Next generates from the
+directory structure (`PageProps<...>`, `LayoutProps<...>`), which plain `tsc`
+never sees. A `params` type that satisfies `tsc` can still fail the build.

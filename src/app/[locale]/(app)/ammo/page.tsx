@@ -10,12 +10,14 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { listAmmoUsageStats } from "@/lib/db/ammo";
 import { createAmmo, deleteAmmo } from "@/lib/actions/ammo";
 import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ error?: string; new?: string }>;
 }
 
 export default async function AmmoPage({ searchParams }: PageProps) {
+  const locale = await getLocale();
   const { error, new: showNew } = await searchParams;
 
   const { supabase, user } = await requireUser();
@@ -93,7 +95,7 @@ export default async function AmmoPage({ searchParams }: PageProps) {
                   </p>
                   <p className="text-xs text-fg-subtle">
                     {totalMatches} torneo{totalMatches === 1 ? "" : "s"}
-                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate)}`}
+                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate, locale)}`}
                   </p>
                 </div>
                 <form action={deleteAmmo}>

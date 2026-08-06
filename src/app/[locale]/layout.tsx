@@ -25,7 +25,13 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
-  const { locale } = await params;
+  // `params.locale` es `string`: los tipos de ruta que genera Next salen de
+  // la estructura de directorios, así que no puede saber qué locales existen.
+  // El estrechamiento va en runtime, igual que en `src/i18n/request.ts`.
+  const { locale: requested } = await params;
+  const locale = hasLocale(routing.locales, requested)
+    ? requested
+    : routing.defaultLocale;
   const t = await getTranslations({ locale, namespace: "meta" });
   return {
     // metadataBase hace que todas las URLs relativas de metadata (og:image,

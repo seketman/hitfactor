@@ -2,6 +2,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
 
 /**
  * Layout para todas las rutas autenticadas.
@@ -13,13 +14,14 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const locale = await getLocale();
   const { supabase, user } = await requireUser();
   const profile = await getProfile(supabase, user.id);
   const userName = profile?.display_name ?? user.email ?? "—";
   // user.created_at viene como ISO timestamp completo (YYYY-MM-DDTHH:mm:ssZ).
   // formatDate trabaja sobre la parte YYYY-MM-DD: cortamos los primeros 10.
   const memberSince = user.created_at
-    ? formatDate(user.created_at.slice(0, 10))
+    ? formatDate(user.created_at.slice(0, 10), locale)
     : null;
 
   return (

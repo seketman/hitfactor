@@ -8,6 +8,7 @@ import { FEEDBACK_MIN_ENTRIES, listMyFeedback } from "@/lib/db/feedback";
 import { countMyMatchEntries } from "@/lib/db/shooters";
 import type { FeedbackStatus, FeedbackType } from "@/lib/db/types";
 import { formatDateTime } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ sent?: string; error?: string }>;
@@ -66,6 +67,7 @@ const STATUS_TONE: Record<
 };
 
 export default async function AboutPage({ searchParams }: PageProps) {
+  const locale = await getLocale();
   const { sent, error } = await searchParams;
   const { supabase, user } = await requireUser();
   const [myReports, entryCount] = await Promise.all([
@@ -178,7 +180,7 @@ export default async function AboutPage({ searchParams }: PageProps) {
                       <StatusBadge status={r.status} type={r.type} />
                     </div>
                     <span className="font-mono text-xs text-fg-subtle">
-                      {formatDateTime(r.created_at)}
+                      {formatDateTime(r.created_at, locale)}
                     </span>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-fg">

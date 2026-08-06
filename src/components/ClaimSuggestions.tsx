@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { claimShooter } from "@/lib/actions/claim";
 import { dismissClaimSuggestions } from "@/app/[locale]/(app)/matches/actions";
+import { getLocale } from "next-intl/server";
 import { formatDate } from "@/lib/utils";
 import type { ClaimSuggestion } from "@/lib/db/claim-suggestions";
 
@@ -36,11 +37,13 @@ interface ClaimSuggestionsProps {
  * "Ocultar sugerencias" es la válvula de escape para los casos en que
  * ninguno de los candidatos es realmente el usuario.
  */
-export function ClaimSuggestions({
+export async function ClaimSuggestions({
   suggestions,
   hasExistingClaims = false,
 }: ClaimSuggestionsProps) {
   if (suggestions.length === 0) return null;
+
+  const locale = await getLocale();
 
   const tiradores =
     suggestions.length === 1 ? "un tirador" : `${suggestions.length} tiradores`;
@@ -97,7 +100,9 @@ export function ClaimSuggestions({
                     {s.matchName}
                   </Link>
                   <span className="text-fg-subtle">·</span>
-                  <span className="font-mono">{formatDate(s.matchDate)}</span>
+                  <span className="font-mono">
+                    {formatDate(s.matchDate, locale)}
+                  </span>
                   {s.divisionCode && (
                     <>
                       <span className="text-fg-subtle">·</span>

@@ -23,6 +23,7 @@ import {
   updateFirearm,
 } from "@/lib/actions/firearms";
 import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -63,6 +64,7 @@ export default async function FirearmDetailPage({
   params,
   searchParams,
 }: PageProps) {
+  const locale = await getLocale();
   const { id } = await params;
   const { error, log } = await searchParams;
 
@@ -212,7 +214,7 @@ export default async function FirearmDetailPage({
                 {history.map((h) => (
                   <TR key={h.key}>
                     <TD className="whitespace-nowrap font-mono text-fg-muted">
-                      {formatDate(h.date)}
+                      {formatDate(h.date, locale)}
                     </TD>
                     <TD>
                       {h.kind === "match" ? (

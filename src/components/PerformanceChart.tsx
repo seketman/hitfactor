@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { cn, formatDate, formatPercent } from "@/lib/utils";
 import type { MatchTimelinePoint } from "@/lib/stats/shooter-stats";
 
@@ -34,6 +34,7 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
   const [hover, setHover] = useState<number | null>(null);
   const gradientId = useId();
   const t = useTranslations("dashboard.chart");
+  const locale = useLocale();
 
   // Para "hits", excluimos puntos sin hits (matches de IPSC/Steel cuando el
   // dashboard es consolidado). Si no quedan al menos 2 puntos, no graficamos.
@@ -227,7 +228,7 @@ export function PerformanceChart({ points, mode = "percentage" }: PerformanceCha
         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs">
           <span className="font-medium">{filteredPoints[hover].matchName}</span>
           <span className="text-fg-muted">
-            {formatDate(filteredPoints[hover].date)}
+            {formatDate(filteredPoints[hover].date, locale)}
           </span>
           <span className="text-fg-muted">
             {filteredPoints[hover].divisionCode}

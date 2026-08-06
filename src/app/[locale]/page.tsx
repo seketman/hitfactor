@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { redirect } from "@/i18n/navigation";
+import { hasLocale } from "next-intl";
 import { getLocale, getTranslations } from "next-intl/server";
+import { routing } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -11,7 +13,11 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string }>;
 }): Promise<Metadata> {
-  const { locale } = await params;
+  // Ver la nota en `[locale]/layout.tsx`: el tipo que genera Next es `string`.
+  const { locale: requested } = await params;
+  const locale = hasLocale(routing.locales, requested)
+    ? requested
+    : routing.defaultLocale;
   const t = await getTranslations({ locale, namespace: "landingMeta" });
   const title = t("title");
   const description = t("description");

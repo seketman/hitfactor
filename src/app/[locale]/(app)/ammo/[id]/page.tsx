@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAmmoById, listAmmoHistory } from "@/lib/db/ammo";
 import { updateAmmo } from "@/lib/actions/ammo";
 import { formatDate } from "@/lib/utils";
+import { getLocale } from "next-intl/server";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -23,6 +24,7 @@ export default async function AmmoDetailPage({
   params,
   searchParams,
 }: PageProps) {
+  const locale = await getLocale();
   const { id } = await params;
   const { error } = await searchParams;
 
@@ -205,7 +207,7 @@ export default async function AmmoDetailPage({
                 {history.map((h) => (
                   <TR key={h.matchEntryId}>
                     <TD className="whitespace-nowrap font-mono text-fg-muted">
-                      {formatDate(h.matchDate)}
+                      {formatDate(h.matchDate, locale)}
                     </TD>
                     <TD className="text-fg-muted">{h.disciplineName ?? "—"}</TD>
                     <TD>
