@@ -62,6 +62,8 @@ function dateFormatter(locale: Locale): Intl.DateTimeFormat {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      // Fijado a UTC junto con `Date.UTC` en `formatDate`. Ver la nota ahí.
+      timeZone: "UTC",
     });
     DATE_FORMATTERS.set(locale, fmt);
   }
@@ -85,12 +87,24 @@ function dateTimeFormatter(locale: Locale): Intl.DateTimeFormat {
  *
  * Tolera que le pasen un timestamp completo: usa los primeros 10 caracteres.
  *
- * **Ojo con el timezone.** La fecha se construye con `new Date(y, m-1, d)`
- * (medianoche *local*), NO con `new Date(iso)`. `new Date("2026-08-06")` se
- * interpreta como medianoche **UTC**, y en cualquier timezone al oeste de
- * Greenwich —Argentina entre ellas— eso cae el día anterior: se renderiza
- * "05/08/2026". Sería un off-by-one en todas las fechas de la app. Hay un
- * test que fija esto (`tests/format-date.test.ts`).
+ * **Ojo con el timezone.** Una fecha de calendario no tiene hora ni lugar: el
+ * 6 de agosto es el 6 de agosto en Tokio y en Buenos Aires. Para que el
+ * render no dependa del timezone del proceso, la fecha se ancla en UTC
+ * (`Date.UTC`) **y** el formatter se fija en UTC. Las dos mitades tienen que
+ * ir juntas: mezclarlas —construir en UTC y formatear en local, que es lo que
+ * pasa si se usa `new Date(iso)` con un formatter sin `timeZone`— corre la
+ * fecha un día al oeste de Greenwich, y sería un off-by-one en toda la app.
+ *
+ * Es el mismo criterio que ya usaba `lib/stats/shooter-stats.ts` para la
+ * aritmética de cadencia. `tests/format-date.test.ts` lo verifica en tres
+ * timezones.
+ *
+ * **Ante entrada inválida devuelve el string original, no "—"** (que es lo
+ * que hace `formatDateTime`). La asimetría es deliberada: acá el input viene
+ * de una columna `date` de la DB, así que un valor que no parsea significa
+ * que algo se escribió mal en el import. Mostrarlo crudo deja el dato roto a
+ * la vista para poder rastrearlo; taparlo con "—" lo vuelve indistinguible
+ * de un campo vacío legítimo.
  */
 export function formatDate(
   iso: string | null | undefined,
@@ -99,9 +113,20 @@ export function formatDate(
   if (!iso) return "—";
   const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!parts) return iso;
-  const [, y, m, d] = parts;
-  const date = new Date(Number(y), Number(m) - 1, Number(d));
-  if (Number.isNaN(date.getTime())) return iso;
+  const [y, m, d] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+  const date = new Date(Date.UTC(y, m - 1, d));
+  // `new Date` NO valida: normaliza. `new Date(2026, 12, 45)` no es un error,
+  // es el 14/02/2027. Sin este chequeo una fecha corrupta se renderizaría
+  // como una fecha plausible y falsa, que es peor que uno visiblemente roto.
+  // Además tapa la semántica legacy de años de dos dígitos: `new Date(26,...)`
+  // es 1926, no el año 26.
+  if (
+    date.getUTCFullYear() !== y ||
+    date.getUTCMonth() !== m - 1 ||
+    date.getUTCDate() !== d
+  ) {
+    return iso;
+  }
   return dateFormatter(locale).format(date);
 }
 
@@ -111,9 +136,14 @@ export function formatDate(
  * A diferencia de `formatDate`, acá `new Date(iso)` **sí** es correcto: el
  * input es un instante, no una fecha de calendario.
  *
+ * **Ante entrada inválida devuelve "—", no el string original** (al revés que
+ * `formatDate`). Acá el input es un timestamp que puede venir de cualquier
+ * lado, no de una columna `date`, así que un string arbitrario no es señal de
+ * corrupción de datos y no aporta mostrarlo crudo en la UI.
+ *
  * Limitación conocida: se renderiza en el timezone del *proceso*, que en
  * Vercel es UTC. Un usuario argentino ve las horas corridas 3 hs. Es un eje
- * distinto del locale y se arregla aparte.
+ * distinto del locale y se arregla aparte — issue #190.
  */
 export function formatDateTime(
   iso: string | null | undefined,

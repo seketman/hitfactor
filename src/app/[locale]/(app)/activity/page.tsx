@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -6,7 +7,6 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { listAuditLog } from "@/lib/db/audit";
 import { describeAuditEntry } from "@/lib/audit/render";
 import { formatDateTime } from "@/lib/utils";
-import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ page?: string }>;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -10,7 +11,6 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { listAmmoUsageStats } from "@/lib/db/ammo";
 import { createAmmo, deleteAmmo } from "@/lib/actions/ammo";
 import { formatDate } from "@/lib/utils";
-import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ error?: string; new?: string }>;

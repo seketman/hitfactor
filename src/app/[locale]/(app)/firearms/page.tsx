@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -9,7 +10,6 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { listFirearmUsageStats } from "@/lib/db/firearms";
 import { createFirearm, deleteFirearm } from "@/lib/actions/firearms";
 import { formatDate } from "@/lib/utils";
-import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ error?: string; new?: string }>;

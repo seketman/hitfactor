@@ -1,6 +1,5 @@
 import { getRequestConfig } from "next-intl/server";
-import { hasLocale } from "next-intl";
-import { routing } from "./routing";
+import { resolveLocale } from "./routing";
 
 /**
  * Carga los mensajes del locale activo para cada request (Server Components).
@@ -8,10 +7,7 @@ import { routing } from "./routing";
  * (el layout además dispara `notFound()` para esos casos).
  */
 export default getRequestConfig(async ({ requestLocale }) => {
-  const requested = await requestLocale;
-  const locale = hasLocale(routing.locales, requested)
-    ? requested
-    : routing.defaultLocale;
+  const locale = resolveLocale(await requestLocale);
 
   return {
     locale,

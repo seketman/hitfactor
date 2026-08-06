@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
@@ -13,7 +14,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getAmmoById, listAmmoHistory } from "@/lib/db/ammo";
 import { updateAmmo } from "@/lib/actions/ammo";
 import { formatDate } from "@/lib/utils";
-import { getLocale } from "next-intl/server";
 
 interface PageProps {
   params: Promise<{ id: string }>;

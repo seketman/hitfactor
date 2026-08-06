@@ -1,10 +1,10 @@
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { claimShooter } from "@/lib/actions/claim";
 import { dismissClaimSuggestions } from "@/app/[locale]/(app)/matches/actions";
-import { getLocale } from "next-intl/server";
 import { formatDate } from "@/lib/utils";
 import type { ClaimSuggestion } from "@/lib/db/claim-suggestions";
 

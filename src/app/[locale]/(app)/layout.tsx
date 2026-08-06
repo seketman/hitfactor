@@ -1,8 +1,8 @@
+import { getLocale } from "next-intl/server";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { formatDate } from "@/lib/utils";
-import { getLocale } from "next-intl/server";
 
 /**
  * Layout para todas las rutas autenticadas.

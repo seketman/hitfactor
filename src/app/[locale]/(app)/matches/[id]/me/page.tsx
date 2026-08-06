@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -36,7 +37,6 @@ import {
   StageResultsTable,
   type StageColumn,
 } from "@/components/matches/StageResultsTable";
-import { getLocale } from "next-intl/server";
 
 const POWER_FACTOR_LABELS: Record<string, string> = {
   Maj: "Major",

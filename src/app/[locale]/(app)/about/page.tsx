@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -8,7 +9,6 @@ import { FEEDBACK_MIN_ENTRIES, listMyFeedback } from "@/lib/db/feedback";
 import { countMyMatchEntries } from "@/lib/db/shooters";
 import type { FeedbackStatus, FeedbackType } from "@/lib/db/types";
 import { formatDateTime } from "@/lib/utils";
-import { getLocale } from "next-intl/server";
 
 interface PageProps {
   searchParams: Promise<{ sent?: string; error?: string }>;

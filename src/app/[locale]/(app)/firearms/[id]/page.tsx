@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { QrCode } from "lucide-react";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
@@ -23,7 +24,6 @@ import {
   updateFirearm,
 } from "@/lib/actions/firearms";
 import { formatDate } from "@/lib/utils";
-import { getLocale } from "next-intl/server";
 
 interface PageProps {
   params: Promise<{ id: string }>;
