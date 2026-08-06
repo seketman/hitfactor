@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { QrCode } from "lucide-react";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
@@ -63,6 +64,7 @@ export default async function FirearmDetailPage({
   params,
   searchParams,
 }: PageProps) {
+  const locale = await getLocale();
   const { id } = await params;
   const { error, log } = await searchParams;
 
@@ -212,7 +214,7 @@ export default async function FirearmDetailPage({
                 {history.map((h) => (
                   <TR key={h.key}>
                     <TD className="whitespace-nowrap font-mono text-fg-muted">
-                      {formatDate(h.date)}
+                      {formatDate(h.date, locale)}
                     </TD>
                     <TD>
                       {h.kind === "match" ? (

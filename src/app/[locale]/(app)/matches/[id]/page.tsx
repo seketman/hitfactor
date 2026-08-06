@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -32,6 +32,7 @@ interface PageProps {
 }
 
 export default async function MatchDetailPage({ params, searchParams }: PageProps) {
+  const locale = await getLocale();
   const { id } = await params;
   const { error, from } = await searchParams;
 
@@ -110,7 +111,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-semibold tracking-tight">{match.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-fg-muted">
-            <span>{formatDate(match.date)}</span>
+            <span>{formatDate(match.date, locale)}</span>
             {clubLabel && <span title={parsedClub.clubCode ?? undefined}>· {clubLabel}</span>}
             {match.disciplines?.name && <span>· {match.disciplines.name}</span>}
           </div>
@@ -119,7 +120,7 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
             <span className="text-fg-muted">
               {importerProfile?.display_name ?? "—"}
             </span>{" "}
-            {t("importedOn", { date: formatDateTime(match.imported_at) })}
+            {t("importedOn", { date: formatDateTime(match.imported_at, locale) })}
           </p>
         </div>
 

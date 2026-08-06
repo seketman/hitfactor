@@ -1,4 +1,4 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -38,6 +38,7 @@ interface MatchListProps {
  * vuelve a renderizarse desde otra ruta.
  */
 export async function MatchList({ matches, userId, from, clubs }: MatchListProps) {
+  const locale = await getLocale();
   const t = await getTranslations("matches");
   const clubLookup = buildClubLookup(clubs);
   return (
@@ -62,7 +63,7 @@ export async function MatchList({ matches, userId, from, clubs }: MatchListProps
                     )}
                   </p>
                   <p className="mt-0.5 text-xs text-fg-muted">
-                    {formatDate(m.date)}
+                    {formatDate(m.date, locale)}
                     {clubLabel && ` · ${clubLabel}`}
                   </p>
                 </div>

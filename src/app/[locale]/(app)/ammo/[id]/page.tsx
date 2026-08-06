@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
@@ -23,6 +24,7 @@ export default async function AmmoDetailPage({
   params,
   searchParams,
 }: PageProps) {
+  const locale = await getLocale();
   const { id } = await params;
   const { error } = await searchParams;
 
@@ -205,7 +207,7 @@ export default async function AmmoDetailPage({
                 {history.map((h) => (
                   <TR key={h.matchEntryId}>
                     <TD className="whitespace-nowrap font-mono text-fg-muted">
-                      {formatDate(h.matchDate)}
+                      {formatDate(h.matchDate, locale)}
                     </TD>
                     <TD className="text-fg-muted">{h.disciplineName ?? "—"}</TD>
                     <TD>

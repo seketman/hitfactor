@@ -1,4 +1,5 @@
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import type { Locale } from "@/i18n/routing";
 import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
 import { PerformanceChart } from "@/components/PerformanceChart";
@@ -49,6 +50,7 @@ export async function StatsOverview({
   if (stats.scoredMatches === 0) return null;
 
   const t = await getTranslations("dashboard.stats");
+  const locale = await getLocale();
 
   const hitsTimelineCount = stats.timeline.filter((p) => p.hits !== null).length;
   const hasHits = hitsTimelineCount >= 2;
@@ -101,7 +103,7 @@ export async function StatsOverview({
                     className="hover:text-accent"
                     title={stats.bestHits.matchName}
                   >
-                    {formatDate(stats.bestHits.date)}
+                    {formatDate(stats.bestHits.date, locale)}
                   </Link>
                 ) : undefined
               }
@@ -132,7 +134,7 @@ export async function StatsOverview({
                     className="hover:text-accent"
                     title={stats.bestPercentage.matchName}
                   >
-                    {formatDate(stats.bestPercentage.date)}
+                    {formatDate(stats.bestPercentage.date, locale)}
                   </Link>
                 ) : undefined
               }
@@ -150,7 +152,7 @@ export async function StatsOverview({
                 className="hover:text-accent"
                 title={stats.bestPlace.matchName}
               >
-                {formatDate(stats.bestPlace.date)}
+                {formatDate(stats.bestPlace.date, locale)}
               </Link>
             ) : undefined
           }
@@ -176,7 +178,7 @@ export async function StatsOverview({
                   className="hover:text-accent"
                   title={stats.bestHits.matchName}
                 >
-                  {formatDate(stats.bestHits.date)}
+                  {formatDate(stats.bestHits.date, locale)}
                 </Link>
               ) : undefined
             }
@@ -188,7 +190,12 @@ export async function StatsOverview({
 
       {/* Fila 2: KPIs derivados — consistencia / tendencia siguen primaryMetric */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <PercentileCard avg={stats.avgPercentile} best={stats.bestPercentile} t={t} />
+        <PercentileCard
+          avg={stats.avgPercentile}
+          best={stats.bestPercentile}
+          t={t}
+          locale={locale}
+        />
         {showHitsAsPrimary ? (
           <>
             <ConsistencyHitsCard value={stats.consistencyHits} t={t} />
@@ -397,10 +404,12 @@ function PercentileCard({
   avg,
   best,
   t,
+  locale,
 }: {
   avg: number | null;
   best: ShooterStats["bestPercentile"];
   t: StatsT;
+  locale: Locale;
 }) {
   if (avg === null) {
     return (
@@ -430,7 +439,7 @@ function PercentileCard({
           >
             {t("percentileBest", {
               value: (100 - best.value).toFixed(0),
-              date: formatDate(best.date),
+              date: formatDate(best.date, locale),
             })}
           </Link>
         ) : (

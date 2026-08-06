@@ -1,3 +1,4 @@
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -66,6 +67,7 @@ const STATUS_TONE: Record<
 };
 
 export default async function AboutPage({ searchParams }: PageProps) {
+  const locale = await getLocale();
   const { sent, error } = await searchParams;
   const { supabase, user } = await requireUser();
   const [myReports, entryCount] = await Promise.all([
@@ -178,7 +180,7 @@ export default async function AboutPage({ searchParams }: PageProps) {
                       <StatusBadge status={r.status} type={r.type} />
                     </div>
                     <span className="font-mono text-xs text-fg-subtle">
-                      {formatDateTime(r.created_at)}
+                      {formatDateTime(r.created_at, locale)}
                     </span>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-fg">

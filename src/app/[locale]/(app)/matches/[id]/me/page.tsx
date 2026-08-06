@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -51,6 +52,7 @@ export default async function PersonalMatchPage({
   params,
   searchParams,
 }: PageProps) {
+  const locale = await getLocale();
   const { id } = await params;
   const { entry: entryParam } = await searchParams;
 
@@ -146,7 +148,7 @@ export default async function PersonalMatchPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{match.name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-fg-muted">
-            <span className="font-mono">{formatDate(match.date)}</span>
+            <span className="font-mono">{formatDate(match.date, locale)}</span>
             {clubCode && (
               <span title={clubName ?? undefined}>
                 {clubName ?? clubCode}

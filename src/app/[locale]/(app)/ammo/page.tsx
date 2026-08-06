@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getLocale } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +17,7 @@ interface PageProps {
 }
 
 export default async function AmmoPage({ searchParams }: PageProps) {
+  const locale = await getLocale();
   const { error, new: showNew } = await searchParams;
 
   const { supabase, user } = await requireUser();
@@ -93,7 +95,7 @@ export default async function AmmoPage({ searchParams }: PageProps) {
                   </p>
                   <p className="text-xs text-fg-subtle">
                     {totalMatches} torneo{totalMatches === 1 ? "" : "s"}
-                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate)}`}
+                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate, locale)}`}
                   </p>
                 </div>
                 <form action={deleteAmmo}>
