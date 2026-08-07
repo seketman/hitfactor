@@ -1,5 +1,5 @@
 import { Link } from "@/i18n/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,6 +16,7 @@ const PAGE_SIZE = 50;
 
 export default async function ActivityPage({ searchParams }: PageProps) {
   const locale = await getLocale();
+  const t = await getTranslations("activityLog");
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
 
@@ -53,7 +54,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
         <Card>
           <ul className="divide-y divide-border">
             {rows.map((row) => {
-              const desc = describeAuditEntry(row);
+              const desc = describeAuditEntry(row, t);
               return (
                 <li
                   key={row.id}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { expectParserError } from "./helpers/expect-parser-error";
 import {
   detectDisciplineFromFilename,
   isFatPdfFormat,
@@ -176,8 +177,10 @@ describe("parseFatText — fecha en el nombre del archivo", () => {
 
 describe("parseFatText — errores claros", () => {
   it("rechaza el import si no se puede determinar la disciplina", () => {
-    expect(() => parseFatText(FAT_FBI_TEXT, "resultados-apertura.pdf")).toThrow(
-      /disciplina/i,
+    expectParserError(
+      () => parseFatText(FAT_FBI_TEXT, "resultados-apertura.pdf"),
+      "fatUnknownDiscipline",
+      { filename: "resultados-apertura.pdf" },
     );
   });
 

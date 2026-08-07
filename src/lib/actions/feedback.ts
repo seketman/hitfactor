@@ -1,6 +1,6 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "@/i18n/navigation";
 import { redirectWithError } from "@/lib/redirects";
@@ -19,24 +19,25 @@ const MAX_LENGTH = 4000;
  */
 export async function submitFeedback(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const type = String(formData.get("type") ?? "") as FeedbackType;
   const message = String(formData.get("message") ?? "").trim();
   const pageUrl = String(formData.get("page_url") ?? "").trim() || null;
 
   if (!VALID_TYPES.includes(type)) {
-    redirectWithError("/about", "Tipo de reporte inválido", locale);
+    redirectWithError("/about", t("invalidFeedbackType"), locale);
   }
   if (message.length < MIN_LENGTH) {
     redirectWithError(
       "/about",
-      `El mensaje es muy corto (mínimo ${MIN_LENGTH} caracteres)`,
+      t("messageTooShort", { min: MIN_LENGTH }),
       locale,
     );
   }
   if (message.length > MAX_LENGTH) {
     redirectWithError(
       "/about",
-      `El mensaje es muy largo (máximo ${MAX_LENGTH} caracteres)`,
+      t("messageTooLong", { max: MAX_LENGTH }),
       locale,
     );
   }
@@ -49,7 +50,7 @@ export async function submitFeedback(formData: FormData) {
   if (entryCount < FEEDBACK_MIN_ENTRIES) {
     redirectWithError(
       "/about",
-      `Necesitás al menos ${FEEDBACK_MIN_ENTRIES} participaciones para reportar.`,
+      t("needsParticipations", { min: FEEDBACK_MIN_ENTRIES }),
       locale,
     );
   }
@@ -63,7 +64,7 @@ export async function submitFeedback(formData: FormData) {
   if (error) {
     redirectWithError(
       "/about",
-      "No se pudo enviar el reporte: " + error,
+      t("feedbackFailed", { error }),
       locale,
     );
   }

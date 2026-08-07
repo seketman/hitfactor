@@ -1,6 +1,6 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { headers } from "next/headers";
 // Único `redirect` de la app que NO usa el wrapper de `@/i18n/navigation`:
 // `data.url` es una URL absoluta del proveedor OAuth (Google), externa a la
@@ -20,6 +20,7 @@ import { redirectWithError } from "@/lib/redirects";
  */
 export async function signInWithGoogle() {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const headersList = await headers();
   const host = headersList.get("host");
   // En Vercel y otros proxies viene el proto en x-forwarded-proto. En local
@@ -41,7 +42,7 @@ export async function signInWithGoogle() {
   if (error || !data?.url) {
     redirectWithError(
       "/login",
-      error?.message ?? "No se pudo iniciar el login con Google",
+      error?.message ?? t("googleLoginFailed"),
       locale,
     );
   }

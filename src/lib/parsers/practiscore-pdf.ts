@@ -12,6 +12,7 @@ import {
   stripDqPrefix,
   stripNameSuffixes,
 } from "./shared";
+import { ParserError } from "./parser-error";
 
 /**
  * Parser para los PDFs que genera la app **PractiScore** (Android/iOS) al
@@ -94,7 +95,7 @@ export function parsePractiscorePdfText(
   pages: PractiscorePdfPage[],
 ): ParsedMatch {
   if (pages.length === 0) {
-    throw new Error("PDF vacío: no se encontraron páginas.");
+    throw new ParserError("emptyPdf");
   }
 
   const matchEntries: ParsedMatchEntry[] = [];
@@ -199,19 +200,13 @@ export function parsePractiscorePdfText(
 
   if (!matchName) {
     const snippet = (pages[0]?.text ?? "").slice(0, 200).replace(/\s+/g, " ");
-    throw new Error(
-      `No se pudo extraer el nombre del match del PDF de PractiScore. Inicio del texto: "${snippet}"`,
-    );
+    throw new ParserError("noPractiscoreMatchName", { snippet });
   }
   if (!matchDate) {
-    throw new Error(
-      "No se pudo extraer la fecha del PDF (esperaba un título con fecha ISO 'YYYY-MM-DD').",
-    );
+    throw new ParserError("noIsoTitleDate");
   }
   if (matchEntries.length === 0 && stages.length === 0) {
-    throw new Error(
-      "El PDF se identificó como PractiScore pero no se pudo extraer ninguna fila de resultados.",
-    );
+    throw new ParserError("practiscoreNoRows");
   }
 
   const region = extractClubFromTitle(matchName);
@@ -248,9 +243,10 @@ function resolveStageNumber(
 ): number {
   if (explicit != null) {
     if (used.has(explicit)) {
-      throw new Error(
-        `El PDF tiene dos stages con el número ${explicit} (página ${pageNum}). No se puede importar.`,
-      );
+      throw new ParserError("duplicateStageNumber", {
+        stage: explicit,
+        page: pageNum,
+      });
     }
     return explicit;
   }
@@ -259,11 +255,11 @@ function resolveStageNumber(
   const candidateB = (prevStageNumber ?? 0) + 1;
   if (!used.has(candidateA)) return candidateA;
   if (!used.has(candidateB)) return candidateB;
-  throw new Error(
-    `No se pudo determinar el número del stage en la página ${pageNum}: ` +
-      `el orden de página (${candidateA}) y el stage anterior + 1 (${candidateB}) ` +
-      "ya están ocupados. ¿El PDF tiene stages repetidos o fuera de orden?",
-  );
+  throw new ParserError("stageSlotTaken", {
+    page: pageNum,
+    byOrder: candidateA,
+    byPrevious: candidateB,
+  });
 }
 
 interface Section {

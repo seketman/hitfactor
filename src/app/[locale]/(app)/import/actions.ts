@@ -1,6 +1,6 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import type { Locale } from "@/i18n/routing";
 import { parseFile, parsePdf, parsePdfBatch } from "@/lib/parsers";
@@ -24,6 +24,35 @@ import {
   type UploadedImportFile,
 } from "@/lib/import/storage";
 import type { UploadErrorCode } from "@/lib/import/upload-to-storage";
+import { ParserError } from "@/lib/parsers/parser-error";
+
+/**
+ * Traduce a texto para el usuario lo que salió mal en un import.
+ *
+ * Se usa tanto para fallas de descarga como de parseo, y por eso el nombre no
+ * dice "parser": solo el segundo caso produce `ParserError`.
+ *
+ * Los parsers tiran `ParserError` con un código en vez de prosa, porque son
+ * funciones puras y threadearles un traductor por toda la cadena de llamadas
+ * sería invasivo. La traducción se hace acá, que es el primer punto del
+ * camino donde hay locale — y así el querystring de `/import` sigue llevando
+ * texto ya resuelto, sin cambiar su contrato.
+ *
+ * Un `Error` común (bug, falla de red) se pasa tal cual: no es texto pensado
+ * para el usuario, pero ocultarlo detrás de un mensaje genérico haría más
+ * difícil diagnosticar desde un reporte.
+ */
+type ActionTranslator = Awaited<
+  ReturnType<typeof getTranslations<"actionError">>
+>;
+
+async function userFacingErrorMessage(e: unknown, fallbackKey: string) {
+  const t = await getTranslations("import");
+  if (e instanceof ParserError) {
+    return t(`parserError.${e.code}`, e.params);
+  }
+  return e instanceof Error ? e.message : t(fallbackKey);
+}
 
 /**
  * Estado del form de import (`useActionState`).
@@ -83,6 +112,7 @@ export async function importHtml(
   prevState: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
+  const ta = await getTranslations("actionError");
   const locale = await getLocale();
   // Segundo submit: el usuario completó la fecha de un ranking de la FAT.
   if (prevState.status === "needsDate") {
@@ -109,6 +139,7 @@ export async function importHtml(
     supabase,
     formData,
     locale,
+    ta,
   );
 
   // `min_shots`: opcional en el form. Si está vacío o no parsea como int
@@ -129,8 +160,7 @@ export async function importHtml(
     downloaded = await downloadImportFiles(supabase, uploads);
   } catch (e) {
     await cleanupImportFiles(supabase, uploads);
-    const msg =
-      e instanceof Error ? e.message : "No pudimos leer el archivo subido.";
+    const msg = await userFacingErrorMessage(e, "downloadFailed");
     // Log explícito: una falla de download (bucket, RLS, red, presupuesto
     // de bytes) es un problema de infra y hay que poder distinguirla de
     // un archivo con formato raro en los logs de producción.
@@ -159,7 +189,7 @@ export async function importHtml(
     }
   } catch (e) {
     await cleanupImportFiles(supabase, uploads);
-    const msg = e instanceof Error ? e.message : "Error parseando el archivo";
+    const msg = await userFacingErrorMessage(e, "parseFailed");
     // Incluimos el tamaño: es la señal que necesitamos para saber si los
     // fallos correlacionan con archivos grandes (timeout de la Function)
     // o con formatos que el parser no reconoce.
@@ -177,7 +207,7 @@ export async function importHtml(
 
   if (!parsed.name) {
     redirectImportError(
-      "El archivo no parece ser un reporte válido.",
+      ta("notAValidReport"),
       filename,
       locale,
     );
@@ -200,7 +230,7 @@ export async function importHtml(
       };
     }
     redirectImportError(
-      "El archivo no parece ser un reporte válido.",
+      ta("notAValidReport"),
       filename,
       locale,
     );
@@ -238,6 +268,7 @@ async function resolveUploads(
   supabase: TypedSupabaseClient,
   formData: FormData,
   locale: Locale,
+  ta: ActionTranslator,
 ): Promise<{
   uploads: UploadedImportFile[];
   filename: string;
@@ -245,7 +276,7 @@ async function resolveUploads(
 }> {
   const rawUploads = formData.getAll("upload").map(String);
   if (rawUploads.length === 0) {
-    redirectWithError("/import", "Elegí un archivo", locale);
+    redirectWithError("/import", ta("chooseAFile"), locale);
   }
 
   const uploads: UploadedImportFile[] = [];
@@ -256,7 +287,7 @@ async function resolveUploads(
       // No hay nada validado que limpiar todavía más allá de lo que ya
       // juntamos, pero sí puede haber refs previas válidas.
       await cleanupImportFiles(supabase, uploads);
-      redirectWithError("/import", "Elegí un archivo", locale);
+      redirectWithError("/import", ta("chooseAFile"), locale);
     }
     // Referencias repetidas: el mismo objeto N veces multiplicaba la
     // descarga sin subir nada nuevo. Es la forma más barata de abusar
@@ -276,7 +307,7 @@ async function resolveUploads(
   if (uploads.length > MAX_IMPORT_FILES) {
     await cleanupImportFiles(supabase, uploads);
     redirectImportError(
-      `No se pueden importar más de ${MAX_IMPORT_FILES} archivos a la vez.`,
+      ta("tooManyFiles", { max: MAX_IMPORT_FILES }),
       filename,
       locale,
     );
@@ -291,7 +322,7 @@ async function resolveUploads(
     if (!isPdfFile && !isTextFile) {
       await cleanupImportFiles(supabase, uploads);
       redirectImportError(
-        "Solo se aceptan archivos HTML, CSV o PDF",
+        ta("onlyHtmlCsvPdf"),
         filename,
         locale,
       );
@@ -302,8 +333,7 @@ async function resolveUploads(
   if (uploads.length > 1 && !allPdfs) {
     await cleanupImportFiles(supabase, uploads);
     redirectImportError(
-      "Para subir varios archivos a la vez todos tienen que ser PDFs " +
-        "(es el formato multi-archivo soportado, típicamente Steel Challenge).",
+      ta("batchMustBeAllPdf"),
       filename,
       locale,
     );
@@ -322,11 +352,12 @@ async function confirmFatImport(
   formData: FormData,
   locale: Locale,
 ): Promise<ImportFormState> {
+  const ta = await getTranslations("actionError");
   const date = String(formData.get("date") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
 
   if (!isValidIsoDate(date)) {
-    return { ...prevState, error: "Ingresá una fecha válida." };
+    return { ...prevState, error: ta("invalidDate") };
   }
 
   const parsed: ParsedMatch = {

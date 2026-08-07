@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { expectParserError } from "./helpers/expect-parser-error";
 import {
   isWinmssFormat,
   parseWinmssText,
@@ -250,14 +251,17 @@ PC OPTICS - Results Overall
 Printed Jul 27, 2026 12:20:57 ESS - Electronic Scoring System 1 of 1`;
 
   it("tira si quedaron filas de datos sin leer, en vez de importar a medias", () => {
-    expect(() => parseWinmssText(pages(conFilaIlegible))).toThrow(
-      /no pudimos leer/i,
+    expectParserError(
+      () => parseWinmssText(pages(conFilaIlegible)),
+      "partialRows",
     );
   });
 
   it("el error dice qué página y cuántas filas se perdieron", () => {
-    expect(() => parseWinmssText(pages(conFilaIlegible))).toThrow(
-      /página 1: leímos 1 de 2 filas/,
+    expectParserError(
+      () => parseWinmssText(pages(conFilaIlegible)),
+      "partialRows",
+      { detail: "página 1: leímos 1 de 2 filas" },
     );
   });
 
@@ -817,7 +821,7 @@ Page 1`;
 
 describe("parseWinmssText — errores", () => {
   it("lanza error si el PDF está vacío", () => {
-    expect(() => parseWinmssText([])).toThrow(/vac/i);
+    expectParserError(() => parseWinmssText([]), "emptyPdf");
   });
 
   it("lanza error si no se encuentra el nombre del match", () => {
@@ -826,7 +830,10 @@ Printed mayo 2, 2026 at 16:17
 % Points CompetitorCompetitor Cat Reg Cls Tag ICS
 1 100,00 100,0000 1 Doe, John
 World Classification System used Page 1`;
-    expect(() => parseWinmssText(pages(noTitlePage))).toThrow(/nombre/i);
+    expectParserError(
+      () => parseWinmssText(pages(noTitlePage)),
+      "noWinmssMatchName",
+    );
   });
 
   it("lanza error si no se extrae ninguna fila (PDF column-major roto)", () => {
@@ -838,7 +845,10 @@ World Classification System used Page 1`;
 PointsPointsPointsPoints%%%% CompetitorCompetitorCompetitorCompetitor RegRegRegRegCatCatCatCat TagTagTagTag ICSICSICSICSClsClsClsCls
 Printed mayo 8, 2026 at 14:12
 World Classification System used Page 1`;
-    expect(() => parseWinmssText(pages(columnMajorPage))).toThrow(/fila/i);
+    expectParserError(
+      () => parseWinmssText(pages(columnMajorPage)),
+      "winmssNoRows",
+    );
   });
 
   it("lanza error si no se encuentra la fecha", () => {
@@ -847,7 +857,10 @@ Some Match
 % Points CompetitorCompetitor Cat Reg Cls Tag ICS
 1 100,00 100,0000 1 Doe, John
 World Classification System used Page 1`;
-    expect(() => parseWinmssText(pages(noDatePage))).toThrow(/fecha/i);
+    expectParserError(
+      () => parseWinmssText(pages(noDatePage)),
+      "noPrintedDate",
+    );
   });
 
   it("acepta meses en español: enero a diciembre", () => {

@@ -1,26 +1,23 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
 
 export async function signup(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("display_name") ?? "").trim();
 
   if (!email || !password || !displayName) {
-    redirectWithError("/signup", "Faltan datos", locale);
+    redirectWithError("/signup", t("missingSignupData"), locale);
   }
 
   if (password.length < 8) {
-    redirectWithError(
-      "/signup",
-      "La contraseña debe tener al menos 8 caracteres",
-      locale,
-    );
+    redirectWithError("/signup", t("passwordTooShort"), locale);
   }
 
   const supabase = await createClient();

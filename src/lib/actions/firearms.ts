@@ -1,6 +1,6 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "@/i18n/navigation";
 import { redirectWithError } from "@/lib/redirects";
@@ -35,9 +35,10 @@ function revalidateFirearmPaths(id?: string) {
 
 export async function createFirearm(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
-    redirectWithError("/firearms", "Falta el nombre", locale);
+    redirectWithError("/firearms", t("missingName"), locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -56,7 +57,7 @@ export async function createFirearm(formData: FormData) {
   );
 
   if (error) {
-    redirectWithError("/firearms", error, locale);
+    redirectWithError("/firearms", t("deleteFailed", { error }), locale);
   }
 
   await logAction(supabase, user.id, {
@@ -77,10 +78,11 @@ export async function createFirearm(formData: FormData) {
 
 export async function updateFirearm(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   if (!id || !name) {
-    redirectWithError("/firearms", "Datos incompletos", locale);
+    redirectWithError("/firearms", t("incompleteData"), locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -99,7 +101,7 @@ export async function updateFirearm(formData: FormData) {
   const { error } = await firearmsDb.updateFirearm(supabase, id, after);
 
   if (error) {
-    redirectWithError("/firearms", error, locale);
+    redirectWithError("/firearms", t("deleteFailed", { error }), locale);
   }
 
   await logAction(supabase, user.id, {
@@ -119,6 +121,7 @@ export async function updateFirearm(formData: FormData) {
 
 export async function deleteFirearm(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -129,7 +132,7 @@ export async function deleteFirearm(formData: FormData) {
 
   const { error } = await firearmsDb.deleteFirearm(supabase, id);
   if (error) {
-    redirectWithError("/firearms", error, locale);
+    redirectWithError("/firearms", t("deleteFailed", { error }), locale);
   }
 
   if (snapshot) {
@@ -158,6 +161,7 @@ export async function deleteFirearm(formData: FormData) {
  */
 export async function createFirearmUsage(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const firearmId = String(formData.get("firearm_id") ?? "");
   const usedOn = String(formData.get("used_on") ?? "").trim();
   const roundsRaw = String(formData.get("rounds_fired") ?? "");
@@ -167,18 +171,14 @@ export async function createFirearmUsage(formData: FormData) {
   const errorTarget = firearmId ? `/firearms/${firearmId}` : "/firearms";
 
   if (!firearmId) {
-    redirectWithError("/firearms", "Arma no especificada", locale);
+    redirectWithError("/firearms", t("firearmNotSpecified"), locale);
   }
   if (!usedOn) {
-    redirectWithError(errorTarget, "Falta la fecha", locale);
+    redirectWithError(errorTarget, t("missingDate"), locale);
   }
   const rounds = Number.parseInt(roundsRaw, 10);
   if (!Number.isFinite(rounds) || rounds <= 0) {
-    redirectWithError(
-      errorTarget,
-      "Tiros disparados debe ser mayor que cero",
-      locale,
-    );
+    redirectWithError(errorTarget, t("roundsMustBePositive"), locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -227,6 +227,7 @@ export async function createFirearmUsage(formData: FormData) {
 
 export async function deleteFirearmUsage(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const id = String(formData.get("id") ?? "");
   const firearmId = String(formData.get("firearm_id") ?? "");
   if (!id || !firearmId) return;
@@ -238,7 +239,11 @@ export async function deleteFirearmUsage(formData: FormData) {
   const { error } = await firearmsDb.deleteFirearmUsage(supabase, id);
 
   if (error) {
-    redirectWithError(`/firearms/${firearmId}`, error, locale);
+    redirectWithError(
+      `/firearms/${firearmId}`,
+      t("deleteFailed", { error }),
+      locale,
+    );
   }
 
   if (snapshot) {
@@ -266,6 +271,7 @@ export async function deleteFirearmUsage(formData: FormData) {
  */
 export async function setMatchFirearm(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const matchEntryId = String(formData.get("match_entry_id") ?? "");
   const matchId = String(formData.get("match_id") ?? "");
   const firearmId = String(formData.get("firearm_id") ?? "");
@@ -319,7 +325,7 @@ export async function setMatchFirearm(formData: FormData) {
   } else {
     const rounds = Number.parseInt(roundsRaw, 10);
     if (!Number.isFinite(rounds) || rounds < 0) {
-      redirectWithError(errorTarget, "Tiros disparados inválido", locale);
+      redirectWithError(errorTarget, t("invalidRounds"), locale);
     }
 
     const { error } = await firearmsDb.upsertMatchFirearmLog(supabase, {

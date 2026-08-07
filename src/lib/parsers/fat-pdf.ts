@@ -6,6 +6,7 @@ import {
 import type { ParsedMatch, ParsedMatchEntry } from "../types/match";
 import { resolveDivisionCode } from "./division-registry";
 import { stripNameSuffixes } from "./shared";
+import { ParserError } from "./parser-error";
 
 /**
  * Parser para los PDFs de "RANKING OFICIAL" que publica la FAT (Federación
@@ -128,20 +129,12 @@ export function detectDisciplineFromFilename(
 export function parseFatText(text: string, filename: string): ParsedMatch {
   const discipline = detectDisciplineFromFilename(filename);
   if (!discipline) {
-    throw new Error(
-      `No pudimos determinar la disciplina del archivo «${filename}». ` +
-        `El nombre del archivo tiene que incluir la disciplina (por ejemplo: ` +
-        `"resultados-apertura-fbi.pdf"). Disciplinas válidas: FBI, IPSC, ` +
-        `Steel Challenge, Combat Solutions.`,
-    );
+    throw new ParserError("fatUnknownDiscipline", { filename });
   }
 
   const sections = parseSections(text, discipline);
   if (sections.length === 0) {
-    throw new Error(
-      "El archivo se reconoció como ranking de la FAT pero no se pudo " +
-        "extraer ninguna sección de resultados.",
-    );
+    throw new ParserError("fatNoSections");
   }
 
   // Mapa nombre→categoría: lo arman las secciones que NO son "GENERAL"
@@ -174,11 +167,7 @@ export function parseFatText(text: string, filename: string): ParsedMatch {
 
   if (rankingByDivision.size === 0) {
     const found = sections.map((s) => s.header).join(", ");
-    throw new Error(
-      `El archivo es un ranking de la FAT pero no pudimos mapear ninguna ` +
-        `de sus secciones a una división de la disciplina detectada. ` +
-        `Secciones encontradas: ${found}.`,
-    );
+    throw new ParserError("fatNoDivisions", { sections: found });
   }
 
   const hitsBased = isHitsBasedDiscipline(discipline);

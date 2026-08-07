@@ -7,6 +7,7 @@ import type {
 } from "../types/match";
 import { resolveDivisionCode } from "./division-registry";
 import { extractClubFromTitle, stripNameSuffixes } from "./shared";
+import { ParserError } from "./parser-error";
 
 /**
  * Parser para PDFs WinMSS (formato usado por ipsc.org.ar para archivos
@@ -157,7 +158,7 @@ export function isWinmssFormat(text: string): boolean {
  */
 export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
   if (pages.length === 0) {
-    throw new Error("PDF vacío: no se encontraron páginas.");
+    throw new ParserError("emptyPdf");
   }
 
   const matchEntries: ParsedMatchEntry[] = [];
@@ -253,23 +254,17 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
 
   if (!matchName) {
     const snippet = (pages[0]?.text ?? "").slice(0, 300).replace(/\s+/g, " ");
-    throw new Error(
-      `No se pudo extraer el nombre del match del PDF. ¿Es un archivo WinMSS válido? Inicio del texto: "${snippet}"`,
-    );
+    throw new ParserError("noWinmssMatchName", { snippet });
   }
   if (!matchDate) {
-    throw new Error(
-      "No se pudo extraer la fecha del PDF (esperaba 'Printed mes DD, YYYY').",
-    );
+    throw new ParserError("noPrintedDate");
   }
   // Si no extraemos ni entries ni stages, abortamos en lugar de crear un
   // match vacío. Pasaba ocasionalmente con PDFs cuyas filas `unpdf` extrae
   // en orden column-major (cada celda en lugar de cada row) y las regex
   // de fila no matchean nada.
   if (matchEntries.length === 0 && stagesByNum.size === 0) {
-    throw new Error(
-      "El PDF se identificó como WinMSS pero no se pudo extraer ninguna fila de resultados. Probá con otro archivo o avisame con el nombre del torneo.",
-    );
+    throw new ParserError("winmssNoRows");
   }
 
   // Import parcial: leímos ALGO pero se nos escaparon filas. Frenamos en
@@ -282,11 +277,7 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
   // había salido "bien". Un error ruidoso es mejor que datos incompletos en
   // una base compartida.
   if (dropped.length > 0) {
-    throw new Error(
-      `El archivo tiene filas que no pudimos leer (${dropped.join("; ")}). ` +
-        "Puede ser un formato que todavía no soportamos. No importamos nada " +
-        "para no dejar el match a medias — avisame con el nombre del torneo.",
-    );
+    throw new ParserError("partialRows", { detail: dropped.join("; ") });
   }
 
   const stages: ParsedStage[] = Array.from(stagesByNum.entries())
