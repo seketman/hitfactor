@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.22.2](https://github.com/seketman/hitfactor/compare/v1.22.1...v1.22.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* **matches:** stop reporting writes that RLS rejected, and settle admin scope ([#216](https://github.com/seketman/hitfactor/issues/216)) ([babdd51](https://github.com/seketman/hitfactor/commit/babdd514b74b405a50bceca4be8af88d3f8c6e8a))
+
+
+### Documentation
+
+* extend the English rule to migration comments ([#214](https://github.com/seketman/hitfactor/issues/214)) ([e7b9664](https://github.com/seketman/hitfactor/commit/e7b96641432a4e0d09202764822350458231b1bb))
+
 ## [1.22.1](https://github.com/seketman/hitfactor/compare/v1.22.0...v1.22.1) (2026-08-07)
 
 
