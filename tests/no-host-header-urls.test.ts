@@ -1,4 +1,4 @@
-import { globSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -38,10 +38,28 @@ const ALLOWLIST = new Map<string, string>([
 /** `headersList.get("host")`, `.get('x-forwarded-host')`, etc. */
 const HOST_HEADER = /\.get\(\s*["'`](?:x-forwarded-host|x-forwarded-proto|host)["'`]\s*\)/i;
 
-function sourceFiles(): string[] {
-  return globSync("**/*.{ts,tsx}", { cwd: SRC })
-    .map((f) => f.replaceAll("\\", "/"))
-    .sort();
+/**
+ * Walks `src/` by hand rather than using `fs.globSync` or
+ * `readdirSync(recursive: true)`. Both are newer than the Node the CI
+ * runs (20, per `.github/workflows/ci.yml`) — `globSync` landed in 22 and
+ * throws `TypeError: globSync is not a function` there, which is exactly
+ * how this file first went red. `readdirSync` with `withFileTypes` has
+ * been available forever.
+ *
+ * Paths come back relative to `src/` and slash-separated, so ALLOWLIST
+ * keys read the same on every platform.
+ */
+function sourceFiles(dir = SRC, prefix = ""): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      out.push(...sourceFiles(join(dir, entry.name), rel));
+    } else if (/\.tsx?$/.test(entry.name)) {
+      out.push(rel);
+    }
+  }
+  return out.sort();
 }
 
 describe("absolute URLs are not built from request headers", () => {
