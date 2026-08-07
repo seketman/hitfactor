@@ -69,6 +69,7 @@ Apply **all** the migrations in Supabase, in numeric order:
 | 0018 | [`0018_update_ui_prefs_rpc.sql`](../supabase/migrations/0018_update_ui_prefs_rpc.sql) | `update_ui_prefs` RPC — atomic merge of `ui_prefs`, avoids lost updates (#126) |
 | 0019 | [`0019_fbi_optic_division.sql`](../supabase/migrations/0019_fbi_optic_division.sql) | `OPTIC` division for Tiro FBI |
 | 0020 | [`0020_import_uploads_storage.sql`](../supabase/migrations/0020_import_uploads_storage.sql) | Private `match-imports` bucket + per-user RLS policies, for staging import files |
+| 0021 | [`0021_fix_shooters_claim_rls.sql`](../supabase/migrations/0021_fix_shooters_claim_rls.sql) | Fixes the UPDATE RLS on `shooters`: its `using` clause let any authenticated user edit or unlink someone else's shooter (#195) |
 
 If you add a migration, add its row here: there is a test
 (`tests/migrations-doc.test.ts`) that fails if the directory and this table
