@@ -13,6 +13,7 @@ import {
   stripDqPrefix,
   stripNameSuffixes,
 } from "./shared";
+import { ParserError } from "./parser-error";
 
 /**
  * Parser para reportes PDF de Steel Challenge generados por PractiScore
@@ -121,7 +122,7 @@ export function isSteelChallengePdfFormat(text: string): boolean {
  */
 export function parseSteelChallengePdfs(files: SteelPdfFile[]): ParsedMatch {
   if (files.length === 0) {
-    throw new Error("No se recibió ningún archivo para parsear.");
+    throw new ParserError("noFiles");
   }
 
   // Identificamos archivos que SÍ son Stage Results.
@@ -131,11 +132,7 @@ export function parseSteelChallengePdfs(files: SteelPdfFile[]): ParsedMatch {
   });
 
   if (stageFiles.length === 0) {
-    throw new Error(
-      "Subí los PDFs 'Stage Results - By Division' del torneo. Los " +
-        "'Category Leaders' por sí solos no alcanzan: sus porcentajes son " +
-        "por categoría y no traen el ranking absoluto de la división.",
-    );
+    throw new ParserError("steelCategoryLeadersOnly");
   }
 
   // Los archivos 'Category Leaders - <división>' SÍ traen la categoría de
@@ -159,11 +156,7 @@ export function parseSteelChallengePdfs(files: SteelPdfFile[]): ParsedMatch {
   // traen los mismos valores en las primeras líneas).
   const { name, date } = extractNameAndDate(stageFiles[0]!);
   if (!date) {
-    throw new Error(
-      "No pudimos extraer la fecha del torneo del PDF. Verificá que el " +
-        "reporte arranque con 'Steel Challenge' seguido de la fecha en " +
-        "formato YYYY-MM-DD.",
-    );
+    throw new ParserError("noSteelDate");
   }
 
   // Acumulador de stages: keyed por stageNumber. Detectamos duplicados
@@ -191,10 +184,10 @@ export function parseSteelChallengePdfs(files: SteelPdfFile[]): ParsedMatch {
     for (const section of sections) {
       const divKey = `${section.divisionCode}|${section.stageNumber}`;
       if (seenDivStage.has(divKey)) {
-        throw new Error(
-          `Hay dos archivos cubriendo el stage ${section.stageNumber} ` +
-            `de ${section.divisionLabel}. Subí un solo PDF por stage.`,
-        );
+        throw new ParserError("duplicateStageFile", {
+          stage: section.stageNumber,
+          division: section.divisionLabel,
+        });
       }
       seenDivStage.add(divKey);
 

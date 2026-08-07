@@ -1,6 +1,6 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "@/i18n/navigation";
 import { redirectWithError } from "@/lib/redirects";
@@ -36,6 +36,7 @@ import { getMatchName } from "@/lib/db/matches";
  */
 export async function claimShooter(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const shooterId = String(formData.get("shooter_id") ?? "");
   const matchId = String(formData.get("match_id") ?? "");
   const redirectToRaw = String(formData.get("redirect_to") ?? "");
@@ -64,11 +65,7 @@ export async function claimShooter(formData: FormData) {
 
   // Linkeado a otro usuario: error.
   if (shooter && shooter.linked_user_id && shooter.linked_user_id !== userId) {
-    redirectWithError(
-      errorTarget,
-      "Este tirador ya fue claimado por otro usuario.",
-      locale,
-    );
+    redirectWithError(errorTarget, t("shooterClaimedByOther"), locale);
   }
 
   const { error } = await shootersDb.claimShooter(supabase, shooterId, userId);
@@ -76,7 +73,7 @@ export async function claimShooter(formData: FormData) {
   if (error) {
     redirectWithError(
       errorTarget,
-      "No se pudo asociar el tirador a tu cuenta: " + error,
+      t("claimFailed", { error }),
       locale,
     );
   }

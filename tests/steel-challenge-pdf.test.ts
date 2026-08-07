@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { expectParserError } from "./helpers/expect-parser-error";
 import {
   isSteelChallengePdfFormat,
   parseSteelChallengePdfs,
@@ -189,20 +190,25 @@ describe("parseSteelChallengePdfs — happy path con 3 stages", () => {
 
 describe("parseSteelChallengePdfs — error paths", () => {
   it("error claro si solo se suben Category Leaders sin Stage Results", () => {
-    expect(() =>
-      parseSteelChallengePdfs([
-        asPdfFile("leaders.pdf", categoryLeadersPistolaText),
-      ]),
-    ).toThrowError(/Stage Results - By Division/);
+    expectParserError(
+      () =>
+        parseSteelChallengePdfs([
+          asPdfFile("leaders.pdf", categoryLeadersPistolaText),
+        ]),
+      "steelCategoryLeadersOnly",
+    );
   });
 
   it("error si se suben dos archivos del mismo stage (data duplicada)", () => {
-    expect(() =>
-      parseSteelChallengePdfs([
-        asPdfFile("stage1.pdf", stage1Text),
-        asPdfFile("stage1-dup.pdf", stage1Text),
-      ]),
-    ).toThrowError(/stage 1/i);
+    expectParserError(
+      () =>
+        parseSteelChallengePdfs([
+          asPdfFile("stage1.pdf", stage1Text),
+          asPdfFile("stage1-dup.pdf", stage1Text),
+        ]),
+      "duplicateStageFile",
+      { stage: 1 },
+    );
   });
 
   it("error si no se recibe ningún archivo", () => {

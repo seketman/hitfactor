@@ -1,5 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { describeAuditEntry } from "@/lib/audit/render";
+import { createTranslator } from "use-intl";
+import { describeAuditEntry, type AuditTranslator } from "@/lib/audit/render";
+import es from "../messages/es.json";
+import en from "../messages/en.json";
+
+/**
+ * Se usa el traductor **real** sobre `messages/es.json` en vez de un fake tipo
+ * `(k) => k`. Un fake haría pasar los tests aunque falte una clave: next-intl
+ * devuelve `<namespace>.<clave>` cuando no la encuentra, así que el assert
+ * sobre el texto final es lo único que detecta un mensaje sin traducir.
+ */
+/**
+ * `createTranslator` infiere las claves del JSON importado, así que su `key`
+ * es una unión literal y no `string`. `AuditTranslator` acepta cualquier
+ * `string` —tiene que hacerlo: `describeDiff` arma `field.<columna>` en
+ * runtime— y por contravarianza el traductor concreto no es asignable al tipo
+ * más ancho. El cast vive acá, una sola vez, en vez de en cada llamada.
+ */
+function auditTranslator(
+  locale: string,
+  messages: Record<string, unknown>,
+): AuditTranslator {
+  const translate = createTranslator({
+    locale,
+    messages,
+    namespace: "activityLog",
+  } as never) as unknown as AuditTranslator;
+  return translate;
+}
+
+const t = auditTranslator("es", es);
+const tEn = auditTranslator("en", en);
 import type { AuditLogRow } from "@/lib/db/types";
 
 function row(overrides: Partial<AuditLogRow>): AuditLogRow {
@@ -28,6 +59,7 @@ describe("describeAuditEntry", () => {
           stages_count: 0,
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Social 4");
     expect(desc.summary).toContain("Importaste");
@@ -43,6 +75,7 @@ describe("describeAuditEntry", () => {
         action: "match.import",
         metadata: { match_name: "X", entries_count: 5, stages_count: 8 },
       }),
+      t,
     );
     expect(desc.detail).toContain("8 stages");
   });
@@ -53,6 +86,7 @@ describe("describeAuditEntry", () => {
         action: "match.delete",
         metadata: { match_name: "Social 3", match_date: "2026-04-19" },
       }),
+      t,
     );
     expect(desc.summary).toContain("Eliminaste");
     expect(desc.summary).toContain("Social 3");
@@ -70,6 +104,7 @@ describe("describeAuditEntry", () => {
           after: { region: "ARG-TFALP" },
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Social 4");
     expect(desc.detail).toBe("— → ARG-TFALP");
@@ -86,6 +121,7 @@ describe("describeAuditEntry", () => {
           match_name: "TP Escopeta",
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Demarziani, Diego");
     expect(desc.detail).toContain("TP Escopeta");
@@ -98,6 +134,7 @@ describe("describeAuditEntry", () => {
         action: "shooter.unclaim",
         metadata: { shooter_full_name: "Demarziani Diego" },
       }),
+      t,
     );
     expect(desc.summary).toContain("Quitaste la asociación");
     expect(desc.summary).toContain("Demarziani Diego");
@@ -115,6 +152,7 @@ describe("describeAuditEntry", () => {
           caliber: "9x19",
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Glock 17");
     expect(desc.detail).toBe("Glock · 17 Gen 5 · 9x19");
@@ -141,13 +179,15 @@ describe("describeAuditEntry", () => {
           },
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Glock 17 Gen 5");
-    expect(desc.detail).toContain("name");
+    // El nombre del campo ahora se traduce: "name" → "nombre".
+    expect(desc.detail).toContain("nombre");
     expect(desc.detail).toContain('"Glock 17"');
     expect(desc.detail).toContain('"Glock 17 Gen 5"');
-    expect(desc.detail).not.toContain("brand"); // sin cambio
-    expect(desc.detail).not.toContain("caliber"); // sin cambio
+    expect(desc.detail).not.toContain("marca"); // sin cambio
+    expect(desc.detail).not.toContain("calibre"); // sin cambio
   });
 
   it("firearm.delete: nombre del arma borrada", () => {
@@ -156,6 +196,7 @@ describe("describeAuditEntry", () => {
         action: "firearm.delete",
         metadata: { name: "Glock 17", caliber: "9x19" },
       }),
+      t,
     );
     expect(desc.summary).toContain("Glock 17");
     expect(desc.detail).toContain("9x19");
@@ -176,6 +217,7 @@ describe("describeAuditEntry", () => {
           },
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Glock 17");
     expect(desc.summary).toContain("Social 4");
@@ -189,6 +231,7 @@ describe("describeAuditEntry", () => {
         action: "match_firearm.clear",
         metadata: { match_id: "m-1", match_name: "Social 4" },
       }),
+      t,
     );
     expect(desc.summary).toContain("Quitaste");
     expect(desc.summary).toContain("Social 4");
@@ -207,6 +250,7 @@ describe("describeAuditEntry", () => {
           brand: "Hornady",
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("9mm Hornady 124gr");
     // "reload" se renderiza como "recarga" en español.
@@ -234,9 +278,13 @@ describe("describeAuditEntry", () => {
           },
         },
       }),
+      t,
     );
-    expect(desc.detail).toContain("powder_charge_grains");
-    expect(desc.detail).not.toContain("powder:"); // unchanged
+    // Los campos de munición también se traducen: el snapshot de ammo hace
+    // `select("*")`, así que estos entran igual que los del arma.
+    expect(desc.detail).toContain("carga de pólvora (gr)");
+    expect(desc.detail).not.toContain("powder_charge_grains");
+    expect(desc.detail).not.toContain("pólvora:"); // sin cambio
   });
 
   it("ammo.delete: nombre y atributos del borrado", () => {
@@ -249,6 +297,7 @@ describe("describeAuditEntry", () => {
           caliber: "9x19",
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("9mm Hornady 124gr");
     expect(desc.detail).toContain("factory");
@@ -267,6 +316,7 @@ describe("describeAuditEntry", () => {
           ammunition_name: "Magtech 124gr",
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Glock 17");
     expect(desc.detail).toContain("150 tiros");
@@ -287,6 +337,7 @@ describe("describeAuditEntry", () => {
           ammunition_name: null,
         },
       }),
+      t,
     );
     expect(desc.detail).toContain("80 tiros");
     expect(desc.detail).not.toContain("null");
@@ -303,6 +354,7 @@ describe("describeAuditEntry", () => {
           rounds_fired: 80,
         },
       }),
+      t,
     );
     expect(desc.summary).toContain("Borraste");
     expect(desc.summary).toContain("Glock 17");
@@ -311,7 +363,86 @@ describe("describeAuditEntry", () => {
   });
 
   it("acción desconocida: cae al fallback con el code crudo", () => {
-    const desc = describeAuditEntry(row({ action: "future.thing" }));
+    const desc = describeAuditEntry(row({ action: "future.thing" }), t);
     expect(desc.summary).toBe("future.thing");
+  });
+});
+
+/**
+ * Cobertura de lo que introdujo la internacionalización (#147). Los tests de
+ * arriba verifican el texto en español; estos verifican que el mecanismo
+ * funcione y no se rompa con datos inesperados.
+ */
+describe("describeAuditEntry — i18n", () => {
+  it("renderiza en inglés con el mismo row", () => {
+    const r = row({
+      action: "match.import",
+      entity_id: "m-1",
+      metadata: { match_name: "Copa Social", entries_count: 12 },
+    });
+    expect(describeAuditEntry(r, t).summary).toBe(
+      'Importaste el match "Copa Social"',
+    );
+    expect(describeAuditEntry(r, tEn).summary).toBe(
+      'You imported the match "Copa Social"',
+    );
+  });
+
+  // Los conteos usan plural ICU. Con un fake `(k) => k` esto pasaría igual;
+  // con el traductor real, un `{count}` mal escrito se ve.
+  it("pluraliza los conteos en los dos idiomas", () => {
+    const one = row({
+      action: "match.import",
+      metadata: { match_name: "X", entries_count: 1, stages_count: 1 },
+    });
+    const many = row({
+      action: "match.import",
+      metadata: { match_name: "X", entries_count: 12, stages_count: 4 },
+    });
+    expect(describeAuditEntry(one, t).detail).toBe("1 tirador · 1 stage");
+    expect(describeAuditEntry(many, t).detail).toBe("12 tiradores · 4 stages");
+    expect(describeAuditEntry(one, tEn).detail).toBe("1 shooter · 1 stage");
+    expect(describeAuditEntry(many, tEn).detail).toBe(
+      "12 shooters · 4 stages",
+    );
+  });
+
+  /**
+   * El audit log es histórico: puede tener snapshots de columnas que ya no
+   * existen. Un campo fuera de `DIFF_FIELD_KEYS` tiene que salir crudo, no
+   * como `activityLog.field.<x>`, que es lo que devuelve next-intl cuando no
+   * encuentra la clave.
+   */
+  it("muestra crudo un campo del diff que no tiene traducción", () => {
+    const desc = describeAuditEntry(
+      row({
+        action: "firearm.update",
+        metadata: {
+          before: { columna_vieja: "a" },
+          after: { columna_vieja: "b" },
+        },
+      }),
+      t,
+    );
+    expect(desc.detail).toContain("columna_vieja:");
+    expect(desc.detail).not.toContain("activityLog");
+  });
+
+  it("los labels de link también se traducen", () => {
+    const r = row({
+      action: "match.import",
+      entity_id: "m-1",
+      metadata: { match_name: "X" },
+    });
+    expect(describeAuditEntry(r, t).link?.label).toBe("Ver match");
+    expect(describeAuditEntry(r, tEn).link?.label).toBe("View match");
+  });
+
+  it("una acción desconocida cae al nombre crudo", () => {
+    const desc = describeAuditEntry(
+      row({ action: "algo.nuevo" as never, metadata: {} }),
+      t,
+    );
+    expect(desc.summary).toBe("algo.nuevo");
   });
 });

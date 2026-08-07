@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { expectParserError } from "./helpers/expect-parser-error";
 import {
   isPractiscorePdfFormat,
   parsePractiscorePdfText,
@@ -310,19 +311,28 @@ describe("parsePractiscorePdfText — stages", () => {
     // Stage 3 (idx 1, used={3}), Stage 2 (idx 2, used={3,2}), sin-número
     // (idx 3): candidato A = 3 → ocupado; candidato B = prev(2) + 1 = 3 →
     // ocupado → error.
-    expect(() =>
-      parsePractiscorePdfText(
-        pages(stagePage("Stage 3 Campo A"), stagePage("Stage 2 Campo B"), stagePage("Campo C")),
-      ),
-    ).toThrow(/no se pudo determinar el número del stage/i);
+    expectParserError(
+      () =>
+        parsePractiscorePdfText(
+          pages(
+            stagePage("Stage 3 Campo A"),
+            stagePage("Stage 2 Campo B"),
+            stagePage("Campo C"),
+          ),
+        ),
+      "stageSlotTaken",
+    );
   });
 
   it("aborta si dos páginas declaran el mismo número de stage explícito", () => {
-    expect(() =>
-      parsePractiscorePdfText(
-        pages(stagePage("Stage 2 Campo A"), stagePage("Stage 2 Campo B")),
-      ),
-    ).toThrow(/dos stages con el número 2/i);
+    expectParserError(
+      () =>
+        parsePractiscorePdfText(
+          pages(stagePage("Stage 2 Campo A"), stagePage("Stage 2 Campo B")),
+        ),
+      "duplicateStageNumber",
+      { stage: 2 },
+    );
   });
 
   // PractiScore para Android: "Ejercicio N" + stages multi-página.

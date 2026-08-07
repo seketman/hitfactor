@@ -14,6 +14,7 @@ import {
   stripNameSuffixes,
 } from "./shared";
 import { resolveDivisionCode } from "./division-registry";
+import { ParserError } from "./parser-error";
 
 /**
  * Parser para resultados de Tiro FBI exportados desde Google Sheets como CSV.
@@ -117,13 +118,13 @@ export function parseFbiCsv(content: string): ParsedMatch {
     return REQUIRED_HEADERS.every((h) => normalized.includes(h));
   });
   if (headerIdx === -1) {
-    throw new Error("No se encontró la fila de headers (Tirador, Club, ...).");
+    throw new ParserError("missingHeaderRow");
   }
 
   const headers = rows[headerIdx]!.map(normalize);
   const col = (name: string) => {
     const i = headers.indexOf(name);
-    if (i === -1) throw new Error(`Header faltante: ${name}`);
+    if (i === -1) throw new ParserError("missingHeader", { name });
     return i;
   };
   const idxTirador = col(HEADER_TIRADOR);

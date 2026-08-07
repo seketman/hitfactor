@@ -1,6 +1,6 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "@/i18n/navigation";
 import { redirectWithError } from "@/lib/redirects";
@@ -60,13 +60,14 @@ function revalidateAmmoPaths(id?: string) {
 
 export async function createAmmo(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const name = String(formData.get("name") ?? "").trim();
   const type = parseAmmoType(formData.get("type"));
   if (!name) {
-    redirectWithError("/ammo", "Falta el nombre", locale);
+    redirectWithError("/ammo", t("missingName"), locale);
   }
   if (!type) {
-    redirectWithError("/ammo", "Falta el tipo (factory o reload)", locale);
+    redirectWithError("/ammo", t("missingAmmoType"), locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -91,7 +92,7 @@ export async function createAmmo(formData: FormData) {
   const { id: createdId, error } = await ammoDb.createAmmo(supabase, payload);
 
   if (error) {
-    redirectWithError("/ammo", error, locale);
+    redirectWithError("/ammo", t("deleteFailed", { error }), locale);
   }
 
   await logAction(supabase, user.id, {
@@ -112,11 +113,12 @@ export async function createAmmo(formData: FormData) {
 
 export async function updateAmmo(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const type = parseAmmoType(formData.get("type"));
   if (!id || !name || !type) {
-    redirectWithError("/ammo", "Datos incompletos", locale);
+    redirectWithError("/ammo", t("incompleteData"), locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -162,6 +164,7 @@ export async function updateAmmo(formData: FormData) {
 
 export async function deleteAmmo(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -175,7 +178,7 @@ export async function deleteAmmo(formData: FormData) {
   const { error } = await ammoDb.deleteAmmo(supabase, id);
 
   if (error) {
-    redirectWithError("/ammo", error, locale);
+    redirectWithError("/ammo", t("deleteFailed", { error }), locale);
   }
 
   if (snapshot) {

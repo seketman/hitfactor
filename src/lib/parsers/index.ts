@@ -17,6 +17,7 @@ import {
   parsePractiscorePdfText,
 } from "./practiscore-pdf";
 import { isFatPdfFormat, parseFatText } from "./fat-pdf";
+import { ParserError } from "./parser-error";
 
 /**
  * Selección de parser por **registry de descriptores** en lugar de un
@@ -114,7 +115,7 @@ export async function parsePdfBatch(
   files: Array<{ data: Uint8Array; filename: string }>,
 ): Promise<ParsedMatch> {
   if (files.length === 0) {
-    throw new Error("No se recibió ningún archivo.");
+    throw new ParserError("noFiles");
   }
 
   const filePages: SteelPdfFile[] = await Promise.all(
@@ -132,10 +133,7 @@ export async function parsePdfBatch(
   }
 
   if (files.length > 1) {
-    throw new Error(
-      "Solo Steel Challenge soporta múltiples PDFs en un mismo import. " +
-        "Subí los archivos uno por uno.",
-    );
+    throw new ParserError("multiplePdfsUnsupported");
   }
 
   const single = filePages[0]!;
@@ -143,11 +141,7 @@ export async function parsePdfBatch(
   for (const fmt of SINGLE_FILE_PDF_FORMATS) {
     if (fmt.detect(singleText)) return fmt.parse(single);
   }
-  throw new Error(
-    "No reconocemos el formato de este PDF. Soportamos los PDFs de PractiScore, " +
-      "los WinMSS de ipsc.org.ar, los rankings oficiales en PDF de la FAT, y los " +
-      "reportes de Steel Challenge generados por PractiScore iPhone.",
-  );
+  throw new ParserError("unknownPdfFormat");
 }
 
 export { parsePractiscoreHtml } from "./practiscore";

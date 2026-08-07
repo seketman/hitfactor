@@ -1,6 +1,6 @@
 "use server";
 
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
@@ -8,6 +8,7 @@ import { safeBackPath } from "@/lib/paths";
 
 export async function login(formData: FormData) {
   const locale = await getLocale();
+  const t = await getTranslations("actionError");
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   // Destino post-login. Validado con safeBackPath (whitelist de rutas
@@ -20,7 +21,7 @@ export async function login(formData: FormData) {
   );
 
   if (!email || !password) {
-    redirectWithError("/login", "Faltan credenciales", locale);
+    redirectWithError("/login", t("missingCredentials"), locale);
   }
 
   const supabase = await createClient();
