@@ -9,32 +9,35 @@ follow, and the Pull Request flow.
 
 ## Language
 
-**Everything written into the repo or into GitHub is in English**: issue titles
-and bodies, PR titles and bodies, review comments, commit messages, code,
-identifiers, code comments, and documentation.
+**Write in English anything you add to the repo or to GitHub**: issue titles and
+bodies, PR titles and bodies, review comments, commit messages, code,
+identifiers, code comments, and documentation. It applies to what you *write or
+edit*, in whatever language the discussion around it happened.
 
 The project is open source and the maintainer is an Argentinian Spanish
-speaker, so the temptation to switch is real — but a contributor who doesn't
-speak Spanish should be able to read the whole history, not the half of it that
-happens to be code. Issues are part of that history: they're where the *why*
-of a change is argued out before it reaches a commit.
+speaker, so the temptation to switch is real. The goal is that a contributor
+who doesn't read Spanish can follow along — above all in **issues and pull
+requests**, which is where the *why* of a change is argued out before it
+becomes a commit, and which are the first thing a newcomer reads.
 
-One thing is deliberately **not** covered by this rule: **user-facing copy**,
-which lives in `messages/es.json` and `messages/en.json` and is translated for
-both locales. Keys must exist in both — there is a test
-(`tests/messages-parity.test.ts`) that fails otherwise.
+One thing is deliberately **not** covered: **user-facing copy**, which lives in
+`messages/es.json` and `messages/en.json` and is translated for both locales.
+Keys must exist in both — there is a test (`tests/messages-parity.test.ts`)
+that fails otherwise.
 
-Everything else follows the rule, including the comments in
-`supabase/migrations/`. Those comments carry real design reasoning — why a
-policy is shaped the way it is, what breaks if you change it — so they're
-exactly the kind of thing a contributor needs to be able to read.
+### The repo is mid-migration, on purpose
 
-Two things were left in Spanish on purpose:
+Plenty of comments across `src/` and in migrations `0001`-`0020` are still in
+Spanish, and **they are not being translated in bulk**. They get rewritten in
+English when the code around them is worked on, and left alone otherwise.
 
-- **Closed issues** predating the rule. Rewriting history adds noise without
-  helping anyone.
-- **Migrations `0001` through `0020`**, which were already written and applied.
-  Translating them is tracked separately; from `0021` onwards they're English.
+So a file you touch may end up holding both languages for a while. That is the
+accepted cost: the alternative is a 135-file diff that changes no behavior and
+that nobody can review carefully. Don't translate comments you aren't otherwise
+touching, and don't copy the surrounding Spanish into something you're adding.
+
+Closed issues predating the rule stay in Spanish too — rewriting history adds
+noise without helping anyone.
 
 ## Local setup
 

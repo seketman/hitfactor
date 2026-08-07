@@ -6,18 +6,26 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Write in English
 
-Everything you write into the repo or into GitHub goes in English: **issue
-titles and bodies**, PR titles and bodies, review comments, commit messages,
-code, identifiers, code comments, and docs. This holds regardless of the
-language the maintainer is talking to you in — the conversation is not the
-artifact.
+Anything you write or edit goes in English: **issue titles and bodies**, PR
+titles and bodies, review comments, commit messages, code, identifiers, code
+comments, and docs. This holds regardless of the language the maintainer is
+talking to you in — the conversation is not the artifact.
 
 One narrow exception: user-facing copy belongs in `messages/es.json` /
 `messages/en.json`, never hardcoded. Keys must exist in both locales
 (`tests/messages-parity.test.ts`).
 
-This includes comments in `supabase/migrations/`. Migrations `0001`-`0020`
-predate the rule and are still Spanish — don't translate them as a side effect
-of an unrelated change, and don't copy their language into a new file.
+## The repo is mid-migration
+
+Much of `src/` and migrations `0001`-`0020` still carry Spanish comments, and
+they are **not** being translated in bulk. The rule is incremental:
+
+- A comment you write → English.
+- A comment you edit → rewrite it in English.
+- A comment you don't touch → leave it in Spanish.
+
+Do not translate comments as a side effect of an unrelated change, and do not
+copy the surrounding Spanish into something you're adding. Files will hold both
+languages for a while; that's expected, not a defect to fix.
 
 See `.github/CONTRIBUTING.md` for the full statement.
