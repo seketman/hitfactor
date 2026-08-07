@@ -13,21 +13,21 @@ import { canDeleteMatch, canEditEntry, canEditMatch } from "@/lib/permissions";
 import { isLikelyAbsent } from "@/lib/matches/entry-status";
 
 /**
- * Por qué todas las acciones de acá validan permisos server-side Y
- * cuentan filas afectadas:
+ * Why every action here checks permissions server-side AND counts
+ * affected rows:
  *
- * PostgREST **no devuelve error** cuando la RLS filtra todas las filas de
- * un UPDATE/DELETE: devuelve 200 con body vacío. Leer `error === null`
- * como "salió bien" hacía dos cosas malas a la vez — le confirmábamos al
- * usuario una operación que no pasó, y escribíamos en `audit_log` una
- * acción que la base había rechazado. Un audit log que registra
- * intenciones en vez de hechos es peor que no tenerlo, porque se lee con
- * la confianza del segundo. Ver issues #196 y #197.
+ * PostgREST does **not** return an error when RLS filters every row of an
+ * UPDATE/DELETE — it returns 200 with an empty body. Reading
+ * `error === null` as "it worked" did two bad things at once: it
+ * confirmed to the user an operation that never happened, and it wrote to
+ * `audit_log` an action the database had refused. An audit log recording
+ * intentions instead of facts is worse than none, because it gets read
+ * with the confidence of the latter. See issues #196 and #197.
  *
- * El check de permisos va primero para poder dar un error accionable
- * ("no sos el importador") en vez del genérico. El conteo de filas queda
- * igual como red: si la RLS y `canEditMatch` alguna vez discrepan, la
- * discrepancia se ve acá en lugar de convertirse en un audit entry falso.
+ * The permission check comes first so the user gets an actionable error
+ * ("you are not the importer") rather than a generic one. The row count
+ * stays as a backstop: if RLS and `canEditMatch` ever disagree, the
+ * disagreement surfaces here instead of becoming a false audit entry.
  */
 
 export async function deleteMatch(formData: FormData) {
@@ -46,9 +46,9 @@ export async function deleteMatch(formData: FormData) {
 
   const { supabase, user } = await requireUser();
 
-  // Snapshot antes de borrar — sino perdemos el contexto para auditar.
-  // Trae `imported_by_user_id`, así el check de permisos no cuesta una
-  // query extra.
+  // Snapshot before deleting — otherwise we lose the context to audit
+  // with. It carries `imported_by_user_id`, so the permission check costs
+  // no extra query.
   const matchSnapshot = await matchesDb.getMatchDeleteSnapshot(supabase, matchId);
   if (!matchSnapshot) {
     redirectWithError(`/matches/${matchId}`, t("matchNotFound"), locale);
@@ -72,8 +72,8 @@ export async function deleteMatch(formData: FormData) {
       locale,
     );
   }
-  // Cero filas sin error = la RLS lo rechazó. No auditamos y no fingimos
-  // éxito.
+  // Zero rows with no error = RLS refused it. Don't audit, don't fake
+  // success.
   if (affected === 0) {
     redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
   }
@@ -91,11 +91,11 @@ export async function deleteMatch(formData: FormData) {
     },
   });
 
-  // Sin `?info=`: el destino de este redirect es `/matches` o
-  // `/dashboard/{disciplina}`, y ninguna de las dos lee ese search param
-  // (la única que lo hace es `/login`). El mensaje de confirmación que
-  // viajaba acá no se renderizó nunca. Si se quiere confirmar el borrado,
-  // es una decisión de UX aparte, no un string colgado en la URL.
+  // No `?info=`: this redirect targets `/matches` or
+  // `/dashboard/{discipline}`, and neither reads that search param (only
+  // `/login` does). The confirmation message that used to ride along was
+  // never rendered. Confirming a deletion is a separate UX decision, not
+  // a string left dangling in the URL.
   redirect({ href: backTo, locale });
 }
 
@@ -134,8 +134,9 @@ export async function updateMatchClub(formData: FormData) {
 
   const { supabase, user } = await requireUser();
 
-  // Snapshot antes para registrar before/after, y para validar permisos:
-  // trae `imported_by_user_id` por la misma razón que el de delete.
+  // Snapshot beforehand to record before/after, and to check permissions:
+  // it carries `imported_by_user_id` for the same reason the delete one
+  // does.
   const matchBefore = await matchesDb.getMatchClubSnapshot(supabase, matchId);
   if (!matchBefore) {
     redirectWithError(`/matches/${matchId}`, t("matchNotFound"), locale);

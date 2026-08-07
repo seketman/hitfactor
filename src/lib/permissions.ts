@@ -23,8 +23,8 @@ export interface MatchEditContext {
 }
 
 /**
- * `true` si el usuario puede editar el match (club, min_shots).
- * Espeja: importador del match, o admin del sitio.
+ * `true` if the user may edit the match (club, min_shots).
+ * Mirrors: the match importer, or a site admin.
  *
  * RLS: `matches_update_importer` (0001) + `matches_update_admin` (0014).
  */
@@ -33,18 +33,18 @@ export function canEditMatch(ctx: MatchEditContext): boolean {
 }
 
 /**
- * `true` si el usuario puede BORRAR el match.
+ * `true` if the user may DELETE the match.
  *
- * Hoy es la misma regla que `canEditMatch`, y aun así vive en su propia
- * función: borrar tiene su propia policy (`matches_delete_importer` en la
- * 0001 + `matches_delete_admin` en la 0022), y un call-site que dice
- * `canDeleteMatch` antes de un delete se lee sin tener que recordar que
- * "editar" también incluía borrar. Si el alcance del admin se separa
- * alguna vez, se separa acá y no hay que ir a buscar cuál de los
- * `canEditMatch` era en realidad un delete.
+ * Today this is the same rule as `canEditMatch`, and it still gets its own
+ * function: deleting has its own policies (`matches_delete_importer` in
+ * 0001 + `matches_delete_admin` in 0022), and a call site reading
+ * `canDeleteMatch` before a delete doesn't require remembering that "edit"
+ * also covered deletion. If the admin scope ever diverges, it diverges
+ * here instead of sending someone hunting for which `canEditMatch` was
+ * really a delete.
  *
- * El borrado arrastra por cascade `match_entries`, `stages` y
- * `stage_results`; no toca `shooters` ni `firearms`.
+ * Deleting cascades to `match_entries`, `stages` and `stage_results`; it
+ * does not touch `shooters` or `firearms`.
  */
 export function canDeleteMatch(ctx: MatchEditContext): boolean {
   return canEditMatch(ctx);

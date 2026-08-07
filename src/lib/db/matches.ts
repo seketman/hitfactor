@@ -54,10 +54,10 @@ export async function getMatchName(
 }
 
 /**
- * Snapshot de un match (con disciplina) para auditar su borrado.
+ * Snapshot of a match (with its discipline) for auditing its deletion.
  *
- * Trae `imported_by_user_id` porque el server action lo necesita para
- * validar permisos ANTES de borrar, sin pagar una segunda query.
+ * Selects `imported_by_user_id` because the server action needs it to
+ * check permissions BEFORE deleting, without paying for a second query.
  */
 export async function getMatchDeleteSnapshot(
   supabase: TypedSupabaseClient,
@@ -78,13 +78,13 @@ export async function getMatchDeleteSnapshot(
 }
 
 /**
- * Borra un match por id. Devuelve cuántas filas borró.
+ * Deletes a match by id. Returns how many rows it removed.
  *
- * El `.select("id")` no es cosmético: PostgREST **no devuelve error**
- * cuando la RLS filtra todas las filas, devuelve 200 con body vacío. Sin
- * contar filas, un delete rechazado por la RLS es indistinguible de uno
- * exitoso, y el caller termina auditando y confirmándole al usuario un
- * borrado que no ocurrió. Ver issue #196.
+ * The `.select("id")` is not cosmetic: PostgREST does **not** return an
+ * error when RLS filters every row — it returns 200 with an empty body.
+ * Without counting rows, a delete rejected by RLS is indistinguishable
+ * from a successful one, and the caller ends up auditing and confirming
+ * to the user a deletion that never happened. See issue #196.
  */
 export async function deleteMatch(
   supabase: TypedSupabaseClient,
@@ -102,10 +102,10 @@ export async function deleteMatch(
 }
 
 /**
- * Snapshot (name + region) de un match para auditar el cambio de club.
+ * Snapshot (name + region) of a match for auditing the club change.
  *
- * Incluye `imported_by_user_id` para que el server action pueda validar
- * permisos con el mismo read que ya necesitaba para el before/after.
+ * Includes `imported_by_user_id` so the server action can check
+ * permissions with the same read it already needed for the before/after.
  */
 export async function getMatchClubSnapshot(
   supabase: TypedSupabaseClient,
@@ -124,16 +124,15 @@ export async function getMatchClubSnapshot(
 }
 
 /**
- * Actualiza `region` de un match. Devuelve cuántas filas actualizó (ver
- * la nota de `deleteMatch` sobre por qué hace falta contarlas).
+ * Updates a match's `region`. Returns how many rows it updated (see the
+ * note on `deleteMatch` for why counting is necessary).
  *
- * **Ya no filtra por `imported_by_user_id`.** Ese filtro dejaba afuera a
- * los admins, que la RLS sí habilita desde la 0014 (`matches_update_admin`)
- * y que `canEditMatch` siempre dijo que podían — el filtro era la única
- * de las cuatro capas que decía lo contrario. Ver issue #197. Quién puede
- * editar se decide en el server action con `canEditMatch`, y la RLS lo
- * vuelve a validar; no hace falta una tercera regla escondida en el
- * `.eq()` de una query.
+ * **No longer filters by `imported_by_user_id`.** That filter locked out
+ * admins, whom RLS has allowed since 0014 (`matches_update_admin`) and
+ * whom `canEditMatch` always said could edit — the filter was the one
+ * layer of four saying otherwise. See issue #197. Who may edit is decided
+ * in the server action via `canEditMatch` and re-checked by RLS; a third
+ * rule hidden in a query's `.eq()` is not needed.
  */
 export async function updateMatchClub(
   supabase: TypedSupabaseClient,
@@ -169,8 +168,8 @@ export async function getMatchMinShotsSnapshot(
 }
 
 /**
- * Actualiza `min_shots` de un match. Devuelve filas afectadas (ver la nota
- * de `deleteMatch`).
+ * Updates a match's `min_shots`. Returns affected rows (see the note on
+ * `deleteMatch`).
  */
 export async function updateMatchMinShots(
   supabase: TypedSupabaseClient,
@@ -216,8 +215,8 @@ export async function getEntryAbsentSnapshot(
 }
 
 /**
- * Actualiza el flag `is_absent` de un match_entry. Devuelve filas
- * afectadas (ver la nota de `deleteMatch`).
+ * Updates a match_entry's `is_absent` flag. Returns affected rows (see
+ * the note on `deleteMatch`).
  */
 export async function updateEntryAbsent(
   supabase: TypedSupabaseClient,

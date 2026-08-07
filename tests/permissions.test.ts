@@ -31,22 +31,22 @@ describe("canEditMatch", () => {
 });
 
 describe("canDeleteMatch", () => {
-  // El alcance se decidió explícitamente (#197): admin e importador tienen
-  // la misma autoridad, borrado incluido. La RLS que lo habilita es
+  // The scope was decided deliberately (#197): admin and importer hold the
+  // same authority, deletion included. The RLS behind it is
   // `matches_delete_importer` (0001) + `matches_delete_admin` (0022).
-  it("permite al importador", () => {
+  it("allows the importer", () => {
     expect(
       canDeleteMatch({ userId: ALICE, isAdmin: false, importedByUserId: ALICE }),
     ).toBe(true);
   });
 
-  it("permite a un admin sobre un match ajeno", () => {
+  it("allows an admin on someone else's match", () => {
     expect(
       canDeleteMatch({ userId: ALICE, isAdmin: true, importedByUserId: BOB }),
     ).toBe(true);
   });
 
-  it("niega a quien no es ni importador ni admin", () => {
+  it("denies anyone who is neither importer nor admin", () => {
     expect(
       canDeleteMatch({ userId: ALICE, isAdmin: false, importedByUserId: BOB }),
     ).toBe(false);

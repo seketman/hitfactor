@@ -88,11 +88,10 @@ export function MatchActionsBar({
     );
   }
 
-  // Importador y admin tienen la misma autoridad sobre el match — club,
-  // min_shots y borrado. Antes los botones de club y eliminar salían solo
-  // con `isImporter`, así que un admin llegaba a esta barra (la página la
-  // muestra con `canEditMatch`) y se encontraba con una sola acción de
-  // tres. Ver issue #197.
+  // Importer and admin have the same authority over the match — club,
+  // min_shots and deletion. The club and delete buttons used to render on
+  // `isImporter` alone, so an admin reaching this bar (the page renders it
+  // via `canEditMatch`) found one action out of three. See issue #197.
   const canEdit = isImporter || isAdmin;
 
   return (
@@ -217,10 +216,10 @@ function DeleteSubmit({
 }
 
 /**
- * Props propias, no `MatchActionsBarProps & { onCancel }`. Heredar el tipo
- * del padre obligaba al call-site a pasar `currentMinShots`, `isImporter`
- * e `isAdmin`, que este form nunca usó: props muertas que el compilador
- * no marca porque el tipo las declara.
+ * Its own props, not `MatchActionsBarProps & { onCancel }`. Inheriting the
+ * parent's type forced the call site to pass `currentMinShots`,
+ * `isImporter` and `isAdmin`, which this form never used: dead props the
+ * compiler won't flag, because the type declares them.
  */
 interface ClubFormProps {
   matchId: string;
@@ -352,18 +351,18 @@ function MinShotsForm({
 }
 
 /**
- * Botones compartidos por los dos forms. Sub-componente para poder leer
- * `useFormStatus` (sólo funciona dentro de un `<form>`). Mientras la action
- * está en flight:
- *  - "Guardar" muestra spinner + texto "Guardando…" y queda disabled
- *  - "Cancelar" también queda disabled, para que el usuario no oculte el form
- *    mid-update y termine confundido sobre si guardó o no
+ * Buttons shared by both forms. A sub-component so it can read
+ * `useFormStatus`, which only works inside a `<form>`. While the action is
+ * in flight:
+ *  - "Save" shows a spinner plus "Saving…" and goes disabled
+ *  - "Cancel" goes disabled too, so the user can't hide the form
+ *    mid-update and end up unsure whether it saved
  *
- * Usamos `size="md"` (h-10) para que ambos botones matcheen la altura del
- * Select (también h-10) — el form queda alineado en una sola línea visual.
- * "Cancelar" va con `variant="secondary"` (borde + bg suave) en lugar de
- * `ghost`: al lado del Guardar naranja sólido, ghost queda como texto sin
- * peso visual; secondary lo balancea sin competir.
+ * `size="md"` (h-10) makes both buttons match the Select's height (also
+ * h-10), keeping the form aligned on a single visual line. "Cancel" uses
+ * `variant="secondary"` (border + soft bg) rather than `ghost`: next to
+ * the solid orange Save, ghost reads as weightless text; secondary
+ * balances it without competing.
  */
 function FormButtons({ onCancel }: { onCancel: () => void }) {
   const { pending } = useFormStatus();
