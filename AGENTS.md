@@ -12,11 +12,12 @@ code, identifiers, code comments, and docs. This holds regardless of the
 language the maintainer is talking to you in — the conversation is not the
 artifact.
 
-Exceptions, both narrow:
+One narrow exception: user-facing copy belongs in `messages/es.json` /
+`messages/en.json`, never hardcoded. Keys must exist in both locales
+(`tests/messages-parity.test.ts`).
 
-- User-facing copy belongs in `messages/es.json` / `messages/en.json`, never
-  hardcoded. Keys must exist in both locales (`tests/messages-parity.test.ts`).
-- Comments in `supabase/migrations/` are historically Spanish. Match the file
-  you're editing; don't mix languages inside one file.
+This includes comments in `supabase/migrations/`. Migrations `0001`-`0020`
+predate the rule and are still Spanish — don't translate them as a side effect
+of an unrelated change, and don't copy their language into a new file.
 
 See `.github/CONTRIBUTING.md` for the full statement.

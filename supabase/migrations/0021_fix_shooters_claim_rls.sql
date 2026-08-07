@@ -1,57 +1,57 @@
 -- =====================================================================
--- HitFactor — Fix de la RLS de UPDATE sobre shooters (#195)
+-- HitFactor — Fix the UPDATE RLS on shooters (#195)
 -- =====================================================================
--- La policy `shooters_claim_self` de la 0001 quedó así:
+-- The `shooters_claim_self` policy from 0001 read:
 --
 --   using       (auth.role() = 'authenticated')
 --   with check  (linked_user_id is null or linked_user_id = auth.uid())
 --
--- `using` decide QUÉ FILAS se pueden actualizar; `with check` decide CÓMO
--- PUEDEN QUEDAR después. Al dejar `using` en "cualquier autenticado", todo
--- usuario logueado podía hacer UPDATE sobre CUALQUIER fila de shooters
--- pegándole directo a PostgREST con la anon key — que es pública y viaja
--- en el bundle del browser.
+-- `using` decides WHICH ROWS an UPDATE may touch; `with check` decides
+-- WHAT THEY MAY LOOK LIKE afterwards. With `using` set to "any signed-in
+-- user", every authenticated user could UPDATE EVERY row in shooters by
+-- calling PostgREST directly with the anon key — which is public and
+-- ships in the browser bundle.
 --
--- Dos consecuencias:
+-- Two consequences:
 --
---   1. Robo de identidad. El `with check` acepta explícitamente
---      `linked_user_id is null`, así que se podía desvincular el shooter
---      de otra persona (queda libre) y después claimearlo por el flujo
---      normal, llevándose todo su historial.
---   2. Vandalismo: full_name / member_number / region de cualquier
---      shooter eran editables por cualquiera.
+--   1. Identity takeover. The `with check` explicitly accepts
+--      `linked_user_id is null`, so an attacker could unlink someone
+--      else's shooter (leaving it free) and then claim it through the
+--      normal flow, inheriting their entire history.
+--   2. Vandalism: full_name / member_number / region on any shooter were
+--      writable by anyone.
 --
--- El código de app estaba bien (`claimShooter` usa `.is(linked_user_id,
--- null)` y `unclaimShooter` usa `.eq(linked_user_id, userId)`), pero el
--- atacante no pasa por el código de app. La defensa va acá.
---
--- ---------------------------------------------------------------------
--- Por qué `to authenticated` y no `auth.role() = 'authenticated'` en el
--- predicado:
---
--- No es sólo estilo. Si el `using` fuera únicamente el predicado de
--- ownership, un request ANÓNIMO tendría `auth.uid()` en null y evaluaría
--- `linked_user_id is null` → TRUE para todo shooter sin claimear. O sea:
--- arreglaríamos el robo de identidad y abriríamos la edición anónima de
--- los tiradores libres. `to authenticated` cierra eso antes de mirar
--- filas, y encima Postgres lo evalúa una vez por query en vez de una vez
--- por fila.
+-- The application code was fine (`claimShooter` uses `.is(linked_user_id,
+-- null)` and `unclaimShooter` uses `.eq(linked_user_id, userId)`), but an
+-- attacker never runs the application code. The defence belongs here.
 --
 -- ---------------------------------------------------------------------
--- Verificado que no rompe el import: las únicas dos operaciones UPDATE
--- sobre `shooters` en todo el código son `claimShooter` y
--- `unclaimShooter` (src/lib/db/shooters.ts), ambas sobre `linked_user_id`.
--- `resolveShootersBulk` y `findOrCreateShooter`
--- (src/lib/import/shooter-resolution.ts) sólo hacen SELECT e INSERT.
+-- Why `to authenticated` rather than `auth.role() = 'authenticated'` in
+-- the predicate:
+--
+-- This is not styling. If `using` carried only the ownership predicate,
+-- an ANONYMOUS request would have a null `auth.uid()` and would evaluate
+-- `linked_user_id is null` → TRUE for every unclaimed shooter. That is:
+-- we would close identity takeover and open anonymous editing of every
+-- free shooter. `to authenticated` shuts that down before any row is
+-- examined, and Postgres evaluates it once per query instead of once per
+-- row.
 --
 -- ---------------------------------------------------------------------
--- Residual conocido: un autenticado sigue pudiendo editar cualquier
--- columna de un shooter SIN CLAIMEAR, porque el claim necesita
--- justamente poder tocar esas filas y la RLS no soporta restricciones por
--- columna. Ya no hay robo de identidad ni edición de datos ajenos
--- claimeados, que era lo grave. Cerrarlo del todo pide un trigger
--- BEFORE UPDATE que congele todo menos `linked_user_id`; se evalúa
--- aparte para no meter superficie nueva en un fix de seguridad.
+-- Verified this does not break imports: the only two UPDATE operations
+-- against `shooters` in the whole codebase are `claimShooter` and
+-- `unclaimShooter` (src/lib/db/shooters.ts), both on `linked_user_id`.
+-- `resolveShootersBulk` and `findOrCreateShooter`
+-- (src/lib/import/shooter-resolution.ts) only SELECT and INSERT.
+--
+-- ---------------------------------------------------------------------
+-- Known residual: a signed-in user can still edit any column of an
+-- UNCLAIMED shooter, because claiming needs write access to exactly
+-- those rows and RLS cannot restrict per column. Identity takeover and
+-- edits to other people's claimed shooters are both closed, which was
+-- the severe part. Closing the rest needs a BEFORE UPDATE trigger
+-- freezing everything but `linked_user_id`; evaluated separately, so a
+-- security fix doesn't ship new surface alongside it.
 -- =====================================================================
 
 drop policy if exists "shooters_claim_self" on public.shooters;
@@ -60,17 +60,17 @@ create policy "shooters_claim_self"
   on public.shooters for update
   to authenticated
   using (
-    -- Filas sobre las que puedo actuar: las libres (para claimear) y las
-    -- que ya son mías (para editar o desvincular). Las de otro, no.
+    -- Rows I may act on: the free ones (to claim) and the ones already
+    -- mine (to edit or unlink). Somebody else's, no.
     linked_user_id is null
     or linked_user_id = (select auth.uid())
   )
   with check (
-    -- Estados en los que puedo dejarlas: libre (unclaim propio) o mía.
-    -- Nunca linkeada a un tercero.
+    -- States I may leave them in: free (my own unclaim) or mine. Never
+    -- linked to a third party.
     linked_user_id is null
     or linked_user_id = (select auth.uid())
   );
 
 comment on table public.shooters is
-  'Identidades de tiradores tal como aparecen en las planillas. UPDATE restringido por RLS a filas sin claimear o propias — ver 0021.';
+  'Shooter identities as they appear on match sheets. UPDATE is restricted by RLS to unclaimed or own rows — see 0021.';
