@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.21.9](https://github.com/seketman/hitfactor/compare/v1.21.8...v1.21.9) (2026-08-07)
+
+
+### Bug Fixes
+
+* **i18n:** format dates according to the active locale ([#189](https://github.com/seketman/hitfactor/issues/189)) ([d1a1995](https://github.com/seketman/hitfactor/commit/d1a199575b6aee6444724478e4b3aa0303f631f2))
+* **i18n:** keep the active locale across links and redirects ([#191](https://github.com/seketman/hitfactor/issues/191)) ([76e32e8](https://github.com/seketman/hitfactor/commit/76e32e8c1268de852afe58de7eb26a32d44cc47e))
+
 ## [1.21.8](https://github.com/seketman/hitfactor/compare/v1.21.7...v1.21.8) (2026-08-05)
 
 
