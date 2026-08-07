@@ -7,6 +7,31 @@ docs — is welcome.
 This document explains how to run the project locally, the conventions we
 follow, and the Pull Request flow.
 
+## Language
+
+**Everything written into the repo or into GitHub is in English**: issue titles
+and bodies, PR titles and bodies, review comments, commit messages, code,
+identifiers, code comments, and documentation.
+
+The project is open source and the maintainer is an Argentinian Spanish
+speaker, so the temptation to switch is real — but a contributor who doesn't
+speak Spanish should be able to read the whole history, not the half of it that
+happens to be code. Issues are part of that history: they're where the *why*
+of a change is argued out before it reaches a commit.
+
+Two things are deliberately **not** covered by this rule:
+
+- **User-facing copy**, which lives in `messages/es.json` and `messages/en.json`
+  and is translated for both locales. Keys must exist in both — there is a test
+  (`tests/messages-parity.test.ts`) that fails otherwise.
+- **Migrations under `supabase/migrations/`**, whose comments are in Spanish for
+  historical reasons. Match the file you're editing rather than mixing
+  languages inside one file; new migrations may go either way as long as
+  they're internally consistent.
+
+Closed issues predating this rule were left in Spanish on purpose — rewriting
+history adds noise without helping anyone.
+
 ## Local setup
 
 You'll need:

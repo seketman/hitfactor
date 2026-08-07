@@ -3,3 +3,20 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
+
+# Write in English
+
+Everything you write into the repo or into GitHub goes in English: **issue
+titles and bodies**, PR titles and bodies, review comments, commit messages,
+code, identifiers, code comments, and docs. This holds regardless of the
+language the maintainer is talking to you in — the conversation is not the
+artifact.
+
+Exceptions, both narrow:
+
+- User-facing copy belongs in `messages/es.json` / `messages/en.json`, never
+  hardcoded. Keys must exist in both locales (`tests/messages-parity.test.ts`).
+- Comments in `supabase/migrations/` are historically Spanish. Match the file
+  you're editing; don't mix languages inside one file.
+
+See `.github/CONTRIBUTING.md` for the full statement.
