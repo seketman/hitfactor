@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.0](https://github.com/seketman/hitfactor/compare/v1.21.9...v1.22.0) (2026-08-07)
+
+
+### Features
+
+* **i18n:** translate the audit log and error messages ([#193](https://github.com/seketman/hitfactor/issues/193)) ([76d7547](https://github.com/seketman/hitfactor/commit/76d75477089051e800c5f2f086cfc784912ec808))
+
 ## [1.21.9](https://github.com/seketman/hitfactor/compare/v1.21.8...v1.21.9) (2026-08-07)
 
 
