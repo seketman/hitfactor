@@ -72,10 +72,7 @@ export function MatchActionsBar({
         matchId={matchId}
         currentRegion={currentRegion}
         currentClubCode={currentClubCode}
-        currentMinShots={currentMinShots}
         clubs={clubs}
-        isImporter={isImporter}
-        isAdmin={isAdmin}
         onCancel={() => setMode("idle")}
       />
     );
@@ -91,7 +88,11 @@ export function MatchActionsBar({
     );
   }
 
-  const canEditMinShots = isImporter || isAdmin;
+  // Importer and admin have the same authority over the match — club,
+  // min_shots and deletion. The club and delete buttons used to render on
+  // `isImporter` alone, so an admin reaching this bar (the page renders it
+  // via `canEditMatch`) found one action out of three. See issue #197.
+  const canEdit = isImporter || isAdmin;
 
   return (
     // justify-end recuesta los botones contra el borde derecho del header,
@@ -99,12 +100,12 @@ export function MatchActionsBar({
     // el estado de edición (allá los empuja el Select que ocupa flex-1).
     // Sin esto, en reposo flotan a la izquierda y se sienten desconectados.
     <div className="flex flex-wrap items-center justify-end gap-2">
-      {isImporter && (
+      {canEdit && (
         <Button variant="ghost" size="sm" onClick={() => setMode("club")}>
           {currentRegion ? t("editClub") : t("assignClub")}
         </Button>
       )}
-      {canEditMinShots && (
+      {canEdit && (
         <Button
           variant="ghost"
           size="sm"
@@ -116,7 +117,7 @@ export function MatchActionsBar({
             : t("defineMinimum")}
         </Button>
       )}
-      {isImporter && <DeleteButton matchId={matchId} from={from} />}
+      {canEdit && <DeleteButton matchId={matchId} from={from} />}
     </div>
   );
 }
@@ -214,13 +215,27 @@ function DeleteSubmit({
   );
 }
 
+/**
+ * Its own props, not `MatchActionsBarProps & { onCancel }`. Inheriting the
+ * parent's type forced the call site to pass `currentMinShots`,
+ * `isImporter` and `isAdmin`, which this form never used: dead props the
+ * compiler won't flag, because the type declares them.
+ */
+interface ClubFormProps {
+  matchId: string;
+  currentRegion: string | null;
+  currentClubCode: string | null;
+  clubs: Club[];
+  onCancel: () => void;
+}
+
 function ClubForm({
   matchId,
   currentRegion,
   currentClubCode,
   clubs,
   onCancel,
-}: MatchActionsBarProps & { onCancel: () => void }) {
+}: ClubFormProps) {
   const t = useTranslations("matches.actions");
   // Estado inicial: si el club actual está en el catálogo, lo preseleccionamos.
   // Si no está pero hay un texto, arrancamos en "Otro..." con ese texto.
@@ -286,19 +301,6 @@ function ClubForm({
 }
 
 /**
- * Botones del form de club. Sub-componente para poder leer `useFormStatus`
- * (sólo funciona dentro de un `<form>`). Mientras la action está en flight:
- *  - "Guardar" muestra spinner + texto "Guardando…" y queda disabled
- *  - "Cancelar" también queda disabled, para que el usuario no oculte el form
- *    mid-update y termine confundido sobre si guardó o no
- *
- * Usamos `size="md"` (h-10) para que ambos botones matcheen la altura del
- * Select (también h-10) — el form queda alineado en una sola línea visual.
- * "Cancelar" va con `variant="secondary"` (borde + bg suave) en lugar de
- * `ghost`: al lado del Guardar naranja sólido, ghost queda como texto sin
- * peso visual; secondary lo balancea sin competir.
- */
-/**
  * Form de "disparos mínimos" del match (issue #75). Input numérico simple.
  * Vacío limpia el campo (NULL); admin puede usarlo para resetear un valor
  * mal cargado. Server action valida que el usuario sea importer o admin.
@@ -348,6 +350,20 @@ function MinShotsForm({
   );
 }
 
+/**
+ * Buttons shared by both forms. A sub-component so it can read
+ * `useFormStatus`, which only works inside a `<form>`. While the action is
+ * in flight:
+ *  - "Save" shows a spinner plus "Saving…" and goes disabled
+ *  - "Cancel" goes disabled too, so the user can't hide the form
+ *    mid-update and end up unsure whether it saved
+ *
+ * `size="md"` (h-10) makes both buttons match the Select's height (also
+ * h-10), keeping the form aligned on a single visual line. "Cancel" uses
+ * `variant="secondary"` (border + soft bg) rather than `ghost`: next to
+ * the solid orange Save, ghost reads as weightless text; secondary
+ * balances it without competing.
+ */
 function FormButtons({ onCancel }: { onCancel: () => void }) {
   const { pending } = useFormStatus();
   const t = useTranslations("matches.actions");

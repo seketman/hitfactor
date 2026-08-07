@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canEditMatch, canEditEntry } from "@/lib/permissions";
+import { canDeleteMatch, canEditMatch, canEditEntry } from "@/lib/permissions";
 
 const ALICE = "alice-uuid";
 const BOB = "bob-uuid";
@@ -26,6 +26,29 @@ describe("canEditMatch", () => {
   it("niega cuando el match no tiene importador (importedByUserId null)", () => {
     expect(
       canEditMatch({ userId: ALICE, isAdmin: false, importedByUserId: null }),
+    ).toBe(false);
+  });
+});
+
+describe("canDeleteMatch", () => {
+  // The scope was decided deliberately (#197): admin and importer hold the
+  // same authority, deletion included. The RLS behind it is
+  // `matches_delete_importer` (0001) + `matches_delete_admin` (0022).
+  it("allows the importer", () => {
+    expect(
+      canDeleteMatch({ userId: ALICE, isAdmin: false, importedByUserId: ALICE }),
+    ).toBe(true);
+  });
+
+  it("allows an admin on someone else's match", () => {
+    expect(
+      canDeleteMatch({ userId: ALICE, isAdmin: true, importedByUserId: BOB }),
+    ).toBe(true);
+  });
+
+  it("denies anyone who is neither importer nor admin", () => {
+    expect(
+      canDeleteMatch({ userId: ALICE, isAdmin: false, importedByUserId: BOB }),
     ).toBe(false);
   });
 });

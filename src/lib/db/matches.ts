@@ -53,7 +53,12 @@ export async function getMatchName(
   return data ?? null;
 }
 
-/** Snapshot de un match (con disciplina) para auditar su borrado. */
+/**
+ * Snapshot of a match (with its discipline) for auditing its deletion.
+ *
+ * Selects `imported_by_user_id` because the server action needs it to
+ * check permissions BEFORE deleting, without paying for a second query.
+ */
 export async function getMatchDeleteSnapshot(
   supabase: TypedSupabaseClient,
   matchId: string,
@@ -61,54 +66,88 @@ export async function getMatchDeleteSnapshot(
   name: string;
   date: string;
   region: string | null;
+  imported_by_user_id: string | null;
   disciplines: { code: string; name: string } | null;
 } | null> {
   const { data } = await supabase
     .from("matches")
-    .select("name, date, region, disciplines(code, name)")
-    .eq("id", matchId)
-    .maybeSingle();
-  return data ?? null;
-}
-
-/** Borra un match por id. */
-export async function deleteMatch(
-  supabase: TypedSupabaseClient,
-  matchId: string,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase.from("matches").delete().eq("id", matchId);
-  return { error: error?.message ?? null };
-}
-
-/** Snapshot (name + region) de un match para auditar el cambio de club. */
-export async function getMatchClubSnapshot(
-  supabase: TypedSupabaseClient,
-  matchId: string,
-): Promise<{ name: string; region: string | null } | null> {
-  const { data } = await supabase
-    .from("matches")
-    .select("name, region")
+    .select("name, date, region, imported_by_user_id, disciplines(code, name)")
     .eq("id", matchId)
     .maybeSingle();
   return data ?? null;
 }
 
 /**
- * Actualiza `region` de un match. Solo afecta filas del importador
- * (`imported_by_user_id`); RLS además lo enforce.
+ * Deletes a match by id. Returns how many rows it removed.
+ *
+ * The `.select("id")` is not cosmetic: PostgREST does **not** return an
+ * error when RLS filters every row — it returns 200 with an empty body.
+ * Without counting rows, a delete rejected by RLS is indistinguishable
+ * from a successful one, and the caller ends up auditing and confirming
+ * to the user a deletion that never happened. See issue #196.
+ */
+export async function deleteMatch(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
+    .from("matches")
+    .delete()
+    .eq("id", matchId)
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
+}
+
+/**
+ * Snapshot (name + region) of a match for auditing the club change.
+ *
+ * Includes `imported_by_user_id` so the server action can check
+ * permissions with the same read it already needed for the before/after.
+ */
+export async function getMatchClubSnapshot(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{
+  name: string;
+  region: string | null;
+  imported_by_user_id: string | null;
+} | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select("name, region, imported_by_user_id")
+    .eq("id", matchId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/**
+ * Updates a match's `region`. Returns how many rows it updated (see the
+ * note on `deleteMatch` for why counting is necessary).
+ *
+ * **No longer filters by `imported_by_user_id`.** That filter locked out
+ * admins, whom RLS has allowed since 0014 (`matches_update_admin`) and
+ * whom `canEditMatch` always said could edit — the filter was the one
+ * layer of four saying otherwise. See issue #197. Who may edit is decided
+ * in the server action via `canEditMatch` and re-checked by RLS; a third
+ * rule hidden in a query's `.eq()` is not needed.
  */
 export async function updateMatchClub(
   supabase: TypedSupabaseClient,
   matchId: string,
-  userId: string,
   region: string | null,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
     .from("matches")
     .update({ region })
     .eq("id", matchId)
-    .eq("imported_by_user_id", userId);
-  return { error: error?.message ?? null };
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
 }
 
 /** Snapshot (name + min_shots + importador) para validar/auditar min_shots. */
@@ -128,17 +167,24 @@ export async function getMatchMinShotsSnapshot(
   return data ?? null;
 }
 
-/** Actualiza `min_shots` de un match. */
+/**
+ * Updates a match's `min_shots`. Returns affected rows (see the note on
+ * `deleteMatch`).
+ */
 export async function updateMatchMinShots(
   supabase: TypedSupabaseClient,
   matchId: string,
   minShots: number | null,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
     .from("matches")
     .update({ min_shots: minShots })
-    .eq("id", matchId);
-  return { error: error?.message ?? null };
+    .eq("id", matchId)
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
 }
 
 /**
@@ -168,17 +214,24 @@ export async function getEntryAbsentSnapshot(
   return data ?? null;
 }
 
-/** Actualiza el flag `is_absent` de un match_entry. */
+/**
+ * Updates a match_entry's `is_absent` flag. Returns affected rows (see
+ * the note on `deleteMatch`).
+ */
 export async function updateEntryAbsent(
   supabase: TypedSupabaseClient,
   entryId: string,
   isAbsent: boolean,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
     .from("match_entries")
     .update({ is_absent: isAbsent })
-    .eq("id", entryId);
-  return { error: error?.message ?? null };
+    .eq("id", entryId)
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
 }
 
 /** Match con su disciplina embebida. */

@@ -23,11 +23,31 @@ export interface MatchEditContext {
 }
 
 /**
- * `true` si el usuario puede editar el match (club, min_shots, delete).
- * Espeja: importador del match, o admin del sitio.
+ * `true` if the user may edit the match (club, min_shots).
+ * Mirrors: the match importer, or a site admin.
+ *
+ * RLS: `matches_update_importer` (0001) + `matches_update_admin` (0014).
  */
 export function canEditMatch(ctx: MatchEditContext): boolean {
   return ctx.isAdmin || ctx.importedByUserId === ctx.userId;
+}
+
+/**
+ * `true` if the user may DELETE the match.
+ *
+ * Today this is the same rule as `canEditMatch`, and it still gets its own
+ * function: deleting has its own policies (`matches_delete_importer` in
+ * 0001 + `matches_delete_admin` in 0022), and a call site reading
+ * `canDeleteMatch` before a delete doesn't require remembering that "edit"
+ * also covered deletion. If the admin scope ever diverges, it diverges
+ * here instead of sending someone hunting for which `canEditMatch` was
+ * really a delete.
+ *
+ * Deleting cascades to `match_entries`, `stages` and `stage_results`; it
+ * does not touch `shooters` or `firearms`.
+ */
+export function canDeleteMatch(ctx: MatchEditContext): boolean {
+  return canEditMatch(ctx);
 }
 
 /**
