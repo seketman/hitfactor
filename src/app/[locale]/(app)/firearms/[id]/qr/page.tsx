@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
@@ -7,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { requireUser } from "@/lib/supabase/require-user";
 import { getFirearmById } from "@/lib/db/firearms";
+import { absoluteUrl } from "@/lib/seo/site-url";
 import { PrintButton } from "./PrintButton";
 
 interface PageProps {
@@ -35,23 +35,24 @@ export default async function FirearmQrPage({ params }: PageProps) {
   const firearm = await getFirearmById(supabase, id);
   if (!firearm) notFound();
 
-  // Construimos la URL absoluta a partir de los headers del request:
-  // x-forwarded-* cuando hay proxy (Vercel, Cloudflare), fallback a host.
-  // Usamos `https` por default en prod; `http` solo en dev/localhost.
+  // The URL comes from `NEXT_PUBLIC_SITE_URL` via `absoluteUrl`, the same
+  // source of truth the whole SEO surface uses (canonical, sitemap,
+  // robots, Open Graph, JSON-LD).
   //
-  // Usamos `/q/{qr_code}` (6 chars) en lugar del `/firearms/{uuid}?log=1
-  // #log-form` original. Esto baja la URL de ~85 chars a ~30, lo cual
-  // baja el QR de 33×33 módulos a ~25×25 (≈60% del área) y permite
-  // imprimir stickers más chicos sin perder legibilidad. La ruta `/q/...`
-  // resuelve el code → id vía RPC y redirige al detalle.
-  const headersList = await headers();
-  const host =
-    headersList.get("x-forwarded-host") ?? headersList.get("host") ?? "";
-  const proto =
-    headersList.get("x-forwarded-proto") ??
-    (host.startsWith("localhost") ? "http" : "https");
-  const origin = `${proto}://${host}`;
-  const targetUrl = `${origin}/q/${firearm.qr_code}`;
+  // It used to be derived from the request's `Host` / `X-Forwarded-Host`
+  // headers, which are client input: a tampered header returned a page
+  // whose QR pointed somewhere else. That matters more here than in a
+  // typical host-header injection, because **this QR gets printed and
+  // stuck to a firearm**. You don't revoke a sticker with a deploy —
+  // someone has to find it and replace it. See issue #198.
+  //
+  // Encoding `/q/{qr_code}` (6 chars) rather than the original
+  // `/firearms/{uuid}?log=1#log-form` takes the URL from ~85 chars to
+  // ~30, which shrinks the QR from 33×33 modules to ~25×25 (≈60% of the
+  // area) and lets the sticker be smaller without losing legibility. The
+  // `/q/...` route resolves code → id via RPC and redirects to the detail
+  // page.
+  const targetUrl = absoluteUrl(`/q/${firearm.qr_code}`);
 
   // QR como SVG inline para que escale bien al imprimir (vs PNG raster).
   // ECC level "M" balancea capacidad vs robustez — un QR con marcas/polvo
