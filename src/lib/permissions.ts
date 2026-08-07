@@ -23,11 +23,31 @@ export interface MatchEditContext {
 }
 
 /**
- * `true` si el usuario puede editar el match (club, min_shots, delete).
+ * `true` si el usuario puede editar el match (club, min_shots).
  * Espeja: importador del match, o admin del sitio.
+ *
+ * RLS: `matches_update_importer` (0001) + `matches_update_admin` (0014).
  */
 export function canEditMatch(ctx: MatchEditContext): boolean {
   return ctx.isAdmin || ctx.importedByUserId === ctx.userId;
+}
+
+/**
+ * `true` si el usuario puede BORRAR el match.
+ *
+ * Hoy es la misma regla que `canEditMatch`, y aun así vive en su propia
+ * función: borrar tiene su propia policy (`matches_delete_importer` en la
+ * 0001 + `matches_delete_admin` en la 0022), y un call-site que dice
+ * `canDeleteMatch` antes de un delete se lee sin tener que recordar que
+ * "editar" también incluía borrar. Si el alcance del admin se separa
+ * alguna vez, se separa acá y no hay que ir a buscar cuál de los
+ * `canEditMatch` era en realidad un delete.
+ *
+ * El borrado arrastra por cascade `match_entries`, `stages` y
+ * `stage_results`; no toca `shooters` ni `firearms`.
+ */
+export function canDeleteMatch(ctx: MatchEditContext): boolean {
+  return canEditMatch(ctx);
 }
 
 /**

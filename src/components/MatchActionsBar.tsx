@@ -72,10 +72,7 @@ export function MatchActionsBar({
         matchId={matchId}
         currentRegion={currentRegion}
         currentClubCode={currentClubCode}
-        currentMinShots={currentMinShots}
         clubs={clubs}
-        isImporter={isImporter}
-        isAdmin={isAdmin}
         onCancel={() => setMode("idle")}
       />
     );
@@ -91,7 +88,12 @@ export function MatchActionsBar({
     );
   }
 
-  const canEditMinShots = isImporter || isAdmin;
+  // Importador y admin tienen la misma autoridad sobre el match — club,
+  // min_shots y borrado. Antes los botones de club y eliminar salían solo
+  // con `isImporter`, así que un admin llegaba a esta barra (la página la
+  // muestra con `canEditMatch`) y se encontraba con una sola acción de
+  // tres. Ver issue #197.
+  const canEdit = isImporter || isAdmin;
 
   return (
     // justify-end recuesta los botones contra el borde derecho del header,
@@ -99,12 +101,12 @@ export function MatchActionsBar({
     // el estado de edición (allá los empuja el Select que ocupa flex-1).
     // Sin esto, en reposo flotan a la izquierda y se sienten desconectados.
     <div className="flex flex-wrap items-center justify-end gap-2">
-      {isImporter && (
+      {canEdit && (
         <Button variant="ghost" size="sm" onClick={() => setMode("club")}>
           {currentRegion ? t("editClub") : t("assignClub")}
         </Button>
       )}
-      {canEditMinShots && (
+      {canEdit && (
         <Button
           variant="ghost"
           size="sm"
@@ -116,7 +118,7 @@ export function MatchActionsBar({
             : t("defineMinimum")}
         </Button>
       )}
-      {isImporter && <DeleteButton matchId={matchId} from={from} />}
+      {canEdit && <DeleteButton matchId={matchId} from={from} />}
     </div>
   );
 }
@@ -214,13 +216,27 @@ function DeleteSubmit({
   );
 }
 
+/**
+ * Props propias, no `MatchActionsBarProps & { onCancel }`. Heredar el tipo
+ * del padre obligaba al call-site a pasar `currentMinShots`, `isImporter`
+ * e `isAdmin`, que este form nunca usó: props muertas que el compilador
+ * no marca porque el tipo las declara.
+ */
+interface ClubFormProps {
+  matchId: string;
+  currentRegion: string | null;
+  currentClubCode: string | null;
+  clubs: Club[];
+  onCancel: () => void;
+}
+
 function ClubForm({
   matchId,
   currentRegion,
   currentClubCode,
   clubs,
   onCancel,
-}: MatchActionsBarProps & { onCancel: () => void }) {
+}: ClubFormProps) {
   const t = useTranslations("matches.actions");
   // Estado inicial: si el club actual está en el catálogo, lo preseleccionamos.
   // Si no está pero hay un texto, arrancamos en "Otro..." con ese texto.
@@ -286,19 +302,6 @@ function ClubForm({
 }
 
 /**
- * Botones del form de club. Sub-componente para poder leer `useFormStatus`
- * (sólo funciona dentro de un `<form>`). Mientras la action está en flight:
- *  - "Guardar" muestra spinner + texto "Guardando…" y queda disabled
- *  - "Cancelar" también queda disabled, para que el usuario no oculte el form
- *    mid-update y termine confundido sobre si guardó o no
- *
- * Usamos `size="md"` (h-10) para que ambos botones matcheen la altura del
- * Select (también h-10) — el form queda alineado en una sola línea visual.
- * "Cancelar" va con `variant="secondary"` (borde + bg suave) en lugar de
- * `ghost`: al lado del Guardar naranja sólido, ghost queda como texto sin
- * peso visual; secondary lo balancea sin competir.
- */
-/**
  * Form de "disparos mínimos" del match (issue #75). Input numérico simple.
  * Vacío limpia el campo (NULL); admin puede usarlo para resetear un valor
  * mal cargado. Server action valida que el usuario sea importer o admin.
@@ -348,6 +351,20 @@ function MinShotsForm({
   );
 }
 
+/**
+ * Botones compartidos por los dos forms. Sub-componente para poder leer
+ * `useFormStatus` (sólo funciona dentro de un `<form>`). Mientras la action
+ * está en flight:
+ *  - "Guardar" muestra spinner + texto "Guardando…" y queda disabled
+ *  - "Cancelar" también queda disabled, para que el usuario no oculte el form
+ *    mid-update y termine confundido sobre si guardó o no
+ *
+ * Usamos `size="md"` (h-10) para que ambos botones matcheen la altura del
+ * Select (también h-10) — el form queda alineado en una sola línea visual.
+ * "Cancelar" va con `variant="secondary"` (borde + bg suave) en lugar de
+ * `ghost`: al lado del Guardar naranja sólido, ghost queda como texto sin
+ * peso visual; secondary lo balancea sin competir.
+ */
 function FormButtons({ onCancel }: { onCancel: () => void }) {
   const { pending } = useFormStatus();
   const t = useTranslations("matches.actions");

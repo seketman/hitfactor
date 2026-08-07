@@ -9,8 +9,26 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import { getProfile } from "@/lib/db/profiles";
 import * as matchesDb from "@/lib/db/matches";
-import { canEditEntry, canEditMatch } from "@/lib/permissions";
+import { canDeleteMatch, canEditEntry, canEditMatch } from "@/lib/permissions";
 import { isLikelyAbsent } from "@/lib/matches/entry-status";
+
+/**
+ * Por qué todas las acciones de acá validan permisos server-side Y
+ * cuentan filas afectadas:
+ *
+ * PostgREST **no devuelve error** cuando la RLS filtra todas las filas de
+ * un UPDATE/DELETE: devuelve 200 con body vacío. Leer `error === null`
+ * como "salió bien" hacía dos cosas malas a la vez — le confirmábamos al
+ * usuario una operación que no pasó, y escribíamos en `audit_log` una
+ * acción que la base había rechazado. Un audit log que registra
+ * intenciones en vez de hechos es peor que no tenerlo, porque se lee con
+ * la confianza del segundo. Ver issues #196 y #197.
+ *
+ * El check de permisos va primero para poder dar un error accionable
+ * ("no sos el importador") en vez del genérico. El conteo de filas queda
+ * igual como red: si la RLS y `canEditMatch` alguna vez discrepan, la
+ * discrepancia se ve acá en lugar de convertirse en un audit entry falso.
+ */
 
 export async function deleteMatch(formData: FormData) {
   const locale = await getLocale();
@@ -29,9 +47,24 @@ export async function deleteMatch(formData: FormData) {
   const { supabase, user } = await requireUser();
 
   // Snapshot antes de borrar — sino perdemos el contexto para auditar.
+  // Trae `imported_by_user_id`, así el check de permisos no cuesta una
+  // query extra.
   const matchSnapshot = await matchesDb.getMatchDeleteSnapshot(supabase, matchId);
+  if (!matchSnapshot) {
+    redirectWithError(`/matches/${matchId}`, t("matchNotFound"), locale);
+  }
 
-  const { error } = await matchesDb.deleteMatch(supabase, matchId);
+  const profile = await getProfile(supabase, user.id);
+  const allowed = canDeleteMatch({
+    userId: user.id,
+    isAdmin: profile?.is_admin === true,
+    importedByUserId: matchSnapshot.imported_by_user_id,
+  });
+  if (!allowed) {
+    redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
+  }
+
+  const { affected, error } = await matchesDb.deleteMatch(supabase, matchId);
   if (error) {
     redirectWithError(
       `/matches/${matchId}`,
@@ -39,26 +72,31 @@ export async function deleteMatch(formData: FormData) {
       locale,
     );
   }
-
-  if (matchSnapshot) {
-    await logAction(supabase, user.id, {
-      action: AUDIT_ACTION.MATCH_DELETE,
-      entityType: "match",
-      entityId: matchId,
-      metadata: {
-        match_name: matchSnapshot.name,
-        match_date: matchSnapshot.date,
-        region: matchSnapshot.region,
-        discipline_code: matchSnapshot.disciplines?.code,
-        discipline_name: matchSnapshot.disciplines?.name,
-      },
-    });
+  // Cero filas sin error = la RLS lo rechazó. No auditamos y no fingimos
+  // éxito.
+  if (affected === 0) {
+    redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
   }
 
-  redirect({
-    href: { pathname: backTo, query: { info: "Match eliminado" } },
-    locale,
+  await logAction(supabase, user.id, {
+    action: AUDIT_ACTION.MATCH_DELETE,
+    entityType: "match",
+    entityId: matchId,
+    metadata: {
+      match_name: matchSnapshot.name,
+      match_date: matchSnapshot.date,
+      region: matchSnapshot.region,
+      discipline_code: matchSnapshot.disciplines?.code,
+      discipline_name: matchSnapshot.disciplines?.name,
+    },
   });
+
+  // Sin `?info=`: el destino de este redirect es `/matches` o
+  // `/dashboard/{disciplina}`, y ninguna de las dos lee ese search param
+  // (la única que lo hace es `/login`). El mensaje de confirmación que
+  // viajaba acá no se renderizó nunca. Si se quiere confirmar el borrado,
+  // es una decisión de UX aparte, no un string colgado en la URL.
+  redirect({ href: backTo, locale });
 }
 
 /**
@@ -96,13 +134,26 @@ export async function updateMatchClub(formData: FormData) {
 
   const { supabase, user } = await requireUser();
 
-  // Snapshot antes para registrar before/after.
+  // Snapshot antes para registrar before/after, y para validar permisos:
+  // trae `imported_by_user_id` por la misma razón que el de delete.
   const matchBefore = await matchesDb.getMatchClubSnapshot(supabase, matchId);
+  if (!matchBefore) {
+    redirectWithError(`/matches/${matchId}`, t("matchNotFound"), locale);
+  }
 
-  const { error } = await matchesDb.updateMatchClub(
+  const profile = await getProfile(supabase, user.id);
+  const allowed = canEditMatch({
+    userId: user.id,
+    isAdmin: profile?.is_admin === true,
+    importedByUserId: matchBefore.imported_by_user_id,
+  });
+  if (!allowed) {
+    redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
+  }
+
+  const { affected, error } = await matchesDb.updateMatchClub(
     supabase,
     matchId,
-    user.id,
     region,
   );
 
@@ -113,19 +164,20 @@ export async function updateMatchClub(formData: FormData) {
       locale,
     );
   }
-
-  if (matchBefore) {
-    await logAction(supabase, user.id, {
-      action: AUDIT_ACTION.MATCH_UPDATE_CLUB,
-      entityType: "match",
-      entityId: matchId,
-      metadata: {
-        match_name: matchBefore.name,
-        before: { region: matchBefore.region },
-        after: { region },
-      },
-    });
+  if (affected === 0) {
+    redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
   }
+
+  await logAction(supabase, user.id, {
+    action: AUDIT_ACTION.MATCH_UPDATE_CLUB,
+    entityType: "match",
+    entityId: matchId,
+    metadata: {
+      match_name: matchBefore.name,
+      before: { region: matchBefore.region },
+      after: { region },
+    },
+  });
 
   revalidatePath(`/matches/${matchId}`);
   revalidatePath("/dashboard");
@@ -183,7 +235,7 @@ export async function updateMatchMinShots(formData: FormData) {
     redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
   }
 
-  const { error } = await matchesDb.updateMatchMinShots(
+  const { affected, error } = await matchesDb.updateMatchMinShots(
     supabase,
     matchId,
     nextValue,
@@ -195,6 +247,9 @@ export async function updateMatchMinShots(formData: FormData) {
       t("updateFailed", { error }),
       locale,
     );
+  }
+  if (affected === 0) {
+    redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
   }
 
   await logAction(supabase, user.id, {
@@ -272,7 +327,7 @@ export async function toggleEntryAbsent(formData: FormData) {
     redirectWithError(`/matches/${matchId}`, t("cannotMarkAbsent"), locale);
   }
 
-  const { error } = await matchesDb.updateEntryAbsent(
+  const { affected, error } = await matchesDb.updateEntryAbsent(
     supabase,
     entryId,
     nextValue,
@@ -284,6 +339,9 @@ export async function toggleEntryAbsent(formData: FormData) {
       t("updateFailed", { error }),
       locale,
     );
+  }
+  if (affected === 0) {
+    redirectWithError(`/matches/${matchId}`, t("noPermissionForEntry"), locale);
   }
 
   await logAction(supabase, user.id, {

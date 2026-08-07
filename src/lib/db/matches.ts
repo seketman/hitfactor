@@ -53,7 +53,12 @@ export async function getMatchName(
   return data ?? null;
 }
 
-/** Snapshot de un match (con disciplina) para auditar su borrado. */
+/**
+ * Snapshot de un match (con disciplina) para auditar su borrado.
+ *
+ * Trae `imported_by_user_id` porque el server action lo necesita para
+ * validar permisos ANTES de borrar, sin pagar una segunda query.
+ */
 export async function getMatchDeleteSnapshot(
   supabase: TypedSupabaseClient,
   matchId: string,
@@ -61,54 +66,89 @@ export async function getMatchDeleteSnapshot(
   name: string;
   date: string;
   region: string | null;
+  imported_by_user_id: string | null;
   disciplines: { code: string; name: string } | null;
 } | null> {
   const { data } = await supabase
     .from("matches")
-    .select("name, date, region, disciplines(code, name)")
-    .eq("id", matchId)
-    .maybeSingle();
-  return data ?? null;
-}
-
-/** Borra un match por id. */
-export async function deleteMatch(
-  supabase: TypedSupabaseClient,
-  matchId: string,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase.from("matches").delete().eq("id", matchId);
-  return { error: error?.message ?? null };
-}
-
-/** Snapshot (name + region) de un match para auditar el cambio de club. */
-export async function getMatchClubSnapshot(
-  supabase: TypedSupabaseClient,
-  matchId: string,
-): Promise<{ name: string; region: string | null } | null> {
-  const { data } = await supabase
-    .from("matches")
-    .select("name, region")
+    .select("name, date, region, imported_by_user_id, disciplines(code, name)")
     .eq("id", matchId)
     .maybeSingle();
   return data ?? null;
 }
 
 /**
- * Actualiza `region` de un match. Solo afecta filas del importador
- * (`imported_by_user_id`); RLS además lo enforce.
+ * Borra un match por id. Devuelve cuántas filas borró.
+ *
+ * El `.select("id")` no es cosmético: PostgREST **no devuelve error**
+ * cuando la RLS filtra todas las filas, devuelve 200 con body vacío. Sin
+ * contar filas, un delete rechazado por la RLS es indistinguible de uno
+ * exitoso, y el caller termina auditando y confirmándole al usuario un
+ * borrado que no ocurrió. Ver issue #196.
+ */
+export async function deleteMatch(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
+    .from("matches")
+    .delete()
+    .eq("id", matchId)
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
+}
+
+/**
+ * Snapshot (name + region) de un match para auditar el cambio de club.
+ *
+ * Incluye `imported_by_user_id` para que el server action pueda validar
+ * permisos con el mismo read que ya necesitaba para el before/after.
+ */
+export async function getMatchClubSnapshot(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+): Promise<{
+  name: string;
+  region: string | null;
+  imported_by_user_id: string | null;
+} | null> {
+  const { data } = await supabase
+    .from("matches")
+    .select("name, region, imported_by_user_id")
+    .eq("id", matchId)
+    .maybeSingle();
+  return data ?? null;
+}
+
+/**
+ * Actualiza `region` de un match. Devuelve cuántas filas actualizó (ver
+ * la nota de `deleteMatch` sobre por qué hace falta contarlas).
+ *
+ * **Ya no filtra por `imported_by_user_id`.** Ese filtro dejaba afuera a
+ * los admins, que la RLS sí habilita desde la 0014 (`matches_update_admin`)
+ * y que `canEditMatch` siempre dijo que podían — el filtro era la única
+ * de las cuatro capas que decía lo contrario. Ver issue #197. Quién puede
+ * editar se decide en el server action con `canEditMatch`, y la RLS lo
+ * vuelve a validar; no hace falta una tercera regla escondida en el
+ * `.eq()` de una query.
  */
 export async function updateMatchClub(
   supabase: TypedSupabaseClient,
   matchId: string,
-  userId: string,
   region: string | null,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
     .from("matches")
     .update({ region })
     .eq("id", matchId)
-    .eq("imported_by_user_id", userId);
-  return { error: error?.message ?? null };
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
 }
 
 /** Snapshot (name + min_shots + importador) para validar/auditar min_shots. */
@@ -128,17 +168,24 @@ export async function getMatchMinShotsSnapshot(
   return data ?? null;
 }
 
-/** Actualiza `min_shots` de un match. */
+/**
+ * Actualiza `min_shots` de un match. Devuelve filas afectadas (ver la nota
+ * de `deleteMatch`).
+ */
 export async function updateMatchMinShots(
   supabase: TypedSupabaseClient,
   matchId: string,
   minShots: number | null,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
     .from("matches")
     .update({ min_shots: minShots })
-    .eq("id", matchId);
-  return { error: error?.message ?? null };
+    .eq("id", matchId)
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
 }
 
 /**
@@ -168,17 +215,24 @@ export async function getEntryAbsentSnapshot(
   return data ?? null;
 }
 
-/** Actualiza el flag `is_absent` de un match_entry. */
+/**
+ * Actualiza el flag `is_absent` de un match_entry. Devuelve filas
+ * afectadas (ver la nota de `deleteMatch`).
+ */
 export async function updateEntryAbsent(
   supabase: TypedSupabaseClient,
   entryId: string,
   isAbsent: boolean,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
+): Promise<{ affected: number; error: string | null }> {
+  const { data, error } = await supabase
     .from("match_entries")
     .update({ is_absent: isAbsent })
-    .eq("id", entryId);
-  return { error: error?.message ?? null };
+    .eq("id", entryId)
+    .select("id");
+  return {
+    affected: Array.isArray(data) ? data.length : 0,
+    error: error?.message ?? null,
+  };
 }
 
 /** Match con su disciplina embebida. */
