@@ -19,18 +19,22 @@ speak Spanish should be able to read the whole history, not the half of it that
 happens to be code. Issues are part of that history: they're where the *why*
 of a change is argued out before it reaches a commit.
 
-Two things are deliberately **not** covered by this rule:
+One thing is deliberately **not** covered by this rule: **user-facing copy**,
+which lives in `messages/es.json` and `messages/en.json` and is translated for
+both locales. Keys must exist in both — there is a test
+(`tests/messages-parity.test.ts`) that fails otherwise.
 
-- **User-facing copy**, which lives in `messages/es.json` and `messages/en.json`
-  and is translated for both locales. Keys must exist in both — there is a test
-  (`tests/messages-parity.test.ts`) that fails otherwise.
-- **Migrations under `supabase/migrations/`**, whose comments are in Spanish for
-  historical reasons. Match the file you're editing rather than mixing
-  languages inside one file; new migrations may go either way as long as
-  they're internally consistent.
+Everything else follows the rule, including the comments in
+`supabase/migrations/`. Those comments carry real design reasoning — why a
+policy is shaped the way it is, what breaks if you change it — so they're
+exactly the kind of thing a contributor needs to be able to read.
 
-Closed issues predating this rule were left in Spanish on purpose — rewriting
-history adds noise without helping anyone.
+Two things were left in Spanish on purpose:
+
+- **Closed issues** predating the rule. Rewriting history adds noise without
+  helping anyone.
+- **Migrations `0001` through `0020`**, which were already written and applied.
+  Translating them is tracked separately; from `0021` onwards they're English.
 
 ## Local setup
 
