@@ -7,6 +7,11 @@
 
 * **rls:** bind the shooters UPDATE policy to the row owner ([#210](https://github.com/seketman/hitfactor/issues/210)) ([303a58b](https://github.com/seketman/hitfactor/commit/303a58bd7a763a6d7f37edcebf99c5b4b1c2a752)), closes [#195](https://github.com/seketman/hitfactor/issues/195)
 
+
+### Documentation
+
+* require English for issues and everything else written to GitHub ([#212](https://github.com/seketman/hitfactor/issues/212)) ([96c5a50](https://github.com/seketman/hitfactor/commit/96c5a50734f03f1a8364a27393ed39b2b21b00f6))
+
 ## [1.22.0](https://github.com/seketman/hitfactor/compare/v1.21.9...v1.22.0) (2026-08-07)
 
 
