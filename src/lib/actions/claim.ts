@@ -1,8 +1,10 @@
 "use server";
 
+import { getLocale } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect } from "@/i18n/navigation";
 import { redirectWithError } from "@/lib/redirects";
+import { isInternalAppPath } from "@/lib/paths";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import * as shootersDb from "@/lib/db/shooters";
@@ -19,7 +21,12 @@ import { getMatchName } from "@/lib/db/matches";
  * Inputs (FormData):
  *  - `shooter_id` (required): UUID del shooter a linkear.
  *  - `match_id` (optional): para revalidar la página del match si vino de ahí.
- *  - `redirect_to` (optional): URL a la que volver después del claim.
+ *  - `redirect_to` (optional): ruta interna a la que volver después del
+ *    claim. Pasa por `isInternalAppPath`: el valor lo controla quien manda el
+ *    form, y sin whitelist esto es un open redirect. `redirect` de next-intl
+ *    NO alcanza como defensa — cualquier href con esquema (`https:`,
+ *    `javascript:`) no es "localizable" para next-intl, así que lo deja pasar
+ *    crudo, sin prefijo y sin tocar, directo a `redirect()` de Next.
  *
  * Reglas:
  *  - El shooter no debe estar claimado por **otro** usuario (la query update
@@ -28,13 +35,19 @@ import { getMatchName } from "@/lib/db/matches";
  *  - Si ya está claimado por este mismo usuario, es un no-op silencioso.
  */
 export async function claimShooter(formData: FormData) {
+  const locale = await getLocale();
   const shooterId = String(formData.get("shooter_id") ?? "");
   const matchId = String(formData.get("match_id") ?? "");
-  const redirectTo = String(formData.get("redirect_to") ?? "");
+  const redirectToRaw = String(formData.get("redirect_to") ?? "");
   if (!shooterId) return;
 
   const { supabase, user } = await requireUser();
   const userId = user.id;
+
+  // Solo se redirige si el form pidió un destino, igual que antes. La
+  // whitelist descarta lo que no sea una ruta interna: sin ella, el valor lo
+  // elige quien manda el form.
+  const redirectTo = isInternalAppPath(redirectToRaw) ? redirectToRaw : null;
 
   const shooter = await shootersDb.getShooterClaimState(supabase, shooterId);
 
@@ -42,15 +55,20 @@ export async function claimShooter(formData: FormData) {
   if (shooter && shooter.linked_user_id === userId) {
     if (matchId) revalidatePath(`/matches/${matchId}`);
     revalidatePath("/dashboard");
-    if (redirectTo) redirect(redirectTo);
+    if (redirectTo) redirect({ href: redirectTo, locale });
     return;
   }
 
-  const errorTarget = redirectTo || (matchId ? `/matches/${matchId}` : "/dashboard");
+  const errorTarget =
+    redirectTo ?? (matchId ? `/matches/${matchId}` : "/dashboard");
 
   // Linkeado a otro usuario: error.
   if (shooter && shooter.linked_user_id && shooter.linked_user_id !== userId) {
-    redirectWithError(errorTarget, "Este tirador ya fue claimado por otro usuario.");
+    redirectWithError(
+      errorTarget,
+      "Este tirador ya fue claimado por otro usuario.",
+      locale,
+    );
   }
 
   const { error } = await shootersDb.claimShooter(supabase, shooterId, userId);
@@ -59,6 +77,7 @@ export async function claimShooter(formData: FormData) {
     redirectWithError(
       errorTarget,
       "No se pudo asociar el tirador a tu cuenta: " + error,
+      locale,
     );
   }
 
@@ -85,7 +104,7 @@ export async function claimShooter(formData: FormData) {
   revalidatePath("/dashboard");
 
   if (redirectTo) {
-    redirect(redirectTo);
+    redirect({ href: redirectTo, locale });
   }
 }
 

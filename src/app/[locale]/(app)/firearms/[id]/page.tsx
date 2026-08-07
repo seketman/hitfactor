@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
 import { QrCode } from "lucide-react";
 import { getLocale } from "next-intl/server";

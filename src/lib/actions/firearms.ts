@@ -1,7 +1,8 @@
 "use server";
 
+import { getLocale } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect } from "@/i18n/navigation";
 import { redirectWithError } from "@/lib/redirects";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
@@ -33,9 +34,10 @@ function revalidateFirearmPaths(id?: string) {
 }
 
 export async function createFirearm(formData: FormData) {
+  const locale = await getLocale();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
-    redirectWithError("/firearms", "Falta el nombre");
+    redirectWithError("/firearms", "Falta el nombre", locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -54,7 +56,7 @@ export async function createFirearm(formData: FormData) {
   );
 
   if (error) {
-    redirectWithError("/firearms", error);
+    redirectWithError("/firearms", error, locale);
   }
 
   await logAction(supabase, user.id, {
@@ -70,14 +72,15 @@ export async function createFirearm(formData: FormData) {
   });
 
   revalidateFirearmPaths();
-  redirect("/firearms");
+  redirect({ href: "/firearms", locale });
 }
 
 export async function updateFirearm(formData: FormData) {
+  const locale = await getLocale();
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   if (!id || !name) {
-    redirectWithError("/firearms", "Datos incompletos");
+    redirectWithError("/firearms", "Datos incompletos", locale);
   }
 
   const { supabase, user } = await requireUser();
@@ -96,7 +99,7 @@ export async function updateFirearm(formData: FormData) {
   const { error } = await firearmsDb.updateFirearm(supabase, id, after);
 
   if (error) {
-    redirectWithError("/firearms", error);
+    redirectWithError("/firearms", error, locale);
   }
 
   await logAction(supabase, user.id, {
@@ -111,10 +114,11 @@ export async function updateFirearm(formData: FormData) {
   });
 
   revalidateFirearmPaths(id);
-  redirect("/firearms");
+  redirect({ href: "/firearms", locale });
 }
 
 export async function deleteFirearm(formData: FormData) {
+  const locale = await getLocale();
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
@@ -125,7 +129,7 @@ export async function deleteFirearm(formData: FormData) {
 
   const { error } = await firearmsDb.deleteFirearm(supabase, id);
   if (error) {
-    redirectWithError("/firearms", error);
+    redirectWithError("/firearms", error, locale);
   }
 
   if (snapshot) {
@@ -143,7 +147,7 @@ export async function deleteFirearm(formData: FormData) {
   }
 
   revalidateFirearmPaths();
-  redirect("/firearms");
+  redirect({ href: "/firearms", locale });
 }
 
 /**
@@ -153,6 +157,7 @@ export async function deleteFirearm(formData: FormData) {
  * trazabilidad si después sale un número raro.
  */
 export async function createFirearmUsage(formData: FormData) {
+  const locale = await getLocale();
   const firearmId = String(formData.get("firearm_id") ?? "");
   const usedOn = String(formData.get("used_on") ?? "").trim();
   const roundsRaw = String(formData.get("rounds_fired") ?? "");
@@ -162,16 +167,17 @@ export async function createFirearmUsage(formData: FormData) {
   const errorTarget = firearmId ? `/firearms/${firearmId}` : "/firearms";
 
   if (!firearmId) {
-    redirectWithError("/firearms", "Arma no especificada");
+    redirectWithError("/firearms", "Arma no especificada", locale);
   }
   if (!usedOn) {
-    redirectWithError(errorTarget, "Falta la fecha");
+    redirectWithError(errorTarget, "Falta la fecha", locale);
   }
   const rounds = Number.parseInt(roundsRaw, 10);
   if (!Number.isFinite(rounds) || rounds <= 0) {
     redirectWithError(
       errorTarget,
       "Tiros disparados debe ser mayor que cero",
+      locale,
     );
   }
 
@@ -191,7 +197,7 @@ export async function createFirearmUsage(formData: FormData) {
   );
 
   if (error) {
-    redirectWithError(errorTarget, error);
+    redirectWithError(errorTarget, error, locale);
   }
 
   // Resolvemos nombres de arma + munición para alimentar el audit log
@@ -216,10 +222,11 @@ export async function createFirearmUsage(formData: FormData) {
   });
 
   revalidateFirearmPaths(firearmId);
-  redirect(`/firearms/${firearmId}`);
+  redirect({ href: `/firearms/${firearmId}`, locale });
 }
 
 export async function deleteFirearmUsage(formData: FormData) {
+  const locale = await getLocale();
   const id = String(formData.get("id") ?? "");
   const firearmId = String(formData.get("firearm_id") ?? "");
   if (!id || !firearmId) return;
@@ -231,7 +238,7 @@ export async function deleteFirearmUsage(formData: FormData) {
   const { error } = await firearmsDb.deleteFirearmUsage(supabase, id);
 
   if (error) {
-    redirectWithError(`/firearms/${firearmId}`, error);
+    redirectWithError(`/firearms/${firearmId}`, error, locale);
   }
 
   if (snapshot) {
@@ -250,7 +257,7 @@ export async function deleteFirearmUsage(formData: FormData) {
   }
 
   revalidateFirearmPaths(firearmId);
-  redirect(`/firearms/${firearmId}`);
+  redirect({ href: `/firearms/${firearmId}`, locale });
 }
 
 /**
@@ -258,6 +265,7 @@ export async function deleteFirearmUsage(formData: FormData) {
  * Si `firearm_id` viene vacío, borra el log existente (i.e. "no recuerdo / no aplica").
  */
 export async function setMatchFirearm(formData: FormData) {
+  const locale = await getLocale();
   const matchEntryId = String(formData.get("match_entry_id") ?? "");
   const matchId = String(formData.get("match_id") ?? "");
   const firearmId = String(formData.get("firearm_id") ?? "");
@@ -288,7 +296,7 @@ export async function setMatchFirearm(formData: FormData) {
       matchEntryId,
     );
     if (error) {
-      redirectWithError(errorTarget, error);
+      redirectWithError(errorTarget, error, locale);
     }
 
     // Solo loguear si efectivamente había un log antes.
@@ -311,7 +319,7 @@ export async function setMatchFirearm(formData: FormData) {
   } else {
     const rounds = Number.parseInt(roundsRaw, 10);
     if (!Number.isFinite(rounds) || rounds < 0) {
-      redirectWithError(errorTarget, "Tiros disparados inválido");
+      redirectWithError(errorTarget, "Tiros disparados inválido", locale);
     }
 
     const { error } = await firearmsDb.upsertMatchFirearmLog(supabase, {
@@ -322,7 +330,7 @@ export async function setMatchFirearm(formData: FormData) {
       notes: trimOrNull(formData.get("notes")),
     });
     if (error) {
-      redirectWithError(errorTarget, error);
+      redirectWithError(errorTarget, error, locale);
     }
 
     // Resolver nombres para el audit metadata. Si no hay ammo, evitamos
@@ -370,5 +378,5 @@ export async function setMatchFirearm(formData: FormData) {
   const target = matchId
     ? `/matches/${matchId}/me?entry=${encodeURIComponent(matchEntryId)}`
     : "/dashboard";
-  redirect(target);
+  redirect({ href: target, locale });
 }

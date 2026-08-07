@@ -1,8 +1,10 @@
 "use server";
 
+import { getLocale } from "next-intl/server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { redirectWithError, safeBackPath } from "@/lib/redirects";
+import { redirect } from "@/i18n/navigation";
+import { redirectWithError } from "@/lib/redirects";
+import { safeBackPath } from "@/lib/paths";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import { getProfile } from "@/lib/db/profiles";
@@ -11,6 +13,7 @@ import { canEditEntry, canEditMatch } from "@/lib/permissions";
 import { isLikelyAbsent } from "@/lib/matches/entry-status";
 
 export async function deleteMatch(formData: FormData) {
+  const locale = await getLocale();
   const matchId = String(formData.get("match_id") ?? "");
   if (!matchId) return;
   // Ruta a la que volver al terminar — viene del form de la página actual
@@ -29,7 +32,11 @@ export async function deleteMatch(formData: FormData) {
 
   const { error } = await matchesDb.deleteMatch(supabase, matchId);
   if (error) {
-    redirectWithError(`/matches/${matchId}`, "No se pudo borrar: " + error);
+    redirectWithError(
+      `/matches/${matchId}`,
+      "No se pudo borrar: " + error,
+      locale,
+    );
   }
 
   if (matchSnapshot) {
@@ -47,7 +54,10 @@ export async function deleteMatch(formData: FormData) {
     });
   }
 
-  redirect(`${backTo}?info=${encodeURIComponent("Match eliminado")}`);
+  redirect({
+    href: { pathname: backTo, query: { info: "Match eliminado" } },
+    locale,
+  });
 }
 
 /**
@@ -67,6 +77,7 @@ export async function deleteMatch(formData: FormData) {
  *  - Vacío: NULL (= "no especificado").
  */
 export async function updateMatchClub(formData: FormData) {
+  const locale = await getLocale();
   const matchId = String(formData.get("match_id") ?? "");
   if (!matchId) return;
 
@@ -94,7 +105,11 @@ export async function updateMatchClub(formData: FormData) {
   );
 
   if (error) {
-    redirectWithError(`/matches/${matchId}`, "No se pudo actualizar el club: " + error);
+    redirectWithError(
+      `/matches/${matchId}`,
+      "No se pudo actualizar el club: " + error,
+      locale,
+    );
   }
 
   if (matchBefore) {
@@ -112,7 +127,7 @@ export async function updateMatchClub(formData: FormData) {
 
   revalidatePath(`/matches/${matchId}`);
   revalidatePath("/dashboard");
-  redirect(`/matches/${matchId}`);
+  redirect({ href: `/matches/${matchId}`, locale });
 }
 
 /**
@@ -130,6 +145,7 @@ export async function updateMatchClub(formData: FormData) {
  * Otros → error.
  */
 export async function updateMatchMinShots(formData: FormData) {
+  const locale = await getLocale();
   const matchId = String(formData.get("match_id") ?? "");
   if (!matchId) return;
 
@@ -143,6 +159,7 @@ export async function updateMatchMinShots(formData: FormData) {
       redirectWithError(
         `/matches/${matchId}`,
         "Ingresá un número entero positivo o vacío para limpiar",
+        locale,
       );
     }
     nextValue = n;
@@ -153,7 +170,7 @@ export async function updateMatchMinShots(formData: FormData) {
   const matchBefore = await matchesDb.getMatchMinShotsSnapshot(supabase, matchId);
 
   if (!matchBefore) {
-    redirectWithError(`/matches/${matchId}`, "Match no encontrado");
+    redirectWithError(`/matches/${matchId}`, "Match no encontrado", locale);
   }
 
   const profile = await getProfile(supabase, user.id);
@@ -167,6 +184,7 @@ export async function updateMatchMinShots(formData: FormData) {
     redirectWithError(
       `/matches/${matchId}`,
       "Solo el importador o un admin pueden editar el mínimo de disparos",
+      locale,
     );
   }
 
@@ -180,6 +198,7 @@ export async function updateMatchMinShots(formData: FormData) {
     redirectWithError(
       `/matches/${matchId}`,
       "No se pudo actualizar: " + error,
+      locale,
     );
   }
 
@@ -196,7 +215,7 @@ export async function updateMatchMinShots(formData: FormData) {
 
   revalidatePath(`/matches/${matchId}`);
   revalidatePath("/dashboard");
-  redirect(`/matches/${matchId}`);
+  redirect({ href: `/matches/${matchId}`, locale });
 }
 
 /**
@@ -217,6 +236,7 @@ export async function updateMatchMinShots(formData: FormData) {
  * propio marcándolo como ausente).
  */
 export async function toggleEntryAbsent(formData: FormData) {
+  const locale = await getLocale();
   const matchId = String(formData.get("match_id") ?? "");
   const entryId = String(formData.get("entry_id") ?? "");
   if (!matchId || !entryId) return;
@@ -229,7 +249,7 @@ export async function toggleEntryAbsent(formData: FormData) {
   const entry = await matchesDb.getEntryAbsentSnapshot(supabase, entryId);
 
   if (!entry || entry.match_id !== matchId) {
-    redirectWithError(`/matches/${matchId}`, "Entry no encontrada");
+    redirectWithError(`/matches/${matchId}`, "Entry no encontrada", locale);
   }
 
   const profile = await getProfile(supabase, user.id);
@@ -244,6 +264,7 @@ export async function toggleEntryAbsent(formData: FormData) {
     redirectWithError(
       `/matches/${matchId}`,
       "No tenés permiso para cambiar este resultado",
+      locale,
     );
   }
 
@@ -259,6 +280,7 @@ export async function toggleEntryAbsent(formData: FormData) {
     redirectWithError(
       `/matches/${matchId}`,
       "No se puede marcar ausente: el entry tiene puntaje o porcentaje > 0",
+      locale,
     );
   }
 
@@ -272,6 +294,7 @@ export async function toggleEntryAbsent(formData: FormData) {
     redirectWithError(
       `/matches/${matchId}`,
       "No se pudo actualizar: " + error,
+      locale,
     );
   }
 
@@ -290,5 +313,5 @@ export async function toggleEntryAbsent(formData: FormData) {
 
   revalidatePath(`/matches/${matchId}`);
   revalidatePath("/dashboard");
-  redirect(`/matches/${matchId}`);
+  redirect({ href: `/matches/${matchId}`, locale });
 }

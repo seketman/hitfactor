@@ -1,6 +1,8 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
+import type { Locale } from "@/i18n/routing";
 import { parseFile, parsePdf, parsePdfBatch } from "@/lib/parsers";
 import type { ParsedMatch } from "@/lib/types/match";
 import { redirectWithError } from "@/lib/redirects";
@@ -81,9 +83,10 @@ export async function importHtml(
   prevState: ImportFormState,
   formData: FormData,
 ): Promise<ImportFormState> {
+  const locale = await getLocale();
   // Segundo submit: el usuario completó la fecha de un ranking de la FAT.
   if (prevState.status === "needsDate") {
-    return confirmFatImport(prevState, formData);
+    return confirmFatImport(prevState, formData, locale);
   }
 
   // Instrumentación de tiempos: queremos saber dónde se va el tiempo
@@ -105,6 +108,7 @@ export async function importHtml(
   const { uploads, filename, allPdfs } = await resolveUploads(
     supabase,
     formData,
+    locale,
   );
 
   // `min_shots`: opcional en el form. Si está vacío o no parsea como int
@@ -133,7 +137,7 @@ export async function importHtml(
     console.error(
       `[import] download falló file=${filename} files=${uploads.length}: ${msg}`,
     );
-    redirectImportError(msg, filename);
+    redirectImportError(msg, filename, locale);
   }
   const tDownload = Date.now() - tDownloadStart;
   const totalSize = downloaded.reduce((acc, d) => acc + d.data.byteLength, 0);
@@ -163,7 +167,7 @@ export async function importHtml(
       `[import] parse falló file=${filename} bytes=${totalSize} ` +
         `download=${tDownload}ms: ${msg}`,
     );
-    redirectImportError(msg, filename);
+    redirectImportError(msg, filename, locale);
   }
   const tParse = Date.now() - tParseStart;
 
@@ -175,6 +179,7 @@ export async function importHtml(
     redirectImportError(
       "El archivo no parece ser un reporte válido.",
       filename,
+      locale,
     );
   }
 
@@ -197,10 +202,11 @@ export async function importHtml(
     redirectImportError(
       "El archivo no parece ser un reporte válido.",
       filename,
+      locale,
     );
   }
 
-  const result = await runImport(supabase, user.id, parsed, filename, {
+  const result = await runImport(supabase, user.id, parsed, filename, locale, {
     minShots,
   });
 
@@ -211,7 +217,7 @@ export async function importHtml(
       `(${formatDurationHuman(tTotal)})`,
   );
 
-  redirectToResult(result);
+  redirectToResult(result, locale);
 }
 
 /**
@@ -231,6 +237,7 @@ export async function importHtml(
 async function resolveUploads(
   supabase: TypedSupabaseClient,
   formData: FormData,
+  locale: Locale,
 ): Promise<{
   uploads: UploadedImportFile[];
   filename: string;
@@ -238,7 +245,7 @@ async function resolveUploads(
 }> {
   const rawUploads = formData.getAll("upload").map(String);
   if (rawUploads.length === 0) {
-    redirectWithError("/import", "Elegí un archivo");
+    redirectWithError("/import", "Elegí un archivo", locale);
   }
 
   const uploads: UploadedImportFile[] = [];
@@ -249,7 +256,7 @@ async function resolveUploads(
       // No hay nada validado que limpiar todavía más allá de lo que ya
       // juntamos, pero sí puede haber refs previas válidas.
       await cleanupImportFiles(supabase, uploads);
-      redirectWithError("/import", "Elegí un archivo");
+      redirectWithError("/import", "Elegí un archivo", locale);
     }
     // Referencias repetidas: el mismo objeto N veces multiplicaba la
     // descarga sin subir nada nuevo. Es la forma más barata de abusar
@@ -271,6 +278,7 @@ async function resolveUploads(
     redirectImportError(
       `No se pueden importar más de ${MAX_IMPORT_FILES} archivos a la vez.`,
       filename,
+      locale,
     );
   }
 
@@ -282,7 +290,11 @@ async function resolveUploads(
     const isTextFile = /\.(html?|csv)$/i.test(u.filename);
     if (!isPdfFile && !isTextFile) {
       await cleanupImportFiles(supabase, uploads);
-      redirectImportError("Solo se aceptan archivos HTML, CSV o PDF", filename);
+      redirectImportError(
+        "Solo se aceptan archivos HTML, CSV o PDF",
+        filename,
+        locale,
+      );
     }
   }
 
@@ -293,6 +305,7 @@ async function resolveUploads(
       "Para subir varios archivos a la vez todos tienen que ser PDFs " +
         "(es el formato multi-archivo soportado, típicamente Steel Challenge).",
       filename,
+      locale,
     );
   }
 
@@ -307,6 +320,7 @@ async function resolveUploads(
 async function confirmFatImport(
   prevState: Extract<ImportFormState, { status: "needsDate" }>,
   formData: FormData,
+  locale: Locale,
 ): Promise<ImportFormState> {
   const date = String(formData.get("date") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
@@ -342,7 +356,7 @@ async function confirmFatImport(
   }
 
   await logImport(supabase, user.id, result);
-  redirectToResult(result);
+  redirectToResult(result, locale);
 }
 
 /** Importa el `ParsedMatch` y loguea la acción. Errores conocidos → redirect. */
@@ -351,6 +365,7 @@ async function runImport(
   userId: string,
   parsed: ParsedMatch,
   filename: string,
+  locale: Locale,
   options: ImportOptions = {},
 ): Promise<ImportResult> {
   let result: ImportResult;
@@ -358,7 +373,7 @@ async function runImport(
     result = await importParsedMatch(supabase, parsed, userId, filename, options);
   } catch (e) {
     if (e instanceof ImportError) {
-      redirectImportError(e.message, filename);
+      redirectImportError(e.message, filename, locale);
     }
     throw e;
   }
@@ -372,9 +387,15 @@ async function runImport(
  * subir, para que el form remontado tras el error muestre "Último
  * intento: X" como contexto y el usuario sepa qué re-elegir.
  */
-function redirectImportError(message: string, lastFile: string): never {
-  const params = new URLSearchParams({ error: message, lastFile });
-  redirect(`/import?${params.toString()}`);
+function redirectImportError(
+  message: string,
+  lastFile: string,
+  locale: Locale,
+): never {
+  redirect({
+    href: { pathname: "/import", query: { error: message, lastFile } },
+    locale,
+  });
 }
 
 /**
@@ -413,8 +434,8 @@ async function logImport(
 }
 
 /** Redirige a `/import` con el resumen del import exitoso en el querystring. */
-function redirectToResult(result: ImportResult): never {
-  const params = new URLSearchParams({
+function redirectToResult(result: ImportResult, locale: Locale): never {
+  const params: Record<string, string> = {
     ok: "1",
     matchId: result.matchId,
     name: result.matchName,
@@ -423,13 +444,13 @@ function redirectToResult(result: ImportResult): never {
     stages: String(result.insertedStages),
     stageResults: String(result.insertedStageResults),
     existed: result.existedAlready ? "1" : "0",
-  });
+  };
   // Avisos no-fatales del parser (ej. filas descartadas). Van en la URL para
   // que la página los muestre; si no hay, no ensuciamos la query string.
   if (result.warnings?.length) {
-    params.set("warnings", result.warnings.join("\n"));
+    params.warnings = result.warnings.join("\n");
   }
-  redirect(`/import?${params.toString()}`);
+  redirect({ href: { pathname: "/import", query: params }, locale });
 }
 
 /** Valida una fecha "AAAA-MM-DD" real (formato + rangos de mes/día). */

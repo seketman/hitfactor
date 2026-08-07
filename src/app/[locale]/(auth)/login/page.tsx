@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { Alert } from "@/components/ui/Alert";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
-import { isInternalAppPath } from "@/lib/redirects";
+import { isInternalAppPath } from "@/lib/paths";
 import { login } from "./actions";
 
 export default async function LoginPage({

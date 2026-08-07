@@ -1,10 +1,13 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { redirectWithError, safeBackPath } from "@/lib/redirects";
+import { redirectWithError } from "@/lib/redirects";
+import { safeBackPath } from "@/lib/paths";
 
 export async function login(formData: FormData) {
+  const locale = await getLocale();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   // Destino post-login. Validado con safeBackPath (whitelist de rutas
@@ -17,7 +20,7 @@ export async function login(formData: FormData) {
   );
 
   if (!email || !password) {
-    redirectWithError("/login", "Faltan credenciales");
+    redirectWithError("/login", "Faltan credenciales", locale);
   }
 
   const supabase = await createClient();
@@ -40,10 +43,11 @@ export async function login(formData: FormData) {
       redirectWithError(
         "/login",
         `Tu email todavía no está confirmado. Revisá la casilla de ${email} y hacé click en el link que te mandamos al registrarte. Si no lo ves, revisá tu carpeta de spam.`,
+        locale,
       );
     }
-    redirectWithError("/login", error.message);
+    redirectWithError("/login", error.message, locale);
   }
 
-  redirect(next);
+  redirect({ href: next, locale });
 }

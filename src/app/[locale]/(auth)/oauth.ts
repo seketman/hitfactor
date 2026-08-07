@@ -1,6 +1,10 @@
 "use server";
 
+import { getLocale } from "next-intl/server";
 import { headers } from "next/headers";
+// Único `redirect` de la app que NO usa el wrapper de `@/i18n/navigation`:
+// `data.url` es una URL absoluta del proveedor OAuth (Google), externa a la
+// app. Prefijarle un locale la rompería.
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
@@ -15,6 +19,7 @@ import { redirectWithError } from "@/lib/redirects";
  * el dominio para que funcione en local, en preview de Vercel y en prod.
  */
 export async function signInWithGoogle() {
+  const locale = await getLocale();
   const headersList = await headers();
   const host = headersList.get("host");
   // En Vercel y otros proxies viene el proto en x-forwarded-proto. En local
@@ -37,6 +42,7 @@ export async function signInWithGoogle() {
     redirectWithError(
       "/login",
       error?.message ?? "No se pudo iniciar el login con Google",
+      locale,
     );
   }
 

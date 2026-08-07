@@ -1,20 +1,26 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { getLocale } from "next-intl/server";
+import { redirect } from "@/i18n/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirectWithError } from "@/lib/redirects";
 
 export async function signup(formData: FormData) {
+  const locale = await getLocale();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const displayName = String(formData.get("display_name") ?? "").trim();
 
   if (!email || !password || !displayName) {
-    redirectWithError("/signup", "Faltan datos");
+    redirectWithError("/signup", "Faltan datos", locale);
   }
 
   if (password.length < 8) {
-    redirectWithError("/signup", "La contraseña debe tener al menos 8 caracteres");
+    redirectWithError(
+      "/signup",
+      "La contraseña debe tener al menos 8 caracteres",
+      locale,
+    );
   }
 
   const supabase = await createClient();
@@ -29,7 +35,7 @@ export async function signup(formData: FormData) {
   });
 
   if (error) {
-    redirectWithError("/signup", error.message);
+    redirectWithError("/signup", error.message, locale);
   }
 
   // Supabase está configurado con "Confirm email" obligatorio (ver Dashboard
@@ -42,5 +48,5 @@ export async function signup(formData: FormData) {
     `Cuenta creada. Te enviamos un email a ${email} con un link de ` +
     `confirmación. Hacé click ahí y volvé a ingresar. Si no lo ves, ` +
     `revisá tu carpeta de spam.`;
-  redirect(`/login?info=${encodeURIComponent(info)}`);
+  redirect({ href: { pathname: "/login", query: { info } }, locale });
 }
