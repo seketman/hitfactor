@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.7](https://github.com/seketman/hitfactor/compare/v1.22.6...v1.22.7) (2026-08-08)
+
+
+### Bug Fixes
+
+* **auth:** build the OAuth redirectTo from the configured site URL ([#231](https://github.com/seketman/hitfactor/issues/231)) ([9425d6e](https://github.com/seketman/hitfactor/commit/9425d6e48ee8a53dc6bca93ddf88acd582aaf90e)), closes [#219](https://github.com/seketman/hitfactor/issues/219)
+
 ## [1.22.6](https://github.com/seketman/hitfactor/compare/v1.22.5...v1.22.6) (2026-08-08)
 
 
