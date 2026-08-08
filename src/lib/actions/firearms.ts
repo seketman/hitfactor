@@ -57,7 +57,10 @@ export async function createFirearm(formData: FormData) {
   );
 
   if (error) {
-    redirectWithError("/firearms", t("deleteFailed", { error }), locale);
+    redirectWithError("/firearms", t("createFailed"), locale, {
+      context: "firearm.create",
+      detail: error,
+    });
   }
 
   await logAction(supabase, user.id, {
@@ -101,7 +104,10 @@ export async function updateFirearm(formData: FormData) {
   const { error } = await firearmsDb.updateFirearm(supabase, id, after);
 
   if (error) {
-    redirectWithError("/firearms", t("deleteFailed", { error }), locale);
+    redirectWithError("/firearms", t("updateFailed"), locale, {
+      context: "firearm.update",
+      detail: error,
+    });
   }
 
   await logAction(supabase, user.id, {
@@ -132,7 +138,10 @@ export async function deleteFirearm(formData: FormData) {
 
   const { error } = await firearmsDb.deleteFirearm(supabase, id);
   if (error) {
-    redirectWithError("/firearms", t("deleteFailed", { error }), locale);
+    redirectWithError("/firearms", t("deleteFailed"), locale, {
+      context: "firearm.delete",
+      detail: error,
+    });
   }
 
   if (snapshot) {
@@ -197,7 +206,10 @@ export async function createFirearmUsage(formData: FormData) {
   );
 
   if (error) {
-    redirectWithError(errorTarget, error, locale);
+    redirectWithError(errorTarget, t("createFailed"), locale, {
+      context: "firearmUsage.create",
+      detail: error,
+    });
   }
 
   // Resolvemos nombres de arma + munición para alimentar el audit log
@@ -241,8 +253,9 @@ export async function deleteFirearmUsage(formData: FormData) {
   if (error) {
     redirectWithError(
       `/firearms/${firearmId}`,
-      t("deleteFailed", { error }),
+      t("deleteFailed"),
       locale,
+      { context: "firearmUsage.delete", detail: error },
     );
   }
 
@@ -302,7 +315,10 @@ export async function setMatchFirearm(formData: FormData) {
       matchEntryId,
     );
     if (error) {
-      redirectWithError(errorTarget, error, locale);
+      redirectWithError(errorTarget, t("deleteFailed"), locale, {
+        context: "matchFirearm.clear",
+        detail: error,
+      });
     }
 
     // Solo loguear si efectivamente había un log antes.
@@ -336,7 +352,10 @@ export async function setMatchFirearm(formData: FormData) {
       notes: trimOrNull(formData.get("notes")),
     });
     if (error) {
-      redirectWithError(errorTarget, error, locale);
+      redirectWithError(errorTarget, t("updateFailed"), locale, {
+        context: "matchFirearm.set",
+        detail: error,
+      });
     }
 
     // Resolver nombres para el audit metadata. Si no hay ammo, evitamos

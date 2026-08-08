@@ -68,8 +68,9 @@ export async function deleteMatch(formData: FormData) {
   if (error) {
     redirectWithError(
       `/matches/${matchId}`,
-      t("deleteFailed", { error }),
+      t("deleteFailed"),
       locale,
+      { context: "match.delete", detail: error },
     );
   }
   // Zero rows with no error = RLS refused it. Don't audit, don't fake
@@ -161,8 +162,9 @@ export async function updateMatchClub(formData: FormData) {
   if (error) {
     redirectWithError(
       `/matches/${matchId}`,
-      t("updateClubFailed", { error }),
+      t("updateClubFailed"),
       locale,
+      { context: "match.updateClub", detail: error },
     );
   }
   if (affected === 0) {
@@ -245,8 +247,9 @@ export async function updateMatchMinShots(formData: FormData) {
   if (error) {
     redirectWithError(
       `/matches/${matchId}`,
-      t("updateFailed", { error }),
+      t("updateFailed"),
       locale,
+      { context: "match.updateMinShots", detail: error },
     );
   }
   if (affected === 0) {
@@ -337,8 +340,9 @@ export async function toggleEntryAbsent(formData: FormData) {
   if (error) {
     redirectWithError(
       `/matches/${matchId}`,
-      t("updateFailed", { error }),
+      t("updateFailed"),
       locale,
+      { context: "entry.updateAbsent", detail: error },
     );
   }
   if (affected === 0) {
