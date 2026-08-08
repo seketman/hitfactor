@@ -46,6 +46,10 @@ interface Policy {
   command: string;
   /** Contenido del `using (...)`, o null si la policy no declara uno. */
   usingClause: string | null;
+  /** Contenido del `with check (...)`, o null. */
+  checkClause: string | null;
+  /** Rol del `to <rol>`, o null si la policy no lo declara. */
+  toRole: string | null;
   file: string;
 }
 
@@ -79,6 +83,7 @@ function parsePolicies(sql: string, file: string): Policy[] {
     const scope = end === -1 ? body : body.slice(0, end);
 
     const usingMatch = /\busing\s*\(/i.exec(scope);
+    const checkMatch = /\bwith\s+check\s*\(/i.exec(scope);
     out.push({
       name: m[1]!,
       table: m[2]!,
@@ -86,6 +91,12 @@ function parsePolicies(sql: string, file: string): Policy[] {
       usingClause: usingMatch
         ? readBalanced(scope, usingMatch.index + usingMatch[0].length - 1)
         : null,
+      checkClause: checkMatch
+        ? readBalanced(scope, checkMatch.index + checkMatch[0].length - 1)
+        : null,
+      toRole: /\bto\s+(authenticated|anon|service_role|public)\b/i
+        .exec(scope)?.[1]
+        ?.toLowerCase() ?? null,
       file,
     });
   }
@@ -96,19 +107,24 @@ function parsePolicies(sql: string, file: string): Policy[] {
  * Estado final de las policies: recorre las migraciones en orden y deja la
  * última definición de cada `tabla.policy`.
  */
-function effectivePolicies(): Policy[] {
+function effectivePolicyMap(excludeFile?: string): Map<string, Policy> {
   const byKey = new Map<string, Policy>();
 
   for (const file of readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql"))
     .sort()) {
+    if (file === excludeFile) continue;
     const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
     for (const p of parsePolicies(sql, file)) {
       byKey.set(`${p.table}.${p.name}`, p);
     }
   }
 
-  return [...byKey.values()];
+  return byKey;
+}
+
+function effectivePolicies(): Policy[] {
+  return [...effectivePolicyMap().values()];
 }
 
 describe("policies de escritura en supabase/migrations", () => {
@@ -157,5 +173,124 @@ describe("policies de escritura en supabase/migrations", () => {
     // Tiene que poder tocar filas libres (para claimear) y las propias, nada más.
     expect(policy?.usingClause).toMatch(/linked_user_id\s+is\s+null/i);
     expect(policy?.usingClause).toMatch(/linked_user_id\s*=\s*\(?\s*select\s+auth\.uid/i);
+  });
+});
+
+/**
+ * Forma canónica de las policies actuales (#207).
+ *
+ * `auth.role()` está deprecado y se evalúa por fila; el `to` clause se
+ * evalúa antes de mirar filas. `auth.uid()` sin envolver también se
+ * reevalúa por fila — es el advisory `auth_rls_initplan` de Supabase.
+ *
+ * **Ojo con lo que esto NO significa.** `to authenticated` no excluye a
+ * los usuarios anónimos: si se habilitan los anonymous sign-ins, esos
+ * usuarios reciben el rol `authenticated` igual que los permanentes, así
+ * que matchean el clause exactamente como matcheaban el predicado viejo.
+ * Distinguirlos requiere el claim `is_anonymous` del JWT. Ver la nota en
+ * `0023_rls_to_clause_and_initplan.sql`.
+ */
+describe("forma canónica de las policies", () => {
+  it("ninguna policy usa auth.role(), que está deprecado", () => {
+    const offenders = effectivePolicies()
+      .filter((p) => /auth\.role\s*\(/i.test(`${p.usingClause ?? ""} ${p.checkClause ?? ""}`))
+      .map((p) => `${p.name} (${p.file})`);
+
+    expect(
+      offenders,
+      `Usá el clause \`to authenticated\` en vez del predicado: ${offenders.join(", ")}.`,
+    ).toEqual([]);
+  });
+
+  it("toda policy declara a qué rol aplica", () => {
+    const offenders = effectivePolicies()
+      .filter((p) => p.toRole === null)
+      .map((p) => `${p.name} (${p.file})`);
+
+    expect(
+      offenders,
+      `Sin \`to <rol>\` la policy se evalúa para todos los roles, fila por fila: ${offenders.join(", ")}.`,
+    ).toEqual([]);
+  });
+
+  it("auth.uid() siempre va envuelto en un subquery", () => {
+    // `(select auth.uid())` deja que el planner lo suba a un InitPlan y lo
+    // llame una vez, en lugar de una vez por fila.
+    const bare = /(?<!\(\s*select\s+)auth\.uid\s*\(/i;
+    const offenders = effectivePolicies()
+      .filter((p) => {
+        const body = `${p.usingClause ?? ""} ${p.checkClause ?? ""}`;
+        return bare.test(body.replace(/\(\s*select\s+auth\.uid\s*\(\s*\)\s*\)/gi, "UID"));
+      })
+      .map((p) => `${p.name} (${p.file})`);
+
+    expect(
+      offenders,
+      `Envolvelo: \`(select auth.uid())\`. Advisory auth_rls_initplan: ${offenders.join(", ")}.`,
+    ).toEqual([]);
+  });
+});
+
+/**
+ * El seguro del rewrite masivo de la 0023.
+ *
+ * Reescribir 26 policies a mano es exactamente donde se cuela un predicado
+ * mal transcripto — y el modo de falla es silencioso: la migración aplica
+ * sin error y alguien queda viendo datos que no le corresponden, o el app
+ * deja de escribir sin razón visible.
+ *
+ * Esto compara cada policy contra su definición anterior, normalizando
+ * **sólo** las dos transformaciones que la 0023 dice hacer. Cualquier otra
+ * diferencia es un error de transcripción.
+ */
+describe("0023 no cambió ningún predicado", () => {
+  const MIGRATION = "0023_rls_to_clause_and_initplan.sql";
+
+  /** Aplica las dos transformaciones declaradas y aplana el formato. */
+  function normalize(clause: string | null): string | null {
+    if (clause === null) return null;
+    return clause
+      .replace(/--[^\n]*/g, " ")
+      .replace(/\(\s*select\s+(auth\.uid\s*\(\s*\))\s*\)/gi, "$1")
+      .replace(/auth\.role\s*\(\s*\)\s*=\s*'authenticated'/gi, "true")
+      .replace(/\s+/g, " ")
+      .replace(/\(\s+/g, "(")
+      .replace(/\s+\)/g, ")")
+      .trim()
+      .toLowerCase();
+  }
+
+  const before = effectivePolicyMap(MIGRATION);
+  const after = effectivePolicyMap();
+
+  const rewritten = [...after.values()].filter((p) => p.file === MIGRATION);
+
+  it("reescribe las policies que se esperaba (sanity check)", () => {
+    // Si el parser fallara, los tests de abajo compararían un set vacío.
+    expect(rewritten.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it("cada policy reescrita existía antes", () => {
+    const invented = rewritten
+      .filter((p) => !before.has(`${p.table}.${p.name}`))
+      .map((p) => p.name);
+
+    expect(
+      invented,
+      `La 0023 es un rewrite, no debería crear policies nuevas: ${invented.join(", ")}.`,
+    ).toEqual([]);
+  });
+
+  it.each(
+    // Un caso por policy, para que el error diga cuál falló.
+    [...after.values()]
+      .filter((p) => p.file === MIGRATION && before.has(`${p.table}.${p.name}`))
+      .map((p) => [p.name, p] as const),
+  )("%s conserva su predicado", (_name, policy) => {
+    const old = before.get(`${policy.table}.${policy.name}`)!;
+
+    expect(normalize(policy.usingClause)).toBe(normalize(old.usingClause));
+    expect(normalize(policy.checkClause)).toBe(normalize(old.checkClause));
+    expect(policy.command).toBe(old.command);
   });
 });
