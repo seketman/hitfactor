@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.4](https://github.com/seketman/hitfactor/compare/v1.22.3...v1.22.4) (2026-08-08)
+
+
+### Bug Fixes
+
+* **auth:** validate the next param in /auth/callback and /auth/confirm ([#222](https://github.com/seketman/hitfactor/issues/222)) ([556db8d](https://github.com/seketman/hitfactor/commit/556db8d87ea5efceb2a91ced979e2e3a5c82c350)), closes [#218](https://github.com/seketman/hitfactor/issues/218)
+
 ## [1.22.3](https://github.com/seketman/hitfactor/compare/v1.22.2...v1.22.3) (2026-08-07)
 
 
