@@ -27,13 +27,7 @@ const SRC = join(process.cwd(), "src");
  * Files allowed to read the host from the request, each with the issue
  * that covers it. This list should only ever shrink.
  */
-const ALLOWLIST = new Map<string, string>([
-  [
-    "app/[locale]/(auth)/oauth.ts",
-    "#219 — OAuth redirectTo. Fixing it means deciding what happens to " +
-      "per-deploy preview logins, so it isn't a drop-in swap.",
-  ],
-]);
+const ALLOWLIST = new Map<string, string>([]);
 
 /** `headersList.get("host")`, `.get('x-forwarded-host')`, etc. */
 const HOST_HEADER = /\.get\(\s*["'`](?:x-forwarded-host|x-forwarded-proto|host)["'`]\s*\)/i;
