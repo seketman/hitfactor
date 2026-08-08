@@ -71,6 +71,7 @@ Apply **all** the migrations in Supabase, in numeric order:
 | 0020 | [`0020_import_uploads_storage.sql`](../supabase/migrations/0020_import_uploads_storage.sql) | Private `match-imports` bucket + per-user RLS policies, for staging import files |
 | 0021 | [`0021_fix_shooters_claim_rls.sql`](../supabase/migrations/0021_fix_shooters_claim_rls.sql) | Fixes the UPDATE RLS on `shooters`: its `using` clause let any authenticated user edit or unlink someone else's shooter (#195) |
 | 0022 | [`0022_matches_delete_admin.sql`](../supabase/migrations/0022_matches_delete_admin.sql) | `matches_delete_admin` — completes the admin scope over matches that 0014 started, so admin authority matches what the app offers (#197) |
+| 0023 | [`0023_rls_to_clause_and_initplan.sql`](../supabase/migrations/0023_rls_to_clause_and_initplan.sql) | Rewrites every pre-0021 policy to `to authenticated` + `(select auth.uid())` — drops the deprecated `auth.role()` and clears the `auth_rls_initplan` advisory. No predicate changes (#207) |
 
 If you add a migration, add its row here: there is a test
 (`tests/migrations-doc.test.ts`) that fails if the directory and this table
