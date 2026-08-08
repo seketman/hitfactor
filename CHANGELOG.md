@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.6](https://github.com/seketman/hitfactor/compare/v1.22.5...v1.22.6) (2026-08-08)
+
+
+### Performance Improvements
+
+* **rls:** bring every policy to `to authenticated` + `(select auth.uid())` ([#227](https://github.com/seketman/hitfactor/issues/227)) ([8d61286](https://github.com/seketman/hitfactor/commit/8d6128689164be94d4cb0bd7ebdd1ed4f1535ecc)), closes [#207](https://github.com/seketman/hitfactor/issues/207)
+
 ## [1.22.5](https://github.com/seketman/hitfactor/compare/v1.22.4...v1.22.5) (2026-08-08)
 
 
