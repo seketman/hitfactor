@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { safeBackPath } from "@/lib/paths";
 
 /**
  * Endpoint para los flujos de OTP por mail: signup confirm, magic link,
@@ -36,11 +37,21 @@ const ALLOWED_TYPES = new Set<EmailOtpType>([
   "invite",
 ]);
 
+/**
+ * `next` goes through the same whitelist the rest of the app uses, for the
+ * same reason as in `/auth/callback` — see the note there. It matters more
+ * on this route: these links arrive by email (signup confirmation, magic
+ * link, password recovery), which is a far more comfortable delivery
+ * channel for an attacker than anything OAuth offers.
+ *
+ * The `type` parameter was already whitelisted above. `next` was the one
+ * that wasn't. See #218.
+ */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/dashboard";
+  const next = safeBackPath(searchParams.get("next"), "/dashboard");
 
   if (token_hash && typeParam && ALLOWED_TYPES.has(typeParam)) {
     const supabase = await createClient();
@@ -49,11 +60,13 @@ export async function GET(request: Request) {
       token_hash,
     });
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(new URL(next, origin));
     }
   }
 
+  // Error code rather than prose — this route is outside `[locale]`, so it
+  // has no locale to translate with. The login page does it.
   return NextResponse.redirect(
-    `${origin}/login?error=No%20se%20pudo%20confirmar%20el%20email`,
+    new URL("/login?authError=confirmFailed", origin),
   );
 }
