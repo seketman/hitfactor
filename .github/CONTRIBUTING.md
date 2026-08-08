@@ -64,10 +64,16 @@ More detail in [docs/development.md](../docs/development.md).
 Your PR has to pass CI, which runs:
 
 ```bash
+npm run lint           # eslint, no errors
 npx tsc --noEmit       # type-check, no errors
 npm test               # vitest, all tests green
 npm run build          # production build works (in CI, not mandatory locally)
 ```
+
+`npm run lint` fails on errors and prints warnings without failing. The
+warnings that are there today are known and explained in `eslint.config.mjs`
+— don't add to them silently, and don't reach for a disable comment without
+saying why in the same line.
 
 If your change touches business logic (parsers, importer, stats, claim),
 please add or update the matching test in `tests/`. There are real fixtures for
