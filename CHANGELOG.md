@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.3](https://github.com/seketman/hitfactor/compare/v1.22.2...v1.22.3) (2026-08-07)
+
+
+### Bug Fixes
+
+* **qr:** build the printed QR URL from the configured site URL ([#220](https://github.com/seketman/hitfactor/issues/220)) ([7295559](https://github.com/seketman/hitfactor/commit/7295559202e09534ffc50127290349771bb2b988))
+
 ## [1.22.2](https://github.com/seketman/hitfactor/compare/v1.22.1...v1.22.2) (2026-08-07)
 
 
