@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.5](https://github.com/seketman/hitfactor/compare/v1.22.4...v1.22.5) (2026-08-08)
+
+
+### Bug Fixes
+
+* **actions:** stop sending raw SDK errors to the user's query string ([#224](https://github.com/seketman/hitfactor/issues/224)) ([4a2ac3f](https://github.com/seketman/hitfactor/commit/4a2ac3f862a8d6ded500b2364a6e651edafe3de3)), closes [#199](https://github.com/seketman/hitfactor/issues/199) [#200](https://github.com/seketman/hitfactor/issues/200)
+
 ## [1.22.4](https://github.com/seketman/hitfactor/compare/v1.22.3...v1.22.4) (2026-08-08)
 
 
