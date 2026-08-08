@@ -64,8 +64,9 @@ export async function submitFeedback(formData: FormData) {
   if (error) {
     redirectWithError(
       "/about",
-      t("feedbackFailed", { error }),
+      t("feedbackFailed"),
       locale,
+      { context: "feedback.create", detail: error },
     );
   }
 

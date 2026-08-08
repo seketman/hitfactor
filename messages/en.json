@@ -56,7 +56,8 @@
       "displayName": "Display name",
       "displayNamePlaceholder": "e.g. Diego Demarziani",
       "passwordHint": "At least 8 characters.",
-      "submit": "Sign up"
+      "submit": "Sign up",
+      "confirmSent": "Account created. We sent an email to {email} with a confirmation link. Click it and come back to sign in. If you can't see it, check your spam folder."
     }
   },
   "landing": {
@@ -431,15 +432,15 @@
     "invalidRounds": "Invalid round count",
     "roundsMustBePositive": "The round count must be greater than zero",
     "invalidFeedbackType": "Invalid report type",
-    "feedbackFailed": "Could not send the report: {error}",
+    "feedbackFailed": "The report couldn't be sent. Try again in a moment.",
     "shooterClaimedByOther": "This shooter was already claimed by another user.",
-    "claimFailed": "Could not link the shooter to your account: {error}",
+    "claimFailed": "The shooter couldn't be linked to your account. Try again.",
     "entryNotFound": "Entry not found",
     "matchNotFound": "Match not found",
     "minShotsFormat": "Enter a positive whole number, or leave it empty to clear it",
-    "updateClubFailed": "Could not update the club: {error}",
-    "updateFailed": "Could not update: {error}",
-    "deleteFailed": "Could not delete: {error}",
+    "updateClubFailed": "The club couldn't be updated. Try again.",
+    "updateFailed": "That couldn't be updated. Try again.",
+    "deleteFailed": "That couldn't be deleted. Try again.",
     "cannotMarkAbsent": "Cannot mark as absent: the entry has a score or a percentage above 0",
     "noPermissionForEntry": "You do not have permission to change this result",
     "onlyImporterOrAdmin": "Only the importer or an admin can edit the minimum round count",
@@ -455,7 +456,11 @@
     "tooManyFiles": "You cannot import more than {max} files at once.",
     "onlyHtmlCsvPdf": "Only HTML, CSV or PDF files are accepted",
     "batchMustBeAllPdf": "To upload several files at once they all have to be Steel Challenge PDFs.",
-    "invalidDate": "Enter a valid date."
+    "invalidDate": "Enter a valid date.",
+    "createFailed": "That couldn't be created. Try again.",
+    "invalidCredentials": "Wrong email or password.",
+    "emailNotConfirmed": "Your email isn't confirmed yet. Check the inbox for {email} and click the link we sent when you signed up. If you can't see it, look in your spam folder.",
+    "signupFailed": "The account couldn't be created. Check the details and try again."
   },
   "activityLog": {
     "matchImport": "You imported the match \"{name}\"",

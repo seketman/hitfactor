@@ -56,7 +56,8 @@
       "displayName": "Nombre para mostrar",
       "displayNamePlaceholder": "ej. Diego Demarziani",
       "passwordHint": "Mínimo 8 caracteres.",
-      "submit": "Registrarme"
+      "submit": "Registrarme",
+      "confirmSent": "Cuenta creada. Te enviamos un email a {email} con un link de confirmación. Hacé click ahí y volvé a ingresar. Si no lo ves, revisá tu carpeta de spam."
     }
   },
   "landing": {
@@ -482,15 +483,15 @@
     "invalidRounds": "Tiros disparados inválido",
     "roundsMustBePositive": "Tiros disparados debe ser mayor que cero",
     "invalidFeedbackType": "Tipo de reporte inválido",
-    "feedbackFailed": "No se pudo enviar el reporte: {error}",
+    "feedbackFailed": "No se pudo enviar el reporte. Intentá de nuevo en un momento.",
     "shooterClaimedByOther": "Este tirador ya fue claimado por otro usuario.",
-    "claimFailed": "No se pudo asociar el tirador a tu cuenta: {error}",
+    "claimFailed": "No se pudo asociar el tirador a tu cuenta. Intentá de nuevo.",
     "entryNotFound": "Entry no encontrada",
     "matchNotFound": "Match no encontrado",
     "minShotsFormat": "Ingresá un número entero positivo o vacío para limpiar",
-    "updateClubFailed": "No se pudo actualizar el club: {error}",
-    "updateFailed": "No se pudo actualizar: {error}",
-    "deleteFailed": "No se pudo borrar: {error}",
+    "updateClubFailed": "No se pudo actualizar el club. Intentá de nuevo.",
+    "updateFailed": "No se pudo actualizar. Intentá de nuevo.",
+    "deleteFailed": "No se pudo borrar. Intentá de nuevo.",
     "cannotMarkAbsent": "No se puede marcar ausente: el entry tiene puntaje o porcentaje > 0",
     "noPermissionForEntry": "No tenés permiso para cambiar este resultado",
     "onlyImporterOrAdmin": "Solo el importador o un admin pueden editar el mínimo de disparos",
@@ -506,6 +507,10 @@
     "tooManyFiles": "No se pueden importar más de {max} archivos a la vez.",
     "onlyHtmlCsvPdf": "Solo se aceptan archivos HTML, CSV o PDF",
     "batchMustBeAllPdf": "Para subir varios archivos a la vez todos tienen que ser PDFs de Steel Challenge.",
-    "invalidDate": "Ingresá una fecha válida."
+    "invalidDate": "Ingresá una fecha válida.",
+    "createFailed": "No se pudo crear. Intentá de nuevo.",
+    "invalidCredentials": "Email o contraseña incorrectos.",
+    "emailNotConfirmed": "Tu email todavía no está confirmado. Revisá la casilla de {email} y hacé click en el link que te mandamos al registrarte. Si no lo ves, mirá tu carpeta de spam.",
+    "signupFailed": "No se pudo crear la cuenta. Revisá los datos e intentá de nuevo."
   }
 }

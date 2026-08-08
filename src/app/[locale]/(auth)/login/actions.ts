@@ -41,13 +41,26 @@ export async function login(formData: FormData) {
       code === "email_not_confirmed" ||
       /email\s+not\s+confirmed/i.test(error.message ?? "");
     if (isUnconfirmed) {
-      redirectWithError(
-        "/login",
-        `Tu email todavía no está confirmado. Revisá la casilla de ${email} y hacé click en el link que te mandamos al registrarte. Si no lo ves, revisá tu carpeta de spam.`,
-        locale,
-      );
+      // Este mensaje distingue "existe pero sin confirmar" de "credenciales
+      // inválidas", así que sí permite enumerar cuentas sin confirmar. Se
+      // conserva a propósito: es una decisión de UX deliberada (ver el
+      // comentario de arriba) y sacarla mandaría al usuario a probar la
+      // contraseña una y otra vez sin saber que el problema es otro. La
+      // superficie que abre es acotada — sólo cuentas registradas y nunca
+      // confirmadas — y el signup ya no confirma ni desmiente nada.
+      redirectWithError("/login", t("emailNotConfirmed", { email }), locale, {
+        context: "auth.login",
+        detail: error.message,
+      });
     }
-    redirectWithError("/login", error.message, locale);
+    // Todo el resto colapsa en un mensaje genérico. Antes viajaba
+    // `error.message` de GoTrue tal cual: siempre en inglés (lo emite el
+    // SDK, no la app) y distinguiendo "usuario no existe" de "contraseña
+    // incorrecta", que es enumeración de cuentas servida en la URL.
+    redirectWithError("/login", t("invalidCredentials"), locale, {
+      context: "auth.login",
+      detail: error.message,
+    });
   }
 
   redirect({ href: next, locale });

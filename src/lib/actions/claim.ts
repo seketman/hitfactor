@@ -73,8 +73,9 @@ export async function claimShooter(formData: FormData) {
   if (error) {
     redirectWithError(
       errorTarget,
-      t("claimFailed", { error }),
+      t("claimFailed"),
       locale,
+      { context: "shooter.claim", detail: error },
     );
   }
 

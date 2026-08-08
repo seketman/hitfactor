@@ -92,7 +92,10 @@ export async function createAmmo(formData: FormData) {
   const { id: createdId, error } = await ammoDb.createAmmo(supabase, payload);
 
   if (error) {
-    redirectWithError("/ammo", t("deleteFailed", { error }), locale);
+    redirectWithError("/ammo", t("createFailed"), locale, {
+      context: "ammo.create",
+      detail: error,
+    });
   }
 
   await logAction(supabase, user.id, {
@@ -144,7 +147,10 @@ export async function updateAmmo(formData: FormData) {
   const { error } = await ammoDb.updateAmmo(supabase, id, after);
 
   if (error) {
-    redirectWithError(`/ammo/${id}`, error, locale);
+    redirectWithError(`/ammo/${id}`, t("updateFailed"), locale, {
+      context: "ammo.update",
+      detail: error,
+    });
   }
 
   await logAction(supabase, user.id, {
@@ -178,7 +184,10 @@ export async function deleteAmmo(formData: FormData) {
   const { error } = await ammoDb.deleteAmmo(supabase, id);
 
   if (error) {
-    redirectWithError("/ammo", t("deleteFailed", { error }), locale);
+    redirectWithError("/ammo", t("deleteFailed"), locale, {
+      context: "ammo.delete",
+      detail: error,
+    });
   }
 
   if (snapshot) {
