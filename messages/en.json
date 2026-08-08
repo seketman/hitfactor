@@ -40,7 +40,11 @@
       "noAccount": "Don't have an account?",
       "signUpLink": "Sign up",
       "errorTitle": "Couldn't sign in",
-      "submit": "Sign in"
+      "submit": "Sign in",
+      "authError": {
+        "exchangeFailed": "We couldn't complete the sign-in. Try again; if it keeps happening, request a new link.",
+        "confirmFailed": "We couldn't confirm the email. The link may have expired or already been used. Request a new one from sign-up."
+      }
     },
     "signup": {
       "title": "Create account",

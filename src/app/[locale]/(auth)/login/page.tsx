@@ -9,16 +9,36 @@ import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { isInternalAppPath } from "@/lib/paths";
 import { login } from "./actions";
 
+/**
+ * Error codes the auth route handlers can hand us. They live outside the
+ * `[locale]` segment and so have no locale to translate with — they send a
+ * code, this page turns it into text (#218). Same split the parsers use
+ * with `ParserError`.
+ *
+ * Whitelisted rather than interpolated straight into `t()`, so a crafted
+ * `?authError=` can't probe the message catalogue.
+ */
+const AUTH_ERROR_CODES = new Set(["exchangeFailed", "confirmFailed"]);
+
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; info?: string; next?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    info?: string;
+    next?: string;
+    authError?: string;
+  }>;
 }) {
   const params = await searchParams;
   const t = await getTranslations("auth");
   // Validamos el `next` acá mismo: si no es interno, no lo metemos en el
   // form (la server action también lo re-valida — defense in depth).
   const next = isInternalAppPath(params.next) ? params.next : null;
+  const authError =
+    params.authError && AUTH_ERROR_CODES.has(params.authError)
+      ? params.authError
+      : null;
 
   return (
     <AuthLayout
@@ -36,6 +56,11 @@ export default async function LoginPage({
       {params.error && (
         <Alert tone="danger" className="mb-4" title={t("login.errorTitle")}>
           {params.error}
+        </Alert>
+      )}
+      {authError && (
+        <Alert tone="danger" className="mb-4" title={t("login.errorTitle")}>
+          {t(`login.authError.${authError}` as "login.authError.exchangeFailed")}
         </Alert>
       )}
       {params.info && (

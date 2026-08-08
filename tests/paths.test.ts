@@ -20,6 +20,12 @@ describe("isInternalAppPath — rechaza destinos externos", () => {
     "///evil.example",
     "javascript:alert(1)",
     "data:text/html,<script>alert(1)</script>",
+    // `@` termina la sección userinfo de una URL: concatenado a un origin,
+    // `https://nuestro-host` pasa a ser el *usuario* y el host real es el
+    // de la derecha. Es el payload que sí escapaba en /auth/callback y
+    // /auth/confirm (#218) — los de arriba, todos, no escapaban.
+    "@evil.example",
+    "@evil.example/phish",
   ];
   it.each(externos)("rechaza %s", (value) => {
     expect(isInternalAppPath(value)).toBe(false);

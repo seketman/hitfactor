@@ -40,7 +40,11 @@
       "noAccount": "¿No tenés cuenta?",
       "signUpLink": "Registrate",
       "errorTitle": "No se pudo ingresar",
-      "submit": "Ingresar"
+      "submit": "Ingresar",
+      "authError": {
+        "exchangeFailed": "No pudimos completar el inicio de sesión. Volvé a intentarlo; si el problema sigue, pedí un link nuevo.",
+        "confirmFailed": "No pudimos confirmar el email. El link puede haber expirado o haber sido usado. Pedí uno nuevo desde el registro."
+      }
     },
     "signup": {
       "title": "Crear cuenta",
