@@ -1,6 +1,11 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { listMyDisciplines } from "@/lib/db/shooters";
 import { APP_VERSION } from "@/lib/version";
+import {
+  SIDEBAR_COLLAPSED_COOKIE,
+  parseSidebarCollapsed,
+} from "@/lib/sidebar-preference";
 import { AppSidebarShell } from "./AppSidebarShell";
 
 interface AppSidebarProps {
@@ -18,6 +23,11 @@ interface AppSidebarProps {
  * Recibe `userId` como prop desde el layout (que ya verificó autenticación)
  * para evitar un segundo `auth.getUser()` que puede correr en paralelo con
  * el layout y romper si hay un mismatch de cookie.
+ *
+ * Acá también se lee la preferencia de collapse, para que el shell reciba el
+ * estado inicial ya resuelto y el server renderice el DOM correcto desde el
+ * primer paint (#209). Este componente ya leía cookies para auth, así que no
+ * agrega un acceso que antes no existiera.
  */
 export async function AppSidebar({
   userId,
@@ -26,7 +36,10 @@ export async function AppSidebar({
   memberSince,
 }: AppSidebarProps) {
   const supabase = await createClient();
-  const disciplines = await listMyDisciplines(supabase, userId);
+  const [disciplines, cookieStore] = await Promise.all([
+    listMyDisciplines(supabase, userId),
+    cookies(),
+  ]);
 
   return (
     <AppSidebarShell
@@ -35,6 +48,9 @@ export async function AppSidebar({
       memberSince={memberSince}
       disciplines={disciplines}
       appVersion={APP_VERSION}
+      defaultCollapsed={parseSidebarCollapsed(
+        cookieStore.get(SIDEBAR_COLLAPSED_COOKIE)?.value,
+      )}
     />
   );
 }

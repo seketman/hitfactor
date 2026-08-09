@@ -19,9 +19,8 @@ import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { getDisciplineIcon } from "@/components/icons/discipline-icons";
+import { serialiseSidebarCookie } from "@/lib/sidebar-preference";
 import { cn } from "@/lib/utils";
-
-const COLLAPSE_STORAGE_KEY = "hitfactor:sidebar-collapsed";
 
 interface DisciplineEntry {
   code: string;
@@ -38,6 +37,14 @@ interface AppSidebarShellProps {
   disciplines: DisciplineEntry[];
   /** Versión de la app (de package.json) — uso interno, render discreto. */
   appVersion: string;
+  /**
+   * Estado inicial del collapse, resuelto en el server desde la cookie.
+   *
+   * Llega como prop en vez de leerse acá porque el server tiene que
+   * renderizar el DOM definitivo: `collapsed` decide qué se renderiza, no
+   * solo cómo se ve. Ver `lib/sidebar-preference.ts` (#209).
+   */
+  defaultCollapsed: boolean;
 }
 
 /**
@@ -48,7 +55,7 @@ interface AppSidebarShellProps {
  *  - Armas, Importar (top-level).
  *  - Footer: ThemeToggle + nombre + Salir.
  *
- * Persiste el estado collapsed en localStorage.
+ * Persiste el estado collapsed en una cookie (ver `lib/sidebar-preference.ts`).
  */
 export function AppSidebarShell({
   userName,
@@ -56,10 +63,11 @@ export function AppSidebarShell({
   memberSince,
   disciplines,
   appVersion,
+  defaultCollapsed,
 }: AppSidebarShellProps) {
   const pathname = usePathname();
   const t = useTranslations("nav");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Tooltip multilínea para el nombre del usuario. Browsers respetan \n
@@ -73,15 +81,24 @@ export function AppSidebarShell({
     .filter(Boolean)
     .join("\n");
 
-  // Hidratar estado desde localStorage solo en cliente.
-  useEffect(() => {
-    const stored = window.localStorage.getItem(COLLAPSE_STORAGE_KEY);
-    if (stored === "1") setCollapsed(true);
-  }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(COLLAPSE_STORAGE_KEY, collapsed ? "1" : "0");
-  }, [collapsed]);
+  /**
+   * Estado y cookie se escriben juntos, acá y no en un efecto.
+   *
+   * Antes eran dos efectos: uno hidrataba desde localStorage al montar y
+   * otro persistía cuando `collapsed` cambiaba. En el primer commit corrían
+   * en orden, así que el de persistencia leía `collapsed` todavía en `false`
+   * y pisaba la preferencia guardada con `"0"`; recién se recomponía en el
+   * re-render siguiente. Terminaba bien, pero la preferencia quedaba mal
+   * escrita en el medio — cerrar la pestaña en esa ventana la perdía.
+   *
+   * Un click no necesita un efecto. Persistir en el handler elimina la
+   * carrera en vez de ordenarla: no hay dos escrituras compitiendo, hay una.
+   */
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    document.cookie = serialiseSidebarCookie(next);
+  }
 
   // Cerrar drawer mobile al navegar.
   useEffect(() => {
@@ -140,7 +157,7 @@ export function AppSidebarShell({
           <button
             type="button"
             aria-label={collapsed ? t("expandMenu") : t("collapseMenu")}
-            onClick={() => setCollapsed((c) => !c)}
+            onClick={toggleCollapsed}
             className="hidden rounded-md p-1.5 text-fg-muted hover:bg-surface-2 hover:text-fg md:block"
           >
             {collapsed ? (
