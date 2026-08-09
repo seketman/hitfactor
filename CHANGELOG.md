@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.1](https://github.com/seketman/hitfactor/compare/v1.23.0...v1.23.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **i18n:** render timestamps in the visitor's time zone ([#235](https://github.com/seketman/hitfactor/issues/235)) ([8e42ba4](https://github.com/seketman/hitfactor/commit/8e42ba4b76dacd1c91be9b14d703809b3decdc65))
+
 ## [1.23.0](https://github.com/seketman/hitfactor/compare/v1.22.7...v1.23.0) (2026-08-09)
 
 
