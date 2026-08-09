@@ -65,23 +65,23 @@ export default defineConfig([
       "@typescript-eslint/no-non-null-assertion": "off",
 
       /**
-       * Downgraded from error, with the four current hits reviewed one by
-       * one.
-       *
-       * Three are the sanctioned client-only hydration pattern and have
-       * no better spelling:
+       * Downgraded from error, with each hit reviewed one by one. Three
+       * remain, all the sanctioned client-only hydration pattern with no
+       * better spelling:
        *   - `ThemeToggle` — the `mounted` guard `next-themes` documents.
        *   - `FeedbackForm` — reads `document.referrer`, which doesn't
        *     exist during SSR, so a lazy `useState` initialiser would
        *     render empty on the server and never recover.
        *   - `AppSidebarShell` — resets the mobile drawer on navigation.
        *
-       * The fourth, `AppSidebarShell` hydrating the collapsed state from
-       * localStorage, **is** a real bug and is tracked as #209.
+       * There was a fourth: `AppSidebarShell` hydrating the collapsed
+       * state from localStorage. That one was a real bug (#209) and the
+       * rule found it. It is fixed — the state now comes from a cookie
+       * the server reads, so there is no effect left to warn about.
        *
-       * Keeping it at error would mean three disable comments on day one,
-       * which is how a linter gets tuned out. As a warning it stays
-       * visible and #209 stays honest.
+       * Keeping the rule at error would mean three disable comments on
+       * day one, which is how a linter gets tuned out. As a warning it
+       * stayed visible long enough to catch the one hit that mattered.
        */
       "react-hooks/set-state-in-effect": "warn",
 
