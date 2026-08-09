@@ -88,6 +88,18 @@ const DIVISION_CODE_BY_DISCIPLINE: Record<
     IRON: "IRON",
     OPTIC: "OPTIC",
     PCC: "PCC",
+    // Rimfire rifle. `RFRI` is SCSA's code (Rimfire Rifle Iron Sight);
+    // every local label for it says "Minirifle", which is what the
+    // PractiScore report prints as the section head. See migration 0024.
+    //
+    // `resolveDivisionCode` also retries with spaces stripped, so
+    // "MINI RIFLE" resolves through the MINIRIFLE key without its own
+    // entry. The bare code is here because some generators print the code
+    // rather than the label.
+    MINIRIFLE: "RFRI",
+    RFRI: "RFRI",
+    "RIMFIRE RIFLE": "RFRI",
+    "RIMFIRE RIFLE IRON": "RFRI",
   },
   [DISCIPLINE.COMBAT]: {},
 };

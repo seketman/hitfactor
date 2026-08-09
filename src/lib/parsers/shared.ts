@@ -63,6 +63,13 @@ export function stripDqPrefix(name: string): { fullName: string; isDq: boolean }
  * la primera vuelta solo B aplica (paréntesis no está al final); después
  * de que cae `ARG`, el paréntesis sí queda al final y la segunda vuelta
  * de A lo levanta.
+ *
+ * Pass C then drops a separator left dangling by the two above. Real case:
+ * a club registered a shooter as "MONTOTO FLORES, Mini" in the minirifle
+ * division, so pass B removed the trailing `MINI` and left
+ * "MONTOTO FLORES," — a stored name with a comma and no given name. It
+ * only ever fires on what A and B already cut, so a legitimate name
+ * cannot reach it with a trailing separator of its own.
  */
 export function stripNameSuffixes(name: string): string {
   let result = name;
@@ -87,6 +94,9 @@ export function stripNameSuffixes(name: string): string {
       if (!TRAILING_NOISE_TOKENS.has(trailing)) break;
       result = match[1]!.trimEnd();
     }
+
+    // Pasada C: separador que quedó colgando tras A o B.
+    result = result.replace(/[,;\-–—]+\s*$/, "").trimEnd();
 
     if (result === before) break;
   }

@@ -121,3 +121,64 @@ describe("parseHtml dispatcher", () => {
     expect(result.stages.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * Resolución de división en el parser HTML (migración 0024).
+ *
+ * Este parser tomaba el rótulo de la sección **crudo** como
+ * `divisions.code`. Funcionaba sólo porque los rótulos que había visto
+ * coincidían con los codes de la base — PISTOLA, REVOLVER. Cualquier alias
+ * moría ahí, que es justo lo que el registry existe para evitar (#114), y
+ * el parser PDF de Steel siempre resolvió a través de él. El HTML era el
+ * que faltaba; "Minirifle" → `RFRI` es el primer rótulo que lo expone.
+ */
+describe("parseSteelChallengeHtml — resolución de división", () => {
+  /** HTML mínimo con la forma que emite PractiScore. */
+  function steelHtml(sectionLabel: string, divisionColumn = "X") {
+    return `<!DOCTYPE html><html><head>
+<title>Steel Challenge 090826 : 2026-08-08</title></head><body>
+<div>Steel Challenge 090826<br>2026-08-08<br>Match Results - By Division</div>
+<table cellspacing="0">
+<thead>
+<tr><td class="division_head" colspan="9"><br><b>${sectionLabel}</b></td></tr>
+<tr><th>Final</th><th class="stage_head">Name</th><th class="stage_head">USPSA#</th><th class="stage_head">Division</th><th class="stage_head">Time</th><th class="stage_head">%</th><th class="stage_head">1: Cancha 3</th><th class="stage_head">2: Cancha 4</th><th class="stage_head">3: Cancha 5</th></tr>
+</thead>
+<tbody class="zebra">
+<tr><td class="score_cell">1</td><td class="nobr">Ibai, Ibai</td><td class="nobr"></td><td class="nobr">${divisionColumn}</td><td class="time_cell">27.73</td><td class="time_cell">100.00</td><td class="time_cell">7.81</td><td class="time_cell">11.42</td><td class="time_cell">8.50</td></tr>
+</tbody>
+</table></body></html>`;
+  }
+
+  it("mapea el rótulo 'Minirifle' al code RFRI", () => {
+    const result = parseSteelChallengeHtml(steelHtml("Minirifle"));
+
+    expect(result.matchEntries).toHaveLength(1);
+    expect(result.matchEntries[0]!.divisionCode).toBe("RFRI");
+  });
+
+  it("sigue resolviendo los rótulos que ya eran code (sin regresión)", () => {
+    for (const label of ["PISTOLA", "REVOLVER", "PCC"]) {
+      const result = parseSteelChallengeHtml(steelHtml(label));
+      expect(result.matchEntries[0]!.divisionCode).toBe(label);
+    }
+  });
+
+  it("la sección manda sobre la columna Division", () => {
+    // En los reportes por categoría la columna trae una sola letra ("M",
+    // "P") que colisiona entre divisiones — PCC y Pistola ambas dicen "P".
+    // El rótulo de la sección es el dato bueno.
+    const result = parseSteelChallengeHtml(steelHtml("Minirifle", "M"));
+    expect(result.matchEntries[0]!.divisionCode).toBe("RFRI");
+  });
+
+  it("una división desconocida NO se descarta: pasa normalizada", () => {
+    // Descartarla perdería una división entera en silencio y el import
+    // reportaría éxito habiendo importado menos de lo que traía el archivo.
+    // Pasándola, `requireDivision` corta con un error que nombra el rótulo
+    // y le dice al admin que lo registre como alias.
+    const result = parseSteelChallengeHtml(steelHtml("Deportivo"));
+
+    expect(result.matchEntries).toHaveLength(1);
+    expect(result.matchEntries[0]!.divisionCode).toBe("DEPORTIVO");
+  });
+});

@@ -72,6 +72,7 @@ Apply **all** the migrations in Supabase, in numeric order:
 | 0021 | [`0021_fix_shooters_claim_rls.sql`](../supabase/migrations/0021_fix_shooters_claim_rls.sql) | Fixes the UPDATE RLS on `shooters`: its `using` clause let any authenticated user edit or unlink someone else's shooter (#195) |
 | 0022 | [`0022_matches_delete_admin.sql`](../supabase/migrations/0022_matches_delete_admin.sql) | `matches_delete_admin` — completes the admin scope over matches that 0014 started, so admin authority matches what the app offers (#197) |
 | 0023 | [`0023_rls_to_clause_and_initplan.sql`](../supabase/migrations/0023_rls_to_clause_and_initplan.sql) | Rewrites every pre-0021 policy to `to authenticated` + `(select auth.uid())` — drops the deprecated `auth.role()` and clears the `auth_rls_initplan` advisory. No predicate changes (#207) |
+| 0024 | [`0024_steel_rfri_division.sql`](../supabase/migrations/0024_steel_rfri_division.sql) | `RFRI` (rimfire rifle, labelled Minirifle) for Steel Challenge — the division was missing, so any match running it failed to import |
 
 If you add a migration, add its row here: there is a test
 (`tests/migrations-doc.test.ts`) that fails if the directory and this table
@@ -87,6 +88,7 @@ accounts without having to confirm them.
 ```bash
 npm run dev          # dev server (localhost:3000)
 npm run build        # production build
+npm run lint         # eslint (errors fail, warnings are printed)
 npm test             # run the tests once
 npm run test:watch   # tests in watch mode
 npm run db:types     # regenerate src/lib/supabase/database.types.ts from the DB
@@ -103,10 +105,11 @@ See [`architecture.md`](./architecture.md).
 ## Quick check after making changes
 
 ```bash
-npm test && npx tsc --noEmit && npm run build
+npm run lint && npx tsc --noEmit && npm test && npm run build
 ```
 
-All three have to pass. Currently: 492 tests green, typecheck clean.
+All four have to pass. Currently: 651 tests green, typecheck clean, lint
+clean (with the four warnings explained in `eslint.config.mjs`).
 
 Note that `npx tsc --noEmit` and `npm run build` are **not** interchangeable.
 `next build` also type-checks against the route types Next generates from the

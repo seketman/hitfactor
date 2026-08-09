@@ -1,5 +1,9 @@
 import { parse, type HTMLElement } from "node-html-parser";
 import { DISCIPLINE } from "../disciplines";
+import {
+  normalizeDivisionName,
+  resolveDivisionCode,
+} from "./division-registry";
 import type {
   ParsedMatch,
   ParsedMatchEntry,
@@ -36,6 +40,23 @@ interface SectionMeta {
   divisionCode: string;
 }
 
+/**
+ * Section label → `divisions.code`, via the shared registry.
+ *
+ * Falls back to the normalised label instead of dropping the section, the
+ * same way `steel-challenge-pdf.ts` does. That fallback is deliberate: an
+ * unrecognised division then reaches `requireDivision`, which fails the
+ * import with a message naming the label and telling the admin to
+ * register it as an alias. Skipping the section here would instead lose a
+ * whole division silently — the import would report success having
+ * imported less than the file contained.
+ */
+function divisionCodeFromLabel(label: string): string {
+  return (
+    resolveDivisionCode(DISCIPLINE.STEEL, label) ?? normalizeDivisionName(label)
+  );
+}
+
 const TITLE_DATE_RE = /(\d{4}-\d{2}-\d{2})/;
 
 export function isSteelChallengeFormat(html: string): boolean {
@@ -53,11 +74,17 @@ export function parseSteelChallengeHtml(html: string): ParsedMatch {
 
   const { name, date } = extractNameAndDate(root, html);
   const generatedBy = extractGeneratedBy(root);
-  // En Steel cada `division_head` contiene directamente el código de
-  // división (no hay regex que clasificar): cualquier cabecera no vacía
-  // abre una sección.
+  // Every non-empty `division_head` opens a section; its text is the
+  // division label, which goes through the shared registry.
+  //
+  // This parser used to take the label raw as the division code. That
+  // worked only because the labels it had been fed happened to equal the
+  // codes in `divisions` — PISTOLA, REVOLVER. Any alias died here, which
+  // is exactly what the registry exists to prevent (#114), and the PDF
+  // Steel parser has always resolved through it. The HTML one was the
+  // odd one out; "Minirifle" → `RFRI` is the first label to expose it.
   const sections = extractDivisionalTableSections<SectionMeta>(root, (titleText) =>
-    titleText ? { divisionCode: titleText } : null,
+    titleText ? { divisionCode: divisionCodeFromLabel(titleText) } : null,
   );
 
   const matchEntries: ParsedMatchEntry[] = [];
