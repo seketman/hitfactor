@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.2](https://github.com/seketman/hitfactor/compare/v1.23.1...v1.23.2) (2026-08-09)
+
+
+### Bug Fixes
+
+* **ui:** persist the sidebar collapse in a cookie the server can read ([#238](https://github.com/seketman/hitfactor/issues/238)) ([81221a1](https://github.com/seketman/hitfactor/commit/81221a1b18c9ef5b235673cbc7373f48f1afb79a)), closes [#209](https://github.com/seketman/hitfactor/issues/209)
+
 ## [1.23.1](https://github.com/seketman/hitfactor/compare/v1.23.0...v1.23.1) (2026-08-09)
 
 
