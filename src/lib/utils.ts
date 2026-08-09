@@ -46,6 +46,12 @@ export function formatNumber(
  * Construir un `Intl.DateTimeFormat` es caro y estas funciones corren una vez
  * por fila de tabla. Memoizamos por locale — son dos, así que el Map no
  * crece.
+ *
+ * `DATE_TIME_FORMATTERS` se indexa además por time zone (#190), así que ése
+ * sí puede crecer: una entrada por par (locale, zona) que la app haya visto.
+ * Queda acotado porque el único origen de zonas es `getRequestTimeZone()`,
+ * que valida contra la base IANA antes de devolver — unos cientos de valores
+ * posibles, no los que se le ocurran a un cliente. Ver `lib/timezone.ts`.
  */
 const DATE_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 const DATE_TIME_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
@@ -70,14 +76,19 @@ function dateFormatter(locale: Locale): Intl.DateTimeFormat {
   return fmt;
 }
 
-function dateTimeFormatter(locale: Locale): Intl.DateTimeFormat {
-  let fmt = DATE_TIME_FORMATTERS.get(locale);
+function dateTimeFormatter(
+  locale: Locale,
+  timeZone: string,
+): Intl.DateTimeFormat {
+  const key = `${locale}|${timeZone}`;
+  let fmt = DATE_TIME_FORMATTERS.get(key);
   if (!fmt) {
     fmt = new Intl.DateTimeFormat(locale, {
       dateStyle: "short",
       timeStyle: "short",
+      timeZone,
     });
-    DATE_TIME_FORMATTERS.set(locale, fmt);
+    DATE_TIME_FORMATTERS.set(key, fmt);
   }
   return fmt;
 }
@@ -141,16 +152,30 @@ export function formatDate(
  * lado, no de una columna `date`, así que un string arbitrario no es señal de
  * corrupción de datos y no aporta mostrarlo crudo en la UI.
  *
- * Limitación conocida: se renderiza en el timezone del *proceso*, que en
- * Vercel es UTC. Un usuario argentino ve las horas corridas 3 hs. Es un eje
- * distinto del locale y se arregla aparte — issue #190.
+ * `timeZone` es obligatorio por la misma razón por la que `locale` lo es
+ * desde #149: es lo que obliga al compilador a enumerar los call sites en vez
+ * de que el default lo decida el ambiente. Un default —el timezone del
+ * proceso, que en Vercel es UTC— era exactamente el bug de #190: un usuario
+ * argentino veía todas las horas corridas 3 hs y nada fallaba. El valor sale
+ * de `getRequestTimeZone()` (`lib/timezone.ts`).
+ *
+ * **Una zona inválida tira `RangeError`.** Es deliberado: la validación vive
+ * en `getRequestTimeZone()`, que es donde entra input no confiable. Pasado
+ * ese borde, una zona que no existe es un error de programación, y tapar eso
+ * cayendo a UTC lo volvería otro bug silencioso de la misma familia que este
+ * fix vino a cerrar.
+ *
+ * A diferencia de `formatDate`, acá el timezone SÍ corresponde aplicarlo: un
+ * instante ocurrió a una hora distinta según dónde estés parado. Una fecha de
+ * calendario no.
  */
 export function formatDateTime(
   iso: string | null | undefined,
   locale: Locale,
+  timeZone: string,
 ): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return dateTimeFormatter(locale).format(date);
+  return dateTimeFormatter(locale, timeZone).format(date);
 }

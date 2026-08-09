@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/supabase/require-user";
 import { listAuditLog } from "@/lib/db/audit";
 import { describeAuditEntry } from "@/lib/audit/render";
 import { formatDateTime } from "@/lib/utils";
+import { getRequestTimeZone } from "@/lib/timezone";
 
 interface PageProps {
   searchParams: Promise<{ page?: string }>;
@@ -16,6 +17,7 @@ const PAGE_SIZE = 50;
 
 export default async function ActivityPage({ searchParams }: PageProps) {
   const locale = await getLocale();
+  const timeZone = await getRequestTimeZone();
   const t = await getTranslations("activityLog");
   const { page: pageParam } = await searchParams;
   const page = Math.max(1, Number.parseInt(pageParam ?? "1", 10) || 1);
@@ -68,7 +70,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
                       </p>
                     )}
                     <p className="mt-1 font-mono text-xs text-fg-subtle">
-                      {formatDateTime(row.created_at, locale)}
+                      {formatDateTime(row.created_at, locale, timeZone)}
                     </p>
                   </div>
                   {desc.link && (
