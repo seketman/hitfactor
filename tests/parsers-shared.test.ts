@@ -78,6 +78,30 @@ describe("stripNameSuffixes", () => {
     expect(stripNameSuffixes("Foo (Bar) Baz")).toBe("Foo (Bar) Baz");
   });
 
+  // Pasada C — separador que queda colgando tras A o B.
+  it("limpia la coma que queda cuando cae el token de división", () => {
+    // Caso real: un club anotó al tirador como "MONTOTO FLORES, Mini" en
+    // la división minirifle. La pasada B se lleva el `MINI` y sin esto el
+    // nombre quedaba guardado como "MONTOTO FLORES," — con coma y sin
+    // nombre de pila.
+    expect(stripNameSuffixes("MONTOTO FLORES, Mini")).toBe("MONTOTO FLORES");
+  });
+
+  it("limpia el separador que queda tras un paréntesis terminal", () => {
+    expect(stripNameSuffixes("Perez, (Cursante)")).toBe("Perez");
+  });
+
+  it("no toca comas internas ni nombres que no perdieron nada", () => {
+    expect(stripNameSuffixes("Bataglino, Sebas")).toBe("Bataglino, Sebas");
+    expect(stripNameSuffixes("Garcia Saldaño, Pablo")).toBe(
+      "Garcia Saldaño, Pablo",
+    );
+    // El guión de un apellido compuesto no es un separador colgando.
+    expect(stripNameSuffixes("Sainz-Trapaga, Juan")).toBe(
+      "Sainz-Trapaga, Juan",
+    );
+  });
+
   // Pasada B — tokens conocidos al final.
   it("saca región IPSC pegada al final del nombre", () => {
     expect(stripNameSuffixes("CIPOLLETTI, Pablo ARG")).toBe("CIPOLLETTI, Pablo");

@@ -85,8 +85,32 @@ describe("resolveDivisionCode — FBI / Steel", () => {
   it("no mezcla el OPTIC de FBI con el de Steel (unique es por disciplina)", () => {
     expect(resolveDivisionCode(DISCIPLINE.FBI, "Optic")).toBe("OPTIC");
     expect(resolveDivisionCode(DISCIPLINE.STEEL, "Optic")).toBe("OPTIC");
-    // …pero Steel no conoce las de FBI.
-    expect(resolveDivisionCode(DISCIPLINE.STEEL, "Minirifle")).toBeNull();
+  });
+
+  it("el mismo rótulo puede dar codes distintos según la disciplina", () => {
+    // "Minirifle" existe en las dos, con codes que NO coinciden: en FBI es
+    // `MINI` (0001) y en Steel `RFRI` (0024), que es el código propio de
+    // SCSA. Antes este caso comprobaba que Steel devolviera null, porque
+    // Steel no tenía minirifle — cuando dejó de ser cierto, el aislamiento
+    // entre disciplinas pasó a poder verificarse de forma más fuerte: no
+    // "una no lo conoce", sino "las dos lo conocen y no se pisan".
+    expect(resolveDivisionCode(DISCIPLINE.FBI, "Minirifle")).toBe("MINI");
+    expect(resolveDivisionCode(DISCIPLINE.STEEL, "Minirifle")).toBe("RFRI");
+  });
+
+  it("Steel acepta las variantes con que se rotula el minirifle", () => {
+    // El reporte de PractiScore imprime "Minirifle"; algunos generadores
+    // usan el código o el nombre en inglés de SCSA.
+    for (const label of [
+      "Minirifle",
+      "MINIRIFLE",
+      "Mini Rifle", // resuelve por el retry sin espacios de resolveDivisionCode
+      "RFRI",
+      "Rimfire Rifle",
+      "Rimfire Rifle Iron",
+    ]) {
+      expect(resolveDivisionCode(DISCIPLINE.STEEL, label)).toBe("RFRI");
+    }
   });
 
   it("Steel usa el nombre como code", () => {
