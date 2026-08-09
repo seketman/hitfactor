@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/seketman/hitfactor/compare/v1.22.7...v1.23.0) (2026-08-09)
+
+
+### Features
+
+* **steel:** add the RFRI division, resolve aliases in the HTML parser ([#233](https://github.com/seketman/hitfactor/issues/233)) ([c894ba8](https://github.com/seketman/hitfactor/commit/c894ba86476a0eddb9ec1eb2bd5eb1a670240d17))
+
 ## [1.22.7](https://github.com/seketman/hitfactor/compare/v1.22.6...v1.22.7) (2026-08-08)
 
 
