@@ -7,6 +7,7 @@ import type { ParsedMatch, ParsedMatchEntry } from "../types/match";
 import { resolveDivisionCode } from "./division-registry";
 import { stripNameSuffixes } from "./shared";
 import { ParserError } from "./parser-error";
+import { isValidIsoDate } from "../dates";
 
 /**
  * Parser para los PDFs de "RANKING OFICIAL" que publica la FAT (Federación
@@ -390,14 +391,6 @@ function dateFromFilename(filename: string): string | null {
   }
 
   return null;
-}
-
-function isValidIsoDate(iso: string): boolean {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return false;
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31;
 }
 
 // ---------------------------------------------------------------------------

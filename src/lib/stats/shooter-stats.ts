@@ -1,4 +1,5 @@
 import type { MyEntryRow, MyStageRow } from "../db/types";
+import { parseIsoDateUtc } from "../dates";
 
 /**
  * Estadísticas agregadas de un tirador a partir de su historial completo
@@ -18,7 +19,8 @@ export interface MatchTimelinePoint {
   totalInDivision: number | null;
   /**
    * Percentil dentro de la división: place/total × 100. Más bajo = mejor.
-   * Null si no se conoce el total.
+   * Null si no se conoce el total **o si no hay puesto asignado**
+   * (`place = 0`) — sin una de las dos puntas la cuenta no significa nada.
    */
   percentile: number | null;
   /**
@@ -124,9 +126,15 @@ export function getAmmoExtrasTier(
 export interface StageStats {
   /** Total de stages contabilizados (no-DQ). */
   scoredStages: number;
-  /** % de stages ganados (place === 1). 0-100. */
+  /**
+   * % de stages ganados (place === 1). 0-100.
+   *
+   * Sobre los stages **con puesto asignado**, que puede ser menos que
+   * `scoredStages`: un stage sin posición no se gana ni se pierde, así que
+   * no entra al denominador.
+   */
   winRate: number;
-  /** % de stages en podio (place 1..3). 0-100. */
+  /** % de stages en podio (place 1..3), sobre los stages con puesto. 0-100. */
   podiumRate: number;
   /**
    * % de stages con al menos una penalty (penalties > 0). Null si no hay
@@ -262,8 +270,20 @@ export function computeShooterStats(
       )
     : null;
 
-  const bestPlace = scored.length
-    ? scored.reduce((best, p) => (p.place < best.place ? p : best))
+  /**
+   * `place = 0` significa "sin puesto asignado", no "primero" (#202). El
+   * filtro de arriba saca DQs y ausentes, pero un entry con datos parciales
+   * —o de un formato que no trae posición— llega acá con 0 y le gana a
+   * cualquier puesto real en el `reduce`. El KPI mostraba **0** como mejor
+   * puesto y el `MatchHighlight` apuntaba a un torneo donde el tirador no
+   * tiene posición.
+   *
+   * Es el mismo criterio que ya usa `isBetterEntry` en `import-match.ts`
+   * para el dedup: solo `place > 0` es un puesto.
+   */
+  const placed = scored.filter((p) => p.place > 0);
+  const bestPlace = placed.length
+    ? placed.reduce((best, p) => (p.place < best.place ? p : best))
     : null;
 
   // Stats de impactos: solo sobre puntos con hits != null (FBI).
@@ -457,7 +477,13 @@ function toTimelinePoints(
     if (!e.matches) continue;
     const divisionCode = e.divisions?.code ?? "";
     const total = divisionSizes?.get(`${e.matches.id}|${divisionCode}`) ?? null;
-    const percentile = total && total > 0 ? (e.place / total) * 100 : null;
+    // El percentil necesita las DOS puntas conocidas. Con `place = 0` —que
+    // es "sin puesto", no "primero"— la cuenta daba 0, y más bajo es mejor:
+    // el peor dato posible se leía como el mejor resultado posible, y encima
+    // arrastraba el promedio hacia abajo. Null es lo que ya significa "no se
+    // puede calcular" acá, igual que cuando falta el total (#202).
+    const percentile =
+      total && total > 0 && e.place > 0 ? (e.place / total) * 100 : null;
 
     out.push({
       matchId: e.matches.id,
@@ -533,7 +559,9 @@ function computeCadence(
 
 /**
  * Agrega KPIs cross-matches sobre stage_results. Filtra DQs y stages sin
- * place (sucede ocasionalmente con datos parciales).
+ * place — que son tanto los `null` como los `0`: el docstring decía "sin
+ * place" desde antes, pero el filtro solo miraba `null` y dejaba pasar los
+ * 0 (#202).
  *
  * `penaltyRate` es null cuando ningún stage del usuario tiene penalties
  * registrados — caso normal para FBI y Steel.
@@ -545,12 +573,29 @@ function computeStageStats(
   const scored = rows.filter((r) => !r.is_dq && r.place !== null);
   if (scored.length === 0) return null;
 
+  /**
+   * Mismo `place = 0` que en `bestPlace`, encontrado al arreglar aquél
+   * (#202). Acá pegaba distinto y peor: `r.place <= 3` es verdadero para 0,
+   * así que un stage **sin puesto asignado contaba como podio**. El
+   * `podiumRate` de un tirador subía por stages en los que no tiene
+   * posición.
+   *
+   * Va con denominador propio y no filtrando `scored`: un stage sin puesto
+   * igual tiene `stage_percentage` y `penalties` válidos, así que sigue
+   * contando para esos KPIs. Lo que no se puede es ganarlo ni perderlo, y
+   * por eso no entra ni al numerador ni al denominador de win/podium.
+   */
+  const placed = scored.filter((r) => r.place !== null && r.place > 0);
+
   let wins = 0;
   let podiums = 0;
+  for (const r of placed) {
+    if (r.place === 1) wins++;
+    if (r.place! <= 3) podiums++;
+  }
+
   let bestPct = 0;
   for (const r of scored) {
-    if (r.place === 1) wins++;
-    if (r.place !== null && r.place <= 3) podiums++;
     if (r.stage_percentage > bestPct) bestPct = r.stage_percentage;
   }
 
@@ -566,18 +611,23 @@ function computeStageStats(
 
   return {
     scoredStages: scored.length,
-    winRate: (wins / scored.length) * 100,
-    podiumRate: (podiums / scored.length) * 100,
+    // Sin ningún stage con puesto no hay tasa que reportar: 0 de 0 es 0%,
+    // no NaN.
+    winRate: placed.length ? (wins / placed.length) * 100 : 0,
+    podiumRate: placed.length ? (podiums / placed.length) * 100 : 0,
     penaltyRate,
     bestStagePercentage: bestPct,
   };
 }
 
+/**
+ * `YYYY-MM-DD` a UTC midnight. Delega en el parser compartido, que además
+ * verifica que la fecha exista: la versión local que había acá construía el
+ * `Date` y lo devolvía sin chequear, así que un `2026-02-31` guardado en la
+ * DB entraba al cómputo de cadencia como 3 de marzo (#201).
+ */
 function parseIsoDate(iso: string): Date | null {
-  // YYYY-MM-DD a UTC midnight (evita timezone shifts).
-  const [y, m, d] = iso.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(Date.UTC(y, m - 1, d));
+  return parseIsoDateUtc(iso);
 }
 
 function aggregateByDiscipline(
