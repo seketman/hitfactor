@@ -61,19 +61,36 @@ describe("getRequestTimeZone", () => {
   });
 
   /**
-   * Written expecting `-03:00` to be rejected; it is not. ES2024 made offset
-   * identifiers valid time zones, so `Intl` accepts them and this passes them
-   * through.
+   * Offset identifiers like `-03:00` are the one input whose handling is not
+   * fixed: ES2024 made them valid time zones, so a new enough ICU accepts
+   * them and this passes them through, while an older one rejects them and
+   * it falls back. Node 20 (what CI runs, per `.github/workflows/ci.yml`)
+   * and Node 25 (what this was written on) land on opposite sides — the
+   * first version of this test hardcoded the newer answer and went red on
+   * CI only.
    *
-   * Left as-is rather than tightened. Vercel's edge only ever sends IANA
-   * names, so this is unreachable in production, and an offset still renders
-   * a correct wall clock — it just cannot follow DST. Rejecting it would be
-   * code guarding a case that does not arrive.
+   * So the expectation is derived at runtime rather than written down. What
+   * is asserted is the invariant that holds either way: the helper never
+   * returns a value its own validity check would reject.
+   *
+   * That makes this test a link in a chain, not a standalone claim — it is
+   * `isValidTimeZone` on both sides, so on its own it would pass vacuously
+   * if that function broke. What anchors it to reality is
+   * "accepts exactly what Intl accepts" below, which compares
+   * `isValidTimeZone` against raw `Intl`. The two together give the real
+   * property; either alone does not.
+   *
+   * Neither outcome is a problem in production: Vercel's edge only ever
+   * sends IANA names, so an offset never arrives, and where it is accepted
+   * it still renders a correct wall clock — it just cannot follow DST.
    */
-  it("passes an offset identifier through (ES2024 made these valid)", async () => {
-    const { getRequestTimeZone } = await import("@/lib/timezone");
+  it("agrees with Intl on offset identifiers, whichever way it goes", async () => {
+    const { getRequestTimeZone, isValidTimeZone } = await import(
+      "@/lib/timezone"
+    );
     withHeader("-03:00");
-    await expect(getRequestTimeZone()).resolves.toBe("-03:00");
+    const expected = isValidTimeZone("-03:00") ? "-03:00" : "UTC";
+    await expect(getRequestTimeZone()).resolves.toBe(expected);
   });
 });
 
