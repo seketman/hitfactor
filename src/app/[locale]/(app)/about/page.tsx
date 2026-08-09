@@ -9,6 +9,7 @@ import { FEEDBACK_MIN_ENTRIES, listMyFeedback } from "@/lib/db/feedback";
 import { countMyMatchEntries } from "@/lib/db/shooters";
 import type { FeedbackStatus, FeedbackType } from "@/lib/db/types";
 import { formatDateTime } from "@/lib/utils";
+import { getRequestTimeZone } from "@/lib/timezone";
 
 interface PageProps {
   searchParams: Promise<{ sent?: string; error?: string }>;
@@ -68,6 +69,7 @@ const STATUS_TONE: Record<
 
 export default async function AboutPage({ searchParams }: PageProps) {
   const locale = await getLocale();
+  const timeZone = await getRequestTimeZone();
   const { sent, error } = await searchParams;
   const { supabase, user } = await requireUser();
   const [myReports, entryCount] = await Promise.all([
@@ -180,7 +182,7 @@ export default async function AboutPage({ searchParams }: PageProps) {
                       <StatusBadge status={r.status} type={r.type} />
                     </div>
                     <span className="font-mono text-xs text-fg-subtle">
-                      {formatDateTime(r.created_at, locale)}
+                      {formatDateTime(r.created_at, locale, timeZone)}
                     </span>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-fg">

@@ -173,28 +173,83 @@ describe("formatDate — entradas raras", () => {
 });
 
 describe("formatDateTime", () => {
-  // Se fija el timezone porque esta función SÍ depende del TZ del proceso:
-  // el input es un instante, no una fecha de calendario.
   it("respeta el locale", async () => {
     const { formatDateTime } = await utilsInTimeZone("UTC");
-    expect(formatDateTime("2026-08-06T14:30:00Z", "es")).toBe("6/8/26, 14:30");
-    expect(formatDateTime("2026-08-06T14:30:00Z", "en")).toBe(
+    expect(formatDateTime("2026-08-06T14:30:00Z", "es", "UTC")).toBe(
+      "6/8/26, 14:30",
+    );
+    expect(formatDateTime("2026-08-06T14:30:00Z", "en", "UTC")).toBe(
       "8/6/26, 2:30 PM",
     );
   });
 
-  it("renderiza en el timezone del proceso", async () => {
-    // Documenta la limitación conocida: en Vercel el proceso corre en UTC,
-    // así que un usuario argentino ve las horas corridas 3 hs.
-    const { formatDateTime } = await utilsInTimeZone(
-      "America/Argentina/Buenos_Aires",
+  /**
+   * El bug de #190. Este bloque **antes fijaba el comportamiento roto**: decía
+   * "renderiza en el timezone del proceso" y lo daba por limitación conocida.
+   *
+   * El proceso se fuerza a UTC —que es lo que corre en Vercel— y se pide el
+   * render en Buenos Aires. Que el proceso y el argumento discrepen es el
+   * punto: si `formatDateTime` volviera a leer el ambiente, saldría
+   * "6/8/26, 02:00" y este test lo agarra. Con los dos en la misma zona
+   * pasaría en verde con la función rota.
+   */
+  it("renderiza en el timezone que se le pasa, no en el del proceso", async () => {
+    const { formatDateTime } = await utilsInTimeZone("UTC");
+    expect(
+      formatDateTime(
+        "2026-08-06T02:00:00Z",
+        "es",
+        "America/Argentina/Buenos_Aires",
+      ),
+    ).toBe("5/8/26, 23:00");
+  });
+
+  // El mismo instante, dos usuarios, dos horas distintas — que es el punto de
+  // renderizar en la zona de cada uno. Cruza el día hacia atrás en Buenos
+  // Aires y hacia adelante en Tokio, así que un timezone ignorado no puede
+  // dar los tres resultados por casualidad.
+  it("da la hora local de cada zona para el mismo instante", async () => {
+    const { formatDateTime } = await utilsInTimeZone("UTC");
+    const instant = "2026-08-06T02:00:00Z";
+    expect(formatDateTime(instant, "es", "UTC")).toBe("6/8/26, 2:00");
+    expect(formatDateTime(instant, "es", "America/Argentina/Buenos_Aires")).toBe(
+      "5/8/26, 23:00",
     );
-    expect(formatDateTime("2026-08-06T02:00:00Z", "es")).toBe("5/8/26, 23:00");
+    expect(formatDateTime(instant, "es", "Asia/Tokyo")).toBe("6/8/26, 11:00");
   });
 
   it("devuelve el guión largo para null y para basura", async () => {
     const { formatDateTime } = await utilsInTimeZone("UTC");
-    expect(formatDateTime(null, "es")).toBe("—");
-    expect(formatDateTime("no soy un timestamp", "es")).toBe("—");
+    expect(formatDateTime(null, "es", "UTC")).toBe("—");
+    expect(formatDateTime("no soy un timestamp", "es", "UTC")).toBe("—");
+  });
+
+  // La memoización indexa por (locale, zona). Con la clave vieja —solo el
+  // locale— la segunda llamada devolvía el formatter de la primera y las dos
+  // zonas rendían igual.
+  it("no reusa el formatter de otra zona con el mismo locale", async () => {
+    const { formatDateTime } = await utilsInTimeZone("UTC");
+    const instant = "2026-08-06T02:00:00Z";
+    const tokyo = formatDateTime(instant, "es", "Asia/Tokyo");
+    const buenosAires = formatDateTime(
+      instant,
+      "es",
+      "America/Argentina/Buenos_Aires",
+    );
+    expect(tokyo).not.toBe(buenosAires);
+  });
+
+  /**
+   * `formatDateTime` no valida la zona a propósito: la validación vive en
+   * `getRequestTimeZone()`, que es el borde por donde entra el header. Pasado
+   * ese borde una zona inexistente es un bug nuestro, y `RangeError` lo hace
+   * visible en vez de renderizar UTC en silencio — que es la familia de bug
+   * que este fix vino a cerrar.
+   */
+  it("tira RangeError si la zona no existe", async () => {
+    const { formatDateTime } = await utilsInTimeZone("UTC");
+    expect(() =>
+      formatDateTime("2026-08-06T02:00:00Z", "es", "Marte/Olympus_Mons"),
+    ).toThrow(RangeError);
   });
 });

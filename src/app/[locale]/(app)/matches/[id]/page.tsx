@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/matches";
 import { buildClubLookup, getClubName, parseRegion } from "@/lib/clubs";
 import { formatDate, formatDateTime } from "@/lib/utils";
+import { getRequestTimeZone } from "@/lib/timezone";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
@@ -33,6 +34,7 @@ interface PageProps {
 
 export default async function MatchDetailPage({ params, searchParams }: PageProps) {
   const locale = await getLocale();
+  const timeZone = await getRequestTimeZone();
   const { id } = await params;
   const { error, from } = await searchParams;
 
@@ -120,7 +122,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
             <span className="text-fg-muted">
               {importerProfile?.display_name ?? "—"}
             </span>{" "}
-            {t("importedOn", { date: formatDateTime(match.imported_at, locale) })}
+            {t("importedOn", {
+              date: formatDateTime(match.imported_at, locale, timeZone),
+            })}
           </p>
         </div>
 
