@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.1](https://github.com/seketman/hitfactor/compare/v1.25.0...v1.25.1) (2026-08-10)
+
+
+### Refactors
+
+* **i18n:** translate ImportError by code instead of throwing Spanish ([#249](https://github.com/seketman/hitfactor/issues/249)) ([9572370](https://github.com/seketman/hitfactor/commit/95723703534f281bc75d6959bcca46750f7186dd)), closes [#203](https://github.com/seketman/hitfactor/issues/203)
+
 ## [1.25.0](https://github.com/seketman/hitfactor/compare/v1.24.0...v1.25.0) (2026-08-10)
 
 
