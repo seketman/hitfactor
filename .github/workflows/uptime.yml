@@ -1,0 +1,93 @@
+name: Uptime
+
+# Polls /api/health and fails the run when the site does not answer 200,
+# which makes GitHub send its usual "workflow failed" notification (#225).
+#
+# ## Read this before trusting it
+#
+# This is the free, zero-dependency option, not the good one. Its limits
+# are real and worth knowing before it is the only thing watching:
+#
+#  - **`schedule` is best-effort.** GitHub does not promise punctuality and
+#    delays of tens of minutes happen under load. Treat the interval as an
+#    upper bound on resolution, not a guarantee.
+#  - **It disables itself after 60 days without repository activity.** If
+#    development pauses, the monitor stops — silently, and precisely when
+#    nobody is around to notice the site is down either.
+#  - **Alerting is email on a failed run**, with no escalation and no
+#    acknowledgement.
+#
+# An external monitor (UptimeRobot, Better Stack — both free at this scale)
+# has none of those problems and points at the same endpoint. This workflow
+# is what makes the check exist today; it is not an argument against
+# setting one up. See `docs/operations.md`.
+
+on:
+  schedule:
+    # Every 15 minutes. Not 5: GitHub's own guidance is that frequent cron
+    # schedules on a busy runner pool get delayed anyway, so a shorter
+    # interval buys resolution it cannot actually deliver, and burns runs.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Never let two checks overlap, and never cancel one in flight — a probe
+# killed halfway would report a failure that says nothing about the site.
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe /api/health
+        env:
+          # Required, with no default on purpose. The production domain
+          # lives in `NEXT_PUBLIC_SITE_URL` on Vercel and nowhere in this
+          # repository, so any hardcoded fallback here would be a guess —
+          # and a monitor guessing its target is worse than no monitor: it
+          # reports green about a host nobody asked it to watch.
+          #
+          # Set it once with:
+          #   gh variable set HEALTHCHECK_URL --body "https://<domain>/api/health"
+          HEALTH_URL: ${{ vars.HEALTHCHECK_URL }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${HEALTH_URL:-}" ]; then
+            echo "::error::HEALTHCHECK_URL is not set. Run: gh variable set HEALTHCHECK_URL --body \"https://<domain>/api/health\""
+            exit 1
+          fi
+
+          # Two attempts before declaring an outage. One failed request from
+          # a GitHub runner is as likely to be the runner's network as the
+          # site's, and a monitor that cries wolf gets muted — after which
+          # it is worth nothing on the day it is right.
+          for attempt in 1 2; do
+            # Deliberately NOT --location. A redirect is a failure here: the
+            # endpoint must answer directly. Following one would mask a
+            # misrouted probe — which is not hypothetical, the i18n proxy
+            # was redirecting /api/health to /es/api/health when this was
+            # written, and --location would have hidden where that went.
+            code=$(curl --silent --show-error \
+                        --max-time 20 \
+                        --output /tmp/health-body.json \
+                        --write-out '%{http_code}' \
+                        "$HEALTH_URL") && rc=0 || rc=$?
+
+            if [ "$rc" -eq 0 ] && [ "$code" = "200" ]; then
+              echo "Attempt $attempt: HTTP $code"
+              cat /tmp/health-body.json
+              exit 0
+            fi
+
+            echo "Attempt $attempt failed: curl exit $rc, HTTP ${code:-none}"
+            cat /tmp/health-body.json 2>/dev/null || true
+
+            if [ "$attempt" -eq 1 ]; then
+              sleep 30
+            fi
+          done
+
+          echo "::error::$HEALTH_URL did not answer 200 on two attempts."
+          exit 1
