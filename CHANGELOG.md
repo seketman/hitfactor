@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.0](https://github.com/seketman/hitfactor/compare/v1.24.0...v1.25.0) (2026-08-10)
+
+
+### Features
+
+* **ops:** add /api/health and an uptime probe ([#246](https://github.com/seketman/hitfactor/issues/246)) ([f5786e3](https://github.com/seketman/hitfactor/commit/f5786e314195e13c98085cf8ff99bb5caf5ed035)), closes [#225](https://github.com/seketman/hitfactor/issues/225)
+
 ## [1.24.0](https://github.com/seketman/hitfactor/compare/v1.23.4...v1.24.0) (2026-08-10)
 
 
