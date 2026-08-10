@@ -17,13 +17,7 @@ export function requireDivision(
 ): number {
   const id = divisionByCode.get(code);
   if (!id) {
-    throw new ImportError(
-      `División no reconocida: "${code}". Si el archivo es un HTML de ` +
-        "PractiScore, fijate cómo se llama la sección en el reporte " +
-        '(ej. "Match Results - Pistola Prod.") y pasale ese nombre a un ' +
-        "admin: se agrega como alias, no hace falta una división nueva.",
-      "UNKNOWN_DIVISION",
-    );
+    throw new ImportError("UNKNOWN_DIVISION", { code });
   }
   return id;
 }

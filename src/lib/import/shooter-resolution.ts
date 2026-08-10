@@ -193,6 +193,8 @@ async function findOrCreateShooter(
     .select("id")
     .single();
 
-  if (error) throw new ImportError(error.message, "SHOOTER_INSERT_FAILED");
+  if (error) {
+    throw new ImportError("SHOOTER_INSERT_FAILED", undefined, error.message);
+  }
   return created!.id as string;
 }

@@ -572,14 +572,46 @@ describe("importParsedMatch — Stage results", () => {
     }
   });
 
-  it("falla con MATCH_NOT_FOUND si no existe el match para el stage", async () => {
+  /**
+   * Sin ningún match de ese día el usuario no tiene nada que elegir, así
+   * que el código es el que dice "importá primero el overall" y no el que
+   * lista candidatos (#203). Antes era un solo código con el párrafo
+   * condicional embebido en la prosa.
+   */
+  it("falla con MATCH_NOT_FOUND_NONE_THAT_DAY si no hay matches ese día", async () => {
     const fakeFresh = buildSupabase(); // sin match overall
     const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-stage1.html"));
 
     await expect(
       importParsedMatch(fakeFresh.asClient(), parsed, USER_ID, "s.html"),
     ).rejects.toMatchObject({
+      code: "MATCH_NOT_FOUND_NONE_THAT_DAY",
+      params: { date: "2026-02-20" },
+    });
+  });
+
+  // Con candidatos el mensaje los enumera, así que el code cambia y los
+  // nombres viajan en `params` en vez de estar pegados en la prosa.
+  it("falla con MATCH_NOT_FOUND y lista los candidatos del día", async () => {
+    const fakeFresh = buildSupabase();
+    // Mismo día y disciplina, pero con un nombre que no matchea el título
+    // del stage — si matcheara, resolveMatchForStage lo encontraría.
+    fakeFresh.seed("matches", [
+      {
+        id: "otro-1",
+        discipline_id: 1,
+        name: "Torneo Ajeno",
+        date: "2026-02-20",
+        imported_by_user_id: OTHER_USER,
+      },
+    ]);
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-stage1.html"));
+
+    await expect(
+      importParsedMatch(fakeFresh.asClient(), parsed, USER_ID, "s.html"),
+    ).rejects.toMatchObject({
       code: "MATCH_NOT_FOUND",
+      params: { date: "2026-02-20", candidates: '"Torneo Ajeno"' },
     });
   });
 
@@ -1004,9 +1036,16 @@ describe("importParsedMatch — un import fallido no deja el match huérfano (#2
       message: "statement timeout",
     };
 
+    // El motivo crudo de Postgres ya no viaja en `message` —eso iba a la
+    // UI, que era el bug de #203— pero tiene que seguir existiendo en
+    // `detail` para el log del server. Perderlo al dejar de mostrarlo
+    // sería cambiar un bug por otro.
     await expect(
       importParsedMatch(fake.asClient(), parsed, USER_ID, "test.html"),
-    ).rejects.toThrow(/statement timeout/);
+    ).rejects.toMatchObject({
+      code: "MATCH_ENTRIES_INSERT_FAILED",
+      detail: expect.stringContaining("statement timeout"),
+    });
   });
 
   /**
@@ -1090,5 +1129,61 @@ describe("importParsedMatch — un import fallido no deja el match huérfano (#2
     expect(result.insertedEntries).toBe(parsed.matchEntries.length);
     // No se creó un segundo match: se completó el que estaba.
     expect(fake.tables.matches.rows).toHaveLength(1);
+  });
+});
+
+describe("importParsedMatch — lista de candidatos acotada (#203)", () => {
+  /**
+   * La lista viaja a la UI dentro de un query param. Sin tope, un día con
+   * muchos torneos producía una URL enorme y un mensaje ilegible.
+   *
+   * Y el "…" no es cosmético: cinco nombres sin marca se leen como *todos*
+   * los del día, así que alguien que no ve el suyo concluye que no está
+   * importado y lo vuelve a subir. Una lista truncada presentada como
+   * completa manda a la persona a hacer algo innecesario.
+   */
+  it("corta en 5 y marca que hay más", async () => {
+    const fake = buildSupabase();
+    fake.seed(
+      "matches",
+      Array.from({ length: 8 }, (_, i) => ({
+        id: `m-${i}`,
+        discipline_id: 1,
+        name: `Torneo Ajeno ${i}`,
+        date: "2026-02-20",
+        imported_by_user_id: OTHER_USER,
+      })),
+    );
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-stage1.html"));
+
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "s.html"),
+    ).rejects.toMatchObject({
+      code: "MATCH_NOT_FOUND",
+      params: {
+        candidates: expect.stringContaining("…"),
+      },
+    });
+  });
+
+  it("no marca de más cuando entran todos", async () => {
+    const fake = buildSupabase();
+    fake.seed("matches", [
+      {
+        id: "m-solo",
+        discipline_id: 1,
+        name: "Torneo Ajeno",
+        date: "2026-02-20",
+        imported_by_user_id: OTHER_USER,
+      },
+    ]);
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-stage1.html"));
+
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "s.html"),
+    ).rejects.toMatchObject({
+      code: "MATCH_NOT_FOUND",
+      params: { candidates: '"Torneo Ajeno"' },
+    });
   });
 });

@@ -75,10 +75,9 @@ export async function importParsedMatch(
     .eq("code", parsed.discipline)
     .single();
   if (discErr || !discipline) {
-    throw new ImportError(
-      `Disciplina desconocida: ${parsed.discipline}`,
-      "UNKNOWN_DISCIPLINE",
-    );
+    throw new ImportError("UNKNOWN_DISCIPLINE", {
+      discipline: parsed.discipline,
+    });
   }
   const disciplineRef: DisciplineRef = {
     id: discipline.id as number,
@@ -91,7 +90,7 @@ export async function importParsedMatch(
     .select("id, code")
     .eq("discipline_id", disciplineRef.id);
   if (divErr || !divisionsData) {
-    throw new ImportError("No se pudieron cargar las divisiones", "DIVISIONS_FETCH_FAILED");
+    throw new ImportError("DIVISIONS_FETCH_FAILED");
   }
   const divisionByCode = new Map<string, number>();
   for (const d of divisionsData) divisionByCode.set(d.code, d.id);
@@ -249,10 +248,7 @@ async function importMatchOverall(
       parsed.region == null ||
       otherUserMatch.region === parsed.region;
     if (regionsCompatible) {
-      throw new ImportError(
-        'Este match ya fue importado por otra persona. Buscalo en la página de Matches y marcate con "Soy yo" en vez de volver a subirlo.',
-        "MATCH_ALREADY_EXISTS_BY_OTHER",
-      );
+      throw new ImportError("MATCH_ALREADY_EXISTS_BY_OTHER");
     }
   }
 
@@ -288,12 +284,9 @@ async function importMatchOverall(
 
   if (matchErr) {
     if (matchErr.code === "23505") {
-      throw new ImportError(
-        "Este match ya fue importado por otro usuario.",
-        "MATCH_ALREADY_EXISTS",
-      );
+      throw new ImportError("MATCH_ALREADY_EXISTS");
     }
-    throw new ImportError(matchErr.message, "MATCH_INSERT_FAILED");
+    throw new ImportError("MATCH_INSERT_FAILED", undefined, matchErr.message);
   }
   const matchId = matchRow!.id as string;
 
@@ -437,20 +430,27 @@ async function importStages(
       discipline.id,
       parsed.date,
     );
-    const detail = candidatesText
-      ? ` Matches existentes del ${parsed.date}: ${candidatesText}.`
-      : ` No hay matches importados con fecha ${parsed.date} todavía.`;
-    throw new ImportError(
-      `No se pudo asociar el stage a un match existente.${detail} Importá primero el archivo de "Match Results" del torneo.`,
-      "MATCH_NOT_FOUND",
-    );
+    // Dos mensajes distintos según haya candidatos o no: "elegí uno de
+    // estos" y "todavía no importaste ninguno" mandan al usuario a hacer
+    // cosas diferentes.
+    //
+    // Dos `throw` explícitos y no uno con el código en un ternario: el
+    // guardrail de `messages-parity` empareja `new ImportError("CODE", {...})`
+    // por texto, así que un código calculado le pasa por al lado sin que
+    // nada avise. Escrito así, los dos entran.
+    if (candidatesText) {
+      throw new ImportError("MATCH_NOT_FOUND", {
+        date: parsed.date,
+        candidates: candidatesText,
+      });
+    }
+    throw new ImportError("MATCH_NOT_FOUND_NONE_THAT_DAY", {
+      date: parsed.date,
+    });
   }
 
   if (matchRow.imported_by_user_id !== importerUserId) {
-    throw new ImportError(
-      "Solo el usuario que importó el match original puede agregarle stages.",
-      "NOT_MATCH_OWNER",
-    );
+    throw new ImportError("NOT_MATCH_OWNER");
   }
   const matchId = matchRow.id;
   const matchName = matchRow.name;
@@ -569,8 +569,9 @@ async function upsertMatchEntries(
     .upsert(dedupedRows, { onConflict: "match_id,shooter_id,division_id" });
   if (error) {
     throw new ImportError(
-      `Error insertando resultados: ${error.message}`,
       "MATCH_ENTRIES_INSERT_FAILED",
+      undefined,
+      error.message,
     );
   }
   return dedupedRows.length;
@@ -763,16 +764,41 @@ export function findBestPrefixMatch<T extends { name: string }>(
   return reverseHits.length === 1 ? reverseHits[0]! : null;
 }
 
+/**
+ * Nombres de los matches del mismo día y disciplina, para sugerirle al
+ * usuario contra cuál asociar un archivo de stages.
+ *
+ * Acotado a `MAX_MATCH_CANDIDATES`. Antes concatenaba todos: el resultado
+ * viaja a la UI dentro de un query param, así que un día con muchos
+ * torneos producía una URL enorme y un mensaje ilegible. Un puñado de
+ * nombres alcanza para reconocer el propio; una lista de cuarenta no ayuda
+ * a nadie.
+ *
+ * Cuando hay más de los que entran, la lista termina en "…". El detalle no
+ * es cosmético: sin la marca, cinco nombres se leen como *todos* los del
+ * día, y un usuario que no ve el suyo concluye que no está importado
+ * cuando sí lo está. Una lista truncada que se presenta como completa
+ * miente, y manda a la persona a re-importar algo que ya existe.
+ */
+const MAX_MATCH_CANDIDATES = 5;
+
 async function listSameDayMatchNames(
   supabase: TypedSupabaseClient,
   disciplineId: number,
   date: string,
 ): Promise<string> {
+  // Se pide uno de más solo para saber si sobran: el extra no se muestra.
   const { data } = await supabase
     .from("matches")
     .select("name")
     .eq("discipline_id", disciplineId)
-    .eq("date", date);
-  const names = (data ?? []).map((m: { name: string }) => `"${m.name}"`);
+    .eq("date", date)
+    .limit(MAX_MATCH_CANDIDATES + 1);
+
+  const rows = data ?? [];
+  const names = rows
+    .slice(0, MAX_MATCH_CANDIDATES)
+    .map((m: { name: string }) => `"${m.name}"`);
+  if (rows.length > MAX_MATCH_CANDIDATES) names.push("…");
   return names.join(", ");
 }

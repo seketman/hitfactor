@@ -30,14 +30,16 @@ import { ParserError } from "@/lib/parsers/parser-error";
 /**
  * Traduce a texto para el usuario lo que salió mal en un import.
  *
- * Se usa tanto para fallas de descarga como de parseo, y por eso el nombre no
- * dice "parser": solo el segundo caso produce `ParserError`.
+ * Este es **el** punto donde los códigos se vuelven prosa. Tanto los parsers
+ * (`ParserError`, #148) como el importer (`ImportError`, #203) tiran un
+ * código en vez de un mensaje: son funciones puras respecto del locale, y
+ * threadearles un traductor por toda la cadena de llamadas sería invasivo.
+ * Acá es el primer punto del camino donde hay locale, así que el querystring
+ * de `/import` sigue llevando texto ya resuelto y su contrato no cambia.
  *
- * Los parsers tiran `ParserError` con un código en vez de prosa, porque son
- * funciones puras y threadearles un traductor por toda la cadena de llamadas
- * sería invasivo. La traducción se hace acá, que es el primer punto del
- * camino donde hay locale — y así el querystring de `/import` sigue llevando
- * texto ya resuelto, sin cambiar su contrato.
+ * `ImportError` puede traer además un `detail` con el mensaje crudo de
+ * Postgres. Se loguea y no se devuelve: mostrarlo era el bug de #199, y
+ * tirarlo del todo dejaría sin explicación por qué falló una escritura.
  *
  * Un `Error` común (bug, falla de red) se pasa tal cual: no es texto pensado
  * para el usuario, pero ocultarlo detrás de un mensaje genérico haría más
@@ -51,6 +53,15 @@ async function userFacingErrorMessage(e: unknown, fallbackKey: string) {
   const t = await getTranslations("import");
   if (e instanceof ParserError) {
     return t(`parserError.${e.code}`, e.params);
+  }
+  if (e instanceof ImportError) {
+    // El detalle crudo de Postgres se loguea acá y no viaja a la UI: es la
+    // única copia que queda de por qué falló el insert, y mostrárselo al
+    // usuario era el bug de #199.
+    if (e.detail) {
+      console.error(`[import:${e.code}] ${e.detail}`);
+    }
+    return t(`importError.${e.code}`, e.params);
   }
   return e instanceof Error ? e.message : t(fallbackKey);
 }
@@ -382,7 +393,11 @@ async function confirmFatImport(
     if (e instanceof ImportError) {
       // No perdemos el trabajo del usuario: volvemos a la pantalla de
       // fecha con el error, conservando el ParsedMatch.
-      return { ...prevState, parsed, error: e.message };
+      return {
+        ...prevState,
+        parsed,
+        error: await userFacingErrorMessage(e, "importFailed"),
+      };
     }
     throw e;
   }
@@ -405,7 +420,11 @@ async function runImport(
     result = await importParsedMatch(supabase, parsed, userId, filename, options);
   } catch (e) {
     if (e instanceof ImportError) {
-      redirectImportError(e.message, filename, locale);
+      redirectImportError(
+        await userFacingErrorMessage(e, "importFailed"),
+        filename,
+        locale,
+      );
     }
     throw e;
   }

@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import es from "../messages/es.json";
 import en from "../messages/en.json";
@@ -130,6 +131,116 @@ describe("ParserError: params ↔ placeholders", () => {
     "%s pasa exactamente los params que su mensaje usa",
     (code, params) => {
       const message = (es.import.parserError as Record<string, string>)[code];
+      expect(message, `falta el mensaje de "${code}"`).toBeDefined();
+      const placeholders = [...message!.matchAll(/\{(\w+)\s*[,}]/g)]
+        .map((m) => m[1]!)
+        .sort();
+      expect(params).toEqual(placeholders);
+    },
+  );
+});
+
+/**
+ * Lo mismo para `ImportErrorCode`, que hasta #203 no lo necesitaba: los
+ * `ImportError` se construían con prosa española hardcodeada, así que no
+ * había mensajes con los que desincronizarse. Ahora sí, y con el mismo
+ * modo de falla silencioso — un código sin mensaje se renderiza como
+ * `import.importError.LO_QUE_SEA` en la pantalla de error.
+ */
+describe("ImportErrorCode ↔ messages", () => {
+  const source = readFileSync("src/lib/import/import-error.ts", "utf8");
+  const union = source.slice(source.indexOf("export type ImportErrorCode"));
+  const codes = [...union.matchAll(/\|\s*"(\w+)"/g)].map((m) => m[1]!);
+
+  it("encuentra los códigos declarados", () => {
+    expect(codes.length).toBeGreaterThan(10);
+  });
+
+  it.each(["es", "en"])("cada código tiene mensaje en %s", (locale) => {
+    const messages = (locale === "es" ? es : en).import.importError as Record<
+      string,
+      string
+    >;
+    expect(codes.filter((c) => !(c in messages))).toEqual([]);
+  });
+
+  it("no hay mensajes de error sin código que los use", () => {
+    const declared = Object.keys(es.import.importError);
+    expect(declared.filter((k) => !codes.includes(k))).toEqual([]);
+  });
+});
+
+/**
+ * Y el chequeo de params ↔ placeholders, por la misma razón que en
+ * `ParserError`: pasar `{ file }` a un mensaje que dice `{filename}` no
+ * rompe nada, solo imprime `{filename}` crudo en la pantalla de error.
+ *
+ * Se escanean todos los módulos de `lib/import/` que tiran, no una lista
+ * fija: un archivo nuevo que empiece a tirar `ImportError` entra solo.
+ */
+describe("ImportError: params ↔ placeholders", () => {
+  const dir = "src/lib/import";
+  /**
+   * Se sacan los comentarios antes de escanear. Sin esto el regex matchea
+   * la prosa que documenta el propio guardrail: el comentario de
+   * `import-match.ts` que explica por qué los códigos van literales
+   * contiene `new ImportError("CODE", ...)` como ejemplo, y el test lo
+   * levantaba como un throw real y fallaba pidiendo el mensaje de "CODE".
+   * Mismo tropiezo que tuvo `no-host-header-urls.test.ts` con su propia
+   * explicación.
+   */
+  const sources = readdirSync(dir)
+    .filter((f) => f.endsWith(".ts"))
+    .map((f) => readFileSync(join(dir, f), "utf8"))
+    .join("\n")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+
+  it("el stripper de comentarios no vació el fuente (sanity check)", () => {
+    // Un stripper roto dejaría 0 throws y todo lo de abajo pasaría en vacío.
+    expect(sources).toContain("new ImportError(");
+    expect(sources.length).toBeGreaterThan(5000);
+  });
+
+  const calls = [
+    ...sources.matchAll(/new ImportError\(\s*"(\w+)"\s*(?:,\s*\{([^}]*)\})?/g),
+  ].map(([, code, params]) => ({
+    code: code!,
+    params: (params ?? "")
+      .split(",")
+      .map((p) => p.split(":")[0]!.trim())
+      .filter(Boolean)
+      .sort(),
+  }));
+
+  /**
+   * El emparejamiento es por texto, así que solo ve `new ImportError("CODE"`
+   * con el código literal. Un código calculado —un ternario, una variable—
+   * no entra y nadie se entera. Por eso además de contar los throws se
+   * verifica que **todos** los códigos declarados aparezcan en alguno: si
+   * alguien escribe uno calculado, su código queda huérfano acá.
+   */
+  it("encuentra los throws del importer", () => {
+    expect(calls.length).toBeGreaterThan(10);
+  });
+
+  it("cada código declarado se tira desde algún lado con literal", () => {
+    const thrown = new Set(calls.map((c) => c.code));
+    const source = readFileSync("src/lib/import/import-error.ts", "utf8");
+    const union = source.slice(source.indexOf("export type ImportErrorCode"));
+    const declared = [...union.matchAll(/\|\s*"(\w+)"/g)].map((m) => m[1]!);
+
+    expect(
+      declared.filter((c) => !thrown.has(c)),
+      "código declarado que ningún `new ImportError(\"...\")` literal usa: " +
+        "o sobra, o se tira con el código calculado y este guardrail no lo ve.",
+    ).toEqual([]);
+  });
+
+  it.each(calls.map((c) => [c.code, c.params] as const))(
+    "%s pasa exactamente los params que su mensaje usa",
+    (code, params) => {
+      const message = (es.import.importError as Record<string, string>)[code];
       expect(message, `falta el mensaje de "${code}"`).toBeDefined();
       const placeholders = [...message!.matchAll(/\{(\w+)\s*[,}]/g)]
         .map((m) => m[1]!)

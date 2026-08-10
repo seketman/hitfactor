@@ -81,7 +81,11 @@ export async function attachStagesToMatch(
     .from("stage_results")
     .upsert(stageResultRows, { onConflict: "stage_id,match_entry_id" });
   if (resErr) {
-    throw new ImportError(resErr.message, "STAGE_RESULTS_INSERT_FAILED");
+    throw new ImportError(
+      "STAGE_RESULTS_INSERT_FAILED",
+      undefined,
+      resErr.message,
+    );
   }
   return { stagesCount, resultsCount: stageResultRows.length };
 }
@@ -117,7 +121,11 @@ async function bulkResolveStages(
       .insert(newStageRows)
       .select("id, stage_number");
     if (stageErr) {
-      throw new ImportError(stageErr.message, "STAGE_INSERT_FAILED");
+      throw new ImportError(
+        "STAGE_INSERT_FAILED",
+        undefined,
+        stageErr.message,
+      );
     }
     for (const s of created ?? []) {
       stageIdByNumber.set(s.stage_number as number, s.id as string);
