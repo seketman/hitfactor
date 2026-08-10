@@ -8,6 +8,7 @@
 | [`glossary.md`](./glossary.md) | Domain terms (shooter, match, claim, hit factor, etc.). Required reading before writing a new spec or plan. |
 | [`development.md`](./development.md) | How to run the project locally. Environment variables. Migrations. |
 | [`deployment.md`](./deployment.md) | How to deploy to Vercel + Supabase. |
+| [`operations.md`](./operations.md) | Knowing whether the site is up: the `/api/health` endpoint, the uptime workflow and its limits, and why Vercel's own alerting does not cover this. |
 | [`importing.md`](./importing.md) | Import business rules, supported formats, how the file reaches the server, and error codes. |
 
 ## Other documents
