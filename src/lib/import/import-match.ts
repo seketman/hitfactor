@@ -212,7 +212,11 @@ async function importMatchOverall(
       insertedEntries: upsertedEntries,
       insertedStages: stagesCount,
       insertedStageResults: resultsCount,
-      existedAlready: true,
+      // Un match sin entries no "ya existía": es el resto de un import que
+      // falló a la mitad y que este merge acaba de terminar (#205).
+      // Reportarlo como re-upload le diría al usuario que su import no hizo
+      // nada, justo cuando hizo todo el trabajo.
+      existedAlready: existingForUser.entryCount > 0,
       warnings: parsed.warnings,
     };
   }
@@ -293,26 +297,50 @@ async function importMatchOverall(
   }
   const matchId = matchRow!.id as string;
 
-  const insertedEntries = await upsertMatchEntries(
-    supabase,
-    parsed,
-    matchId,
-    divisionByCode,
-  );
-
-  // Si el archivo trae stages embebidos (caso Steel Challenge), los
-  // insertamos en la misma operación.
+  let insertedEntries: number;
   let insertedStages = 0;
   let insertedStageResults = 0;
-  if (parsed.stages.length > 0) {
-    const { stagesCount, resultsCount } = await attachStagesToMatch(
+
+  /**
+   * A partir de acá el match ya existe en DB pero todavía no tiene nada
+   * adentro. PostgREST no da transacciones: cada llamada es su propio
+   * commit, así que si el paso que sigue falla, la fila de `matches` queda
+   * sola (#205).
+   *
+   * Un match sin entries no es inofensivo: aparece en la lista del usuario
+   * como un torneo vacío, y en el reintento lo levanta el pre-check de
+   * dedup, que toma el camino de merge. Los datos terminan bien —el merge
+   * puebla lo mismo que la rama fresca— pero el import se anuncia como "ya
+   * existía", que no es lo que pasó.
+   *
+   * Compensamos borrando lo que acabamos de insertar. No es atomicidad: si
+   * el proceso muere entre el insert y el catch, el catch tampoco corre.
+   * Cubre el caso frecuente —error de constraint, timeout de una query,
+   * red— y deja el caso raro para el reintento, que sabe curarlo.
+   */
+  try {
+    insertedEntries = await upsertMatchEntries(
       supabase,
       parsed,
       matchId,
       divisionByCode,
     );
-    insertedStages = stagesCount;
-    insertedStageResults = resultsCount;
+
+    // Si el archivo trae stages embebidos (caso Steel Challenge), los
+    // insertamos en la misma operación.
+    if (parsed.stages.length > 0) {
+      const { stagesCount, resultsCount } = await attachStagesToMatch(
+        supabase,
+        parsed,
+        matchId,
+        divisionByCode,
+      );
+      insertedStages = stagesCount;
+      insertedStageResults = resultsCount;
+    }
+  } catch (e) {
+    await rollbackInsertedMatch(supabase, matchId, filename);
+    throw e;
   }
 
   return {
@@ -327,6 +355,59 @@ async function importMatchOverall(
     existedAlready: false,
     warnings: parsed.warnings,
   };
+}
+
+/**
+ * Borra el match recién insertado cuando el resto del import falló (#205).
+ *
+ * `match_entries`, `stages` y `stage_results` cuelgan de `matches` con
+ * `on delete cascade`, así que esto también se lleva lo que se haya
+ * alcanzado a insertar. Los `shooters` creados en el intento fallido
+ * quedan: son entidades compartidas entre torneos, no hijas de éste, y una
+ * fila de tirador sin participaciones no molesta a nadie — el reintento la
+ * reusa.
+ *
+ * **Nunca tira.** Se la llama desde un `catch` para preservar el error
+ * original, que es el que le explica al usuario qué pasó. Si además falla
+ * el borrado, ese error tapando al primero sería estrictamente peor: el
+ * usuario perdería el diagnóstico y encima seguiría con el huérfano.
+ *
+ * Cuenta las filas afectadas en vez de confiar en `error`. Es la misma
+ * trampa de #196: un DELETE que la RLS filtra por completo **no es un
+ * error** en PostgREST, vuelve 200 con cero filas. Sin contar, un borrado
+ * que no borró nada se registraría como compensación exitosa y el huérfano
+ * quedaría igual, ahora sin rastro de que quedó.
+ */
+async function rollbackInsertedMatch(
+  supabase: TypedSupabaseClient,
+  matchId: string,
+  filename: string,
+): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from("matches")
+      .delete()
+      .eq("id", matchId)
+      .select("id");
+
+    if (error || (data?.length ?? 0) === 0) {
+      console.error(
+        `[import] el import de ${filename} falló y no se pudo borrar el match ` +
+          `${matchId}: queda sin entries en la DB. ` +
+          `Motivo: ${error?.message ?? "el DELETE no afectó ninguna fila (¿RLS?)"}`,
+      );
+      return;
+    }
+    console.warn(
+      `[import] el import de ${filename} falló; se borró el match ${matchId} ` +
+        `para no dejarlo huérfano.`,
+    );
+  } catch (e) {
+    console.error(
+      `[import] el import de ${filename} falló y el borrado del match ` +
+        `${matchId} tiró: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -16,9 +16,35 @@ export interface MockTable {
   rows: Row[];
   /** Si está seteado, falla todos los inserts con este código de error. */
   insertError?: { code: string; message: string };
+  /**
+   * Si está seteado, falla todos los upserts con este código de error.
+   *
+   * Existe para poder testear la compensación del import (#205): lo que hay
+   * que provocar es que el match se inserte y el paso siguiente falle, y ese
+   * paso siguiente escribe con `upsert`, no con `insert`.
+   */
+  upsertError?: { code: string; message: string };
   /** Auto-increment para columnas tipo id. */
   nextId?: number;
 }
+
+/**
+ * Relaciones que el mock sabe resolver cuando la proyección pide un
+ * agregado embebido tipo `match_entries(count)`.
+ *
+ * PostgREST devuelve esos agregados como `[{ count: n }]` dentro de cada
+ * fila del padre, y `findUserMatch` los usa para saber si un match tiene
+ * resultados sin pagar un segundo round-trip. El mock ignoraba la
+ * proyección por completo, así que sin esto el conteo volvía siempre 0 y
+ * un re-upload legítimo se veía igual que un match huérfano.
+ *
+ * Se declara explícito en vez de derivar la FK del nombre de la tabla:
+ * "matches" → "match_id" sale bien por casualidad, y una regla que acierta
+ * por casualidad falla en silencio con la próxima tabla.
+ */
+const EMBEDDED_COUNTS: Record<string, { childTable: string; fk: string }> = {
+  match_entries: { childTable: "match_entries", fk: "match_id" },
+};
 
 export class FakeSupabase {
   tables: Record<string, MockTable> = {};
@@ -41,7 +67,7 @@ export class FakeSupabase {
 
   from(tableName: string) {
     const table = this.table(tableName);
-    return new QueryBuilder(table, tableName);
+    return new QueryBuilder(table, tableName, this);
   }
 }
 
@@ -54,7 +80,11 @@ class QueryBuilder {
   private orderClauses: { col: string; asc: boolean }[] = [];
   private limitN?: number;
 
-  constructor(private table: MockTable, private tableName: string) {}
+  constructor(
+    private table: MockTable,
+    private tableName: string,
+    private db: FakeSupabase,
+  ) {}
 
   select(projection?: string): this {
     this.projection = projection;
@@ -194,7 +224,29 @@ class QueryBuilder {
       });
     }
     if (this.limitN !== undefined) rows = rows.slice(0, this.limitN);
-    return rows;
+    return rows.map((r) => this.withEmbeddedCounts(r));
+  }
+
+  /**
+   * Adjunta los agregados embebidos que pida la proyección, con la forma en
+   * que los devuelve PostgREST: `{ match_entries: [{ count: n }] }`.
+   *
+   * Devuelve una copia cuando hay algo que adjuntar, para no ensuciar la
+   * fila guardada en la tabla del mock — si mutara, un test que lee dos
+   * veces vería el conteo de la primera lectura.
+   */
+  private withEmbeddedCounts(row: Row): Row {
+    if (!this.projection) return row;
+    let out: Row | null = null;
+    for (const [name, rel] of Object.entries(EMBEDDED_COUNTS)) {
+      if (!this.projection.includes(`${name}(count)`)) continue;
+      const count = this.db
+        .table(rel.childTable)
+        .rows.filter((c) => c[rel.fk] === row.id).length;
+      out ??= { ...row };
+      out[name] = [{ count }];
+    }
+    return out ?? row;
   }
 
   private runInsert(): Row[] {
@@ -227,6 +279,9 @@ class QueryBuilder {
   }
 
   private runUpsert(): Row[] {
+    if (this.table.upsertError) {
+      throw this.table.upsertError;
+    }
     const items = Array.isArray(this.payload) ? this.payload : [this.payload];
     const result: Row[] = [];
     for (const item of items) {
