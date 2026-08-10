@@ -32,6 +32,7 @@ function auditTranslator(
 const t = auditTranslator("es", es);
 const tEn = auditTranslator("en", en);
 import type { AuditLogRow } from "@/lib/db/types";
+import { AUDIT_ACTION } from "@/lib/audit/log-action";
 
 function row(overrides: Partial<AuditLogRow>): AuditLogRow {
   return {
@@ -444,5 +445,141 @@ describe("describeAuditEntry — i18n", () => {
       t,
     );
     expect(desc.summary).toBe("algo.nuevo");
+  });
+});
+
+describe("describeAuditEntry — admin.view_as", () => {
+  it("nombra a quién se miró y con qué filtro", () => {
+    const d = describeAuditEntry(
+      row({
+        action: "admin.view_as",
+        entity_type: "profile",
+        entity_id: "target-1",
+        metadata: {
+          profile_display_name: "Someone Else",
+          shooter_count: 2,
+          discipline_code: "ipsc",
+          division_code: "PO",
+        },
+      }),
+      t,
+    );
+    expect(d.summary).toContain("Someone Else");
+    expect(d.detail).toBe("ipsc · PO");
+  });
+
+  it("sin filtros dice que fue la vista consolidada", () => {
+    const d = describeAuditEntry(
+      row({
+        action: "admin.view_as",
+        metadata: {
+          profile_display_name: "Someone Else",
+          discipline_code: null,
+          division_code: null,
+        },
+      }),
+      t,
+    );
+    expect(d.detail).toBe("vista consolidada");
+  });
+
+  it("tolera una fila vieja sin display_name", () => {
+    const d = describeAuditEntry(
+      row({ action: "admin.view_as", metadata: {} }),
+      t,
+    );
+    // No revienta ni deja el summary vacío: cae al nombre desconocido.
+    expect(d.summary.length).toBeGreaterThan(0);
+    expect(d.summary).not.toContain("activityLog.");
+  });
+
+  it("también renderiza en inglés", () => {
+    const d = describeAuditEntry(
+      row({
+        action: "admin.view_as",
+        metadata: {
+          profile_display_name: "Someone Else",
+          discipline_code: null,
+          division_code: null,
+        },
+      }),
+      tEn,
+    );
+    expect(d.summary).toContain("viewed the dashboard as");
+    expect(d.detail).toBe("consolidated view");
+  });
+});
+
+/**
+ * `AUDIT_ACTION` lleva escrita la convención desde el principio: *"Si
+ * agregás una acción nueva, sumala acá Y en `describeAuditEntry` para que
+ * la pantalla /activity la muestre legible"*. Nada la verificaba.
+ *
+ * El costo de olvidarla es silencioso y feo: el `default` del switch
+ * devuelve `row.action` crudo, así que la pantalla muestra `admin.view_as`
+ * en vez de una frase. No falla nada — solo queda una fila ilegible en el
+ * único lugar donde el usuario audita su propia cuenta.
+ */
+describe("describeAuditEntry — cobertura del catálogo", () => {
+  it("toda acción de AUDIT_ACTION tiene su case (y no cae al fallback)", () => {
+    const missing = Object.values(AUDIT_ACTION).filter((action) => {
+      const d = describeAuditEntry(row({ action, metadata: {} }), t);
+      // El fallback devuelve el código crudo como summary.
+      return d.summary === action;
+    });
+
+    expect(
+      missing,
+      `Estas acciones no tienen case en describeAuditEntry, así que /activity ` +
+        `las muestra como código crudo: ${missing.join(", ")}.`,
+    ).toEqual([]);
+  });
+
+  it("ninguna acción deja escapar una clave sin traducir", () => {
+    // next-intl devuelve "<namespace>.<clave>" cuando falta el mensaje, así
+    // que una clave nueva sin entrada en es.json/en.json se ve como
+    // "activityLog.loQueSea" en pantalla en vez de romper.
+    for (const action of Object.values(AUDIT_ACTION)) {
+      for (const translator of [t, tEn]) {
+        const d = describeAuditEntry(row({ action, metadata: {} }), translator);
+        expect(`${d.summary} ${d.detail ?? ""}`, action).not.toContain(
+          "activityLog.",
+        );
+      }
+    }
+  });
+});
+
+describe("describeAuditEntry — admin.view_as sin scope registrado", () => {
+  /**
+   * Distinguir "consolidado" de "no sabemos". Una fila escrita por
+   * `resolveImpersonation` siempre trae `discipline_code`, aunque sea null;
+   * si la clave falta, la fila es anterior a #208 o vino truncada, y decir
+   * "vista consolidada" sería afirmar un dato que no tenemos.
+   */
+  it("omite el detalle si la clave de scope no está", () => {
+    const d = describeAuditEntry(
+      row({
+        action: "admin.view_as",
+        metadata: { profile_display_name: "Someone Else" },
+      }),
+      t,
+    );
+    expect(d.detail).toBeUndefined();
+  });
+
+  it("dice consolidada solo si el scope se registró vacío", () => {
+    const d = describeAuditEntry(
+      row({
+        action: "admin.view_as",
+        metadata: {
+          profile_display_name: "Someone Else",
+          discipline_code: null,
+          division_code: null,
+        },
+      }),
+      t,
+    );
+    expect(d.detail).toBe("vista consolidada");
   });
 });

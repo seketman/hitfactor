@@ -26,6 +26,15 @@ export const AUDIT_ACTION = {
   AMMO_DELETE: "ammo.delete",
   FIREARM_USAGE_CREATE: "firearm_usage.create",
   FIREARM_USAGE_DELETE: "firearm_usage.delete",
+  /**
+   * Un admin miró el dashboard de otro usuario vía `?asProfile` (#208).
+   *
+   * Es la única acción de esta lista que **no modifica nada** — y por eso
+   * mismo hay que registrarla: una lectura no deja rastro en los datos, así
+   * que si no queda acá no queda en ningún lado. Ver
+   * `lib/admin/impersonation.ts`.
+   */
+  ADMIN_VIEW_AS: "admin.view_as",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTION)[keyof typeof AUDIT_ACTION];

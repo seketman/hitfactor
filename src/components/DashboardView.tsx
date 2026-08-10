@@ -8,7 +8,6 @@ import { StatsOverview } from "@/components/StatsOverview";
 import { requireUser } from "@/lib/supabase/require-user";
 import { getProfile } from "@/lib/db/profiles";
 import { listMyShooters } from "@/lib/db/shooters";
-import type { Shooter } from "@/lib/db/types";
 import { listClubs } from "@/lib/db/clubs";
 import {
   getDivisionSizes,
@@ -16,6 +15,7 @@ import {
   listMyStageResultsForEntries,
 } from "@/lib/db/matches";
 import { computeShooterStats } from "@/lib/stats/shooter-stats";
+import { resolveImpersonation } from "@/lib/admin/impersonation";
 import { DISCIPLINE, type DisciplineCode } from "@/lib/disciplines";
 
 type DashboardT = Awaited<ReturnType<typeof getTranslations<"dashboard">>>;
@@ -75,27 +75,20 @@ export async function DashboardView({
     listClubs(supabase),
   ]);
 
-  // Override de admin: si el usuario logueado es admin y pasó
-  // `?asProfile=<uuid>` con un profile válido, sustituimos la identidad
-  // activa por la de ese usuario — cargamos su profile + TODOS sus
-  // shooters linkeados. El resto del dashboard (entries, stats, historial,
-  // filtro de división) opera sobre ese set efectivo, así que el admin ve
-  // exactamente lo que ve ese usuario al entrar con su cuenta.
+  // Override de admin (`?asProfile=<uuid>`): sustituye la identidad activa
+  // por la de otro usuario. Lo que sigue —entries, stats, historial, filtro
+  // de división— opera sobre ese set efectivo, así que el admin ve
+  // exactamente lo que vería ese usuario con su cuenta.
   //
-  // Sigue siendo la sesión del admin: cualquier escritura (claim, import,
-  // etc.) se atribuye al admin, no al usuario impersonado.
-  let impersonatedProfile: Awaited<ReturnType<typeof getProfile>> = null;
-  let impersonatedShooters: Shooter[] = [];
-  if (profile?.is_admin === true && asProfile) {
-    const [impProfileRes, impShootersRes] = await Promise.all([
-      getProfile(supabase, asProfile),
-      listMyShooters(supabase, asProfile),
-    ]);
-    if (impProfileRes) {
-      impersonatedProfile = impProfileRes;
-      impersonatedShooters = impShootersRes;
-    }
-  }
+  // El gate, la carga y el registro en `audit_log` viven juntos en
+  // `lib/admin/impersonation.ts`; el porqué de cada decisión está ahí.
+  const { profile: impersonatedProfile, shooters: impersonatedShooters } =
+    await resolveImpersonation(
+      supabase,
+      { id: userId, isAdmin: profile?.is_admin === true },
+      asProfile,
+      { disciplineCode, divisionCode },
+    );
 
   const isImpersonating = impersonatedProfile !== null;
   const activeProfile = isImpersonating ? impersonatedProfile : profile;

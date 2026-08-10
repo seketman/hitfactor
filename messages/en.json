@@ -479,6 +479,8 @@
     "matchFirearmClearNoMatch": "You removed the firearm assigned to a match",
     "entryMarkAbsent": "You marked \"{name}\" as absent",
     "entryUnmarkAbsent": "You removed the absent mark from \"{name}\"",
+    "adminViewAs": "You viewed the dashboard as \"{name}\"",
+    "adminViewAsConsolidated": "consolidated view",
     "entryInMatch": "in \"{name}\"",
     "ammoCreate": "You added the ammunition type \"{name}\"",
     "ammoUpdate": "You edited the ammunition type \"{name}\"",

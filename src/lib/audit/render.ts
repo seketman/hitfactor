@@ -268,6 +268,23 @@ export function describeAuditEntry(
       };
     }
 
+    case "admin.view_as": {
+      // El scope dice QUÉ se miró, que es lo que vuelve útil tener una fila
+      // por request en vez de una por sesión de impersonación.
+      const scope = join([s(m.discipline_code), s(m.division_code)]);
+      // "Vista consolidada" solo si el scope se registró y vino vacío. Si la
+      // clave directamente no está —fila anterior a #208, o metadata
+      // truncada— no sabemos qué miró, y afirmar que fue el consolidado
+      // sería inventarlo.
+      const scopeRecorded = "discipline_code" in m;
+      return {
+        summary: t("adminViewAs", {
+          name: s(m.profile_display_name) ?? t("unknownName"),
+        }),
+        detail: scope ?? (scopeRecorded ? t("adminViewAsConsolidated") : undefined),
+      };
+    }
+
     default:
       return { summary: row.action };
   }
