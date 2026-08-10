@@ -11,6 +11,17 @@ export interface MatchLookupRow {
    * el usuario haya corregido a mano desde la página del match.
    */
   min_shots: number | null;
+  /**
+   * Cuántos `match_entries` tiene ya el match.
+   *
+   * **0 significa que este match es el resto de un import que falló a la
+   * mitad** (#205): la fila de `matches` se insertó y el paso siguiente no
+   * llegó a completarse. Encontrarlo acá no cambia lo que hacemos —el
+   * merge lo termina de poblar igual, que es lo que el usuario quería— pero
+   * sí cambia lo que le decimos: "ya existía" es falso para un match que
+   * nunca tuvo resultados.
+   */
+  entryCount: number;
 }
 
 /**
@@ -30,17 +41,31 @@ export async function findUserMatch(
   date: string,
   importerUserId: string,
 ): Promise<MatchLookupRow | null> {
+  // `match_entries(count)` es un agregado embebido de PostgREST: viene en la
+  // misma consulta, así que saber si el match tiene resultados no cuesta un
+  // round-trip extra. Llega como `[{ count: n }]`.
   const { data } = await supabase
     .from("matches")
-    .select("id, name, imported_by_user_id, min_shots, imported_at")
+    .select(
+      "id, name, imported_by_user_id, min_shots, imported_at, match_entries(count)",
+    )
     .eq("discipline_id", disciplineId)
     .eq("name", name)
     .eq("date", date)
     .eq("imported_by_user_id", importerUserId)
     .order("imported_at", { ascending: true })
     .limit(1);
-  const rows = data as MatchLookupRow[] | null;
-  return rows && rows.length > 0 ? rows[0]! : null;
+
+  const rows = data as
+    | Array<Omit<MatchLookupRow, "entryCount"> & {
+        match_entries: Array<{ count: number }> | null;
+      }>
+    | null;
+  const row = rows && rows.length > 0 ? rows[0]! : null;
+  if (!row) return null;
+
+  const { match_entries, ...rest } = row;
+  return { ...rest, entryCount: match_entries?.[0]?.count ?? 0 };
 }
 
 /**

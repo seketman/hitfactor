@@ -962,3 +962,133 @@ describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match exis
     });
   });
 });
+
+describe("importParsedMatch — un import fallido no deja el match huérfano (#205)", () => {
+  let fake: FakeSupabase;
+  beforeEach(() => {
+    fake = buildSupabase();
+  });
+
+  /**
+   * PostgREST no da transacciones: el INSERT del match y el upsert de las
+   * entries son commits separados. Si el segundo falla, la fila de `matches`
+   * queda sola — un torneo vacío en la lista del usuario.
+   *
+   * Se simula fallando el upsert de `match_entries`, que es el primer paso
+   * después del insert.
+   */
+  it("borra el match recién insertado si fallan las entries", async () => {
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-match.html"));
+    fake.table("match_entries").upsertError = {
+      code: "57014",
+      message: "statement timeout",
+    };
+
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "test.html"),
+    ).rejects.toThrow();
+
+    expect(fake.tables.matches.rows).toHaveLength(0);
+  });
+
+  /**
+   * La compensación no puede tapar el error original: ése es el que le
+   * explica al usuario qué salió mal. Si `rollbackInsertedMatch` dejara
+   * escapar lo suyo, el mensaje que llega sería sobre el borrado y no sobre
+   * la causa.
+   */
+  it("propaga el error original, no uno del borrado", async () => {
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-match.html"));
+    fake.table("match_entries").upsertError = {
+      code: "57014",
+      message: "statement timeout",
+    };
+
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "test.html"),
+    ).rejects.toThrow(/statement timeout/);
+  });
+
+  /**
+   * Los shooters creados durante el intento fallido sobreviven a propósito:
+   * son entidades compartidas entre torneos, no hijas de este match, y una
+   * fila de tirador sin participaciones no le hace daño a nadie. El
+   * reintento la reusa en vez de duplicarla.
+   */
+  it("conserva los shooters creados en el intento", async () => {
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-match.html"));
+    fake.table("match_entries").upsertError = {
+      code: "57014",
+      message: "statement timeout",
+    };
+
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "test.html"),
+    ).rejects.toThrow();
+
+    expect(fake.tables.shooters.rows.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Y el reintento tiene que quedar limpio: sin el match huérfano, vuelve a
+   * tomar la rama fresca en vez de la de merge.
+   */
+  it("el reintento importa normalmente después de la compensación", async () => {
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-match.html"));
+    fake.table("match_entries").upsertError = {
+      code: "57014",
+      message: "statement timeout",
+    };
+    await expect(
+      importParsedMatch(fake.asClient(), parsed, USER_ID, "test.html"),
+    ).rejects.toThrow();
+
+    delete fake.table("match_entries").upsertError;
+    const retry = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "test.html",
+    );
+
+    expect(retry.existedAlready).toBe(false);
+    expect(retry.insertedEntries).toBe(parsed.matchEntries.length);
+    expect(fake.tables.matches.rows).toHaveLength(1);
+  });
+
+  /**
+   * Si la compensación no llegó a correr —el proceso murió entre el insert
+   * y el catch— el huérfano queda. El reintento igual lo cura, porque el
+   * merge puebla lo mismo que la rama fresca; lo que no puede es anunciarse
+   * como "ya existía", porque nunca hubo un import previo con resultados.
+   */
+  it("un merge contra un huérfano no se reporta como re-upload", async () => {
+    const parsed = parsePractiscoreHtml(read("tp-escopeta-2026-02-20-match.html"));
+    // Huérfano dejado por un import anterior: match sin entries.
+    fake.seed("matches", [
+      {
+        id: "orphan-1",
+        discipline_id: 1,
+        name: parsed.name,
+        date: parsed.date,
+        region: parsed.region,
+        imported_by_user_id: USER_ID,
+        min_shots: null,
+        imported_at: "2026-02-20T10:00:00Z",
+      },
+    ]);
+
+    const result = await importParsedMatch(
+      fake.asClient(),
+      parsed,
+      USER_ID,
+      "test.html",
+    );
+
+    expect(result.matchId).toBe("orphan-1");
+    expect(result.existedAlready).toBe(false);
+    expect(result.insertedEntries).toBe(parsed.matchEntries.length);
+    // No se creó un segundo match: se completó el que estaba.
+    expect(fake.tables.matches.rows).toHaveLength(1);
+  });
+});
