@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.3](https://github.com/seketman/hitfactor/compare/v1.23.2...v1.23.3) (2026-08-10)
+
+
+### Bug Fixes
+
+* **stats,import:** reject impossible dates and stop treating place 0 as first ([#240](https://github.com/seketman/hitfactor/issues/240)) ([7b7ee36](https://github.com/seketman/hitfactor/commit/7b7ee3654a5e9bef1e77540af1f5ad6ffbd29b31)), closes [#201](https://github.com/seketman/hitfactor/issues/201) [#202](https://github.com/seketman/hitfactor/issues/202)
+
 ## [1.23.2](https://github.com/seketman/hitfactor/compare/v1.23.1...v1.23.2) (2026-08-09)
 
 
