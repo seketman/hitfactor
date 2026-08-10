@@ -501,6 +501,126 @@ describe("computeShooterStats — stage stats", () => {
     expect(s.stageStats?.scoredStages).toBe(1);
     expect(s.stageStats?.winRate).toBe(100);
   });
+
+  /**
+   * `place = 0` es "sin puesto asignado", no "primero" (#202). Acá pegaba
+   * peor que en `bestPlace`: `place <= 3` es verdadero para 0, así que un
+   * stage sin posición contaba como **podio** y le subía el podiumRate al
+   * tirador. Antes del fix esto daba 100%.
+   *
+   * El caso llega de Steel: `withStagePlacings` solo asigna puesto a los
+   * resultados con tiempo válido, y los demás quedan en 0 sin ser DQ.
+   */
+  it("un stage con place 0 no es un podio", () => {
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 0, penalties: null, stage_percentage: 40, is_dq: false },
+        { place: 5, penalties: null, stage_percentage: 60, is_dq: false },
+      ],
+    });
+    expect(s.stageStats?.podiumRate).toBe(0);
+    expect(s.stageStats?.winRate).toBe(0);
+  });
+
+  /**
+   * El stage sin puesto sale del denominador de win/podium, pero sigue
+   * contando para los KPIs que sí puede tener: no se puede ganar un stage
+   * sin posición, pero su porcentaje y sus penalties son datos válidos.
+   */
+  it("el stage sin puesto sale de win/podium pero cuenta para el resto", () => {
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 1, penalties: 0, stage_percentage: 100, is_dq: false },
+        { place: 0, penalties: 3, stage_percentage: 55, is_dq: false },
+      ],
+    });
+    // 1 de 1 stage con puesto, no 1 de 2.
+    expect(s.stageStats?.winRate).toBe(100);
+    expect(s.stageStats?.podiumRate).toBe(100);
+    // Y el de place 0 sigue en scoredStages y en penaltyRate.
+    expect(s.stageStats?.scoredStages).toBe(2);
+    expect(s.stageStats?.penaltyRate).toBe(50);
+  });
+
+  it("no devuelve NaN cuando ningún stage tiene puesto", () => {
+    // Sin puestos no hay tasa que reportar. `0 / 0` sería NaN, que se
+    // renderiza como "NaN%" en el dashboard.
+    const s = computeShooterStats([entry()], {
+      stageResults: [
+        { place: 0, penalties: null, stage_percentage: 40, is_dq: false },
+        { place: 0, penalties: null, stage_percentage: 30, is_dq: false },
+      ],
+    });
+    expect(s.stageStats?.winRate).toBe(0);
+    expect(s.stageStats?.podiumRate).toBe(0);
+    expect(s.stageStats?.bestStagePercentage).toBe(40);
+  });
+});
+
+describe("computeShooterStats — place 0 no es primer puesto (#202)", () => {
+  /**
+   * El filtro de arriba saca DQs y ausentes, pero un entry con datos
+   * parciales llega con `place = 0` y le gana a cualquier puesto real en el
+   * `reduce`. El KPI mostraba **0** como mejor puesto y el `MatchHighlight`
+   * apuntaba a un torneo donde el tirador no tiene posición.
+   */
+  it("bestPlace ignora los entries sin puesto", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", place: 0 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", place: 3 }),
+    ]);
+    expect(s.bestPlace?.value).toBe(3);
+    expect(s.bestPlace?.matchId).toBe("mb");
+  });
+
+  it("bestPlace es null si ningún entry tiene puesto", () => {
+    const s = computeShooterStats([
+      entry({ id: "a", matchId: "ma", date: "2026-01-01", place: 0 }),
+      entry({ id: "b", matchId: "mb", date: "2026-02-01", place: 0 }),
+    ]);
+    expect(s.bestPlace).toBeNull();
+  });
+
+  /**
+   * En el percentil `place = 0` mentía más fuerte que en ningún otro lado:
+   * `0 / total × 100` da 0, y en percentil **más bajo es mejor**. El peor
+   * dato posible se leía como el mejor resultado posible.
+   */
+  it("el percentil es null sin puesto, no 0", () => {
+    const sizes = new Map<string, number>([["ma|P", 10]]);
+    const s = computeShooterStats(
+      [entry({ id: "a", matchId: "ma", divisionCode: "P", place: 0 })],
+      { divisionSizes: sizes },
+    );
+    expect(s.timeline[0]?.percentile).toBeNull();
+    expect(s.avgPercentile).toBeNull();
+    expect(s.bestPercentile).toBeNull();
+  });
+
+  it("un entry sin puesto no gana el mejor percentil ni baja el promedio", () => {
+    const sizes = new Map<string, number>([
+      ["ma|P", 10],
+      ["mb|P", 10],
+    ]);
+    const s = computeShooterStats(
+      [
+        entry({ id: "a", matchId: "ma", divisionCode: "P", place: 0 }),
+        entry({
+          id: "b",
+          matchId: "mb",
+          date: "2026-02-01",
+          divisionCode: "P",
+          place: 2,
+        }),
+      ],
+      { divisionSizes: sizes },
+    );
+    // Solo "mb" entra: #2 de 10 = 20. Con el bug, "ma" aportaba un 0 que
+    // ganaba el mejor percentil y arrastraba el promedio a 10.
+    expect(s.avgPercentile).toBeCloseTo(20, 6);
+    expect(s.bestPercentile?.value).toBeCloseTo(20, 6);
+    expect(s.bestPercentile?.matchId).toBe("mb");
+  });
 });
 
 describe("computeShooterStats — impactos (FBI)", () => {

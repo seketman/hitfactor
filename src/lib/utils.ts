@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { Locale } from "@/i18n/routing";
+import { parseIsoDateUtc } from "@/lib/dates";
 
 /**
  * Merge de clases Tailwind con resolución de conflictos.
@@ -122,22 +123,12 @@ export function formatDate(
   locale: Locale,
 ): string {
   if (!iso) return "—";
-  const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (!parts) return iso;
-  const [y, m, d] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
-  const date = new Date(Date.UTC(y, m - 1, d));
-  // `new Date` NO valida: normaliza. `new Date(2026, 12, 45)` no es un error,
-  // es el 14/02/2027. Sin este chequeo una fecha corrupta se renderizaría
-  // como una fecha plausible y falsa, que es peor que uno visiblemente roto.
-  // Además tapa la semántica legacy de años de dos dígitos: `new Date(26,...)`
-  // es 1926, no el año 26.
-  if (
-    date.getUTCFullYear() !== y ||
-    date.getUTCMonth() !== m - 1 ||
-    date.getUTCDate() !== d
-  ) {
-    return iso;
-  }
+  // `slice(0, 10)` es lo que tolera el timestamp completo: recorta la parte
+  // de fecha y deja que el parser exija el formato estricto sobre ella. Un
+  // input más corto o mal formado no llega a los 10 caracteres válidos y el
+  // parser lo rechaza, que es como devolvemos la entrada cruda.
+  const date = parseIsoDateUtc(iso.slice(0, 10));
+  if (!date) return iso;
   return dateFormatter(locale).format(date);
 }
 

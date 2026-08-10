@@ -6,6 +6,7 @@ import type { Locale } from "@/i18n/routing";
 import { parseFile, parsePdf, parsePdfBatch } from "@/lib/parsers";
 import type { ParsedMatch } from "@/lib/types/match";
 import { redirectWithError } from "@/lib/redirects";
+import { isValidIsoDate } from "@/lib/dates";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import type { TypedSupabaseClient } from "@/lib/supabase/types";
@@ -482,15 +483,6 @@ function redirectToResult(result: ImportResult, locale: Locale): never {
     params.warnings = result.warnings.join("\n");
   }
   redirect({ href: { pathname: "/import", query: params }, locale });
-}
-
-/** Valida una fecha "AAAA-MM-DD" real (formato + rangos de mes/día). */
-function isValidIsoDate(value: string): boolean {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return false;
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31;
 }
 
 function formatDurationHuman(ms: number): string {
