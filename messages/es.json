@@ -440,6 +440,8 @@
     "matchFirearmClearNoMatch": "Quitaste el arma asignada a un match",
     "entryMarkAbsent": "Marcaste como ausente a \"{name}\"",
     "entryUnmarkAbsent": "Quitaste la marca de ausente a \"{name}\"",
+    "adminViewAs": "Viste el dashboard como \"{name}\"",
+    "adminViewAsConsolidated": "vista consolidada",
     "entryInMatch": "en \"{name}\"",
     "ammoCreate": "Agregaste el tipo de munición \"{name}\"",
     "ammoUpdate": "Editaste el tipo de munición \"{name}\"",

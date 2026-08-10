@@ -11,6 +11,26 @@
  * `isAdmin` (de su `profile`) e `isSelf` (en una action, por
  * `shooter.linked_user_id === user.id`; en la página, por pertenencia al
  * set de shooters claimeados del usuario).
+ *
+ * ## Lo que un admin puede hacer, y dónde está escrito
+ *
+ * `profiles.is_admin` habilita tres cosas, y solo dos viven en este
+ * archivo:
+ *
+ *  1. Editar cualquier match (`canEditMatch`) — RLS `matches_update_admin`.
+ *  2. Borrar cualquier match (`canDeleteMatch`) — RLS `matches_delete_admin`.
+ *  3. **Ver el dashboard de otro usuario** vía `?asProfile=<uuid>`.
+ *
+ * La tercera no tiene predicado acá porque no espeja ninguna RLS: no
+ * concede permisos de DB, usa la sesión del admin —que ya puede leer esas
+ * filas— y solo cambia qué shooters mira el dashboard. Se menciona igual
+ * porque estaba documentada en ningún lado (#208), y "las capacidades de
+ * admin están en permissions.ts" deja de ser cierto en cuanto una queda
+ * afuera sin decirlo.
+ *
+ * Vive en `lib/admin/impersonation.ts`, que es donde están el gate, la
+ * carga y el registro en `audit_log`. Es de solo lectura: la sesión sigue
+ * siendo la del admin y toda escritura se le atribuye a él.
  */
 
 export interface MatchEditContext {
