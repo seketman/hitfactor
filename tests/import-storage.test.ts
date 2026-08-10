@@ -136,9 +136,15 @@ describe("downloadImportFiles", () => {
       download: () => ({ data: null, error: { message: "not found" } }),
     });
 
-    await expect(downloadImportFiles(client, [upload(1)])).rejects.toThrow(
-      /stage-1\.pdf/,
-    );
+    // El nombre del archivo sigue llegando al usuario, pero ahora como
+    // parámetro de interpolación y no pegado en prosa española (#203).
+    await expect(
+      downloadImportFiles(client, [upload(1)]),
+    ).rejects.toMatchObject({
+      code: "DOWNLOAD_FAILED",
+      params: { filename: "stage-1.pdf" },
+      detail: "not found",
+    });
   });
 
   it("corta cuando se pasa del presupuesto total de bytes", async () => {
@@ -153,7 +159,7 @@ describe("downloadImportFiles", () => {
 
     await expect(
       downloadImportFiles(client, [upload(1), upload(2)]),
-    ).rejects.toThrow(/máximo/i);
+    ).rejects.toMatchObject({ code: "IMPORT_TOO_LARGE" });
   });
 });
 

@@ -205,6 +205,12 @@ The error message says which page and how many rows.
 
 ## Known errors (codes)
 
+The code is the identity of the error. Its user-facing text lives in
+`messages/*.json` under `import.importError.<CODE>` and is resolved in the
+server action, which is the first point on the path that knows the locale
+(#203, same criterion as `parserError`). A code with no message, or a
+message with no code, fails `tests/messages-parity.test.ts`.
+
 | Code | When it's thrown |
 |---|---|
 | `UNKNOWN_DISCIPLINE` | The parser returned a discipline that does not exist in `disciplines` |
@@ -212,13 +218,21 @@ The error message says which page and how many rows.
 | `UNKNOWN_DIVISION` | An unregistered division showed up — ask an admin to add it |
 | `MATCH_INSERT_FAILED` | Generic error inserting the match |
 | `MATCH_ALREADY_EXISTS` | Unique violation: that match already exists |
-| `MATCH_NOT_FOUND` | You uploaded a stage without uploading the overall match first |
-| `MATCH_LOOKUP_FAILED` | Query error while looking up the match |
+| `MATCH_ALREADY_EXISTS_BY_OTHER` | Someone else imported the same match; mark yourself on theirs instead |
+| `MATCH_NOT_FOUND` | You uploaded a stage without the overall match; lists that day's matches |
+| `MATCH_NOT_FOUND_NONE_THAT_DAY` | Same, but nothing at all has been imported for that date |
 | `NOT_MATCH_OWNER` | You're trying to add stages to a match you did not import |
 | `STAGE_INSERT_FAILED` | Error inserting the stage |
 | `STAGE_RESULTS_INSERT_FAILED` | Error inserting the stage_results |
 | `MATCH_ENTRIES_INSERT_FAILED` | Error inserting the match_entries |
 | `SHOOTER_INSERT_FAILED` | Error inserting a shooter |
+| `DOWNLOAD_FAILED` | The staged file could not be read back from the bucket |
+| `IMPORT_TOO_LARGE` | The files together exceed the total byte budget |
+
+The `*_INSERT_FAILED` codes carry the raw Postgres message in a `detail`
+field. It is logged by the server action and never returned to the user:
+showing it was the bug in #199, and dropping it entirely would leave
+nothing explaining why the write failed.
 
 ### Upload errors (before reaching the server)
 

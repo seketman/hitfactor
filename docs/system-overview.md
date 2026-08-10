@@ -1140,10 +1140,10 @@ Pasos:
    - Decide si es **stage import** (`parsed.stages.length > 0 && parsed.matchEntries.filter(e => !e.isDq).length === 0`) o **match overall**. La condición es deliberada para que la página "Disqualified Shooters" de los PDFs WinMSS stages (que el parser captura como entries con `isDq=true`) no haga interpretar el archivo como overall.
    - **Match overall** → `importMatchOverall`:
      - `findUserMatch` busca un match propio del usuario por `(discipline_id, name, date)` **ignorando region** y filtrando por `imported_by_user_id`. Si lo encuentra: re-upload — se hace UPSERT idempotente de `match_entries` y, si vienen stages embebidos (Steel), `attachStagesToMatch`. Si no, INSERT en `matches` con `source_type`, `source_filename`, `imported_by_user_id`, `min_shots` (FBI siempre `45`, resto usa lo del form o `null`). `min_shots` solo se setea en el primer INSERT; nunca se sobreescribe en re-uploads.
-     - Si el INSERT pega contra la unique constraint (código `23505`), se reporta `MATCH_ALREADY_EXISTS` ("Este match ya fue importado por otro usuario").
+     - Si el INSERT pega contra la unique constraint (código `23505`), se reporta `MATCH_ALREADY_EXISTS`.
    - **Stage import** → `importStages`:
      - `resolveMatchForStage`: exact match por `(name limpio sin sufijo de stage, date, discipline_id)` y, si falla, `findBestPrefixMatch` entre los matches del mismo día/disciplina.
-     - Si el match resuelto no es del usuario actual → `NOT_MATCH_OWNER` ("Solo el usuario que importó el match original puede agregarle stages").
+     - Si el match resuelto no es del usuario actual → `NOT_MATCH_OWNER`.
      - Si el archivo trae entries (DQs de WinMSS), se mergean con `upsertMatchEntries`.
      - `attachStagesToMatch` hace bulk-upsert de `stages` (por `match_id + stage_number`) y `stage_results` (con `onConflict: "stage_id,match_entry_id"`).
 7. **Upsert de tiradores** dentro de cada paso de import (`resolveShootersBulk`):
@@ -1247,7 +1247,7 @@ Solo aplica al stage import (PractiScore Stage HTML, WinMSS stages PDF):
 2. **Forward prefix**: entre los matches del mismo `(discipline_id, date)`, se busca aquel cuyo `name` es prefijo (case-insensitive, sin acentos) del título del stage, con separador en `[" ", "-", " -", " –", " —"]` (incluye en-dash y em-dash). Gana el `name` **más largo** (más específico).
 3. **Reverse prefix** (fallback): el título limpio del stage es prefijo del `name` del match — cubre el caso "el usuario renombró el match después del import original con un sufijo distintivo". Se acepta **solo si hay exactamente 1 candidato**; múltiples se rechazan como ambiguos.
 
-Si nada matchea → `MATCH_NOT_FOUND` con la lista de matches del mismo día en el mensaje. Si matchea pero `imported_by_user_id !== userId` → `NOT_MATCH_OWNER`.
+Si nada matchea → `MATCH_NOT_FOUND` con hasta 5 matches del mismo día como parámetro del mensaje (`…` al final si hay más), o `MATCH_NOT_FOUND_NONE_THAT_DAY` si no hay ninguno. Si matchea pero `imported_by_user_id !== userId` → `NOT_MATCH_OWNER`.
 
 ### 8.6 Dedupe y resolución
 
@@ -1262,7 +1262,7 @@ Si se identifica como re-upload:
 - `stages`: bulk SELECT por `match_id`, INSERT solo de los `stage_number` nuevos.
 - `stage_results`: UPSERT con `onConflict: "stage_id,match_entry_id"`.
 
-Si la unique constraint `(discipline, name, date, region)` rebota en INSERT con código `23505` → `MATCH_ALREADY_EXISTS` ("Este match ya fue importado por otro usuario").
+Si la unique constraint `(discipline, name, date, region)` rebota en INSERT con código `23505` → `MATCH_ALREADY_EXISTS`.
 
 **Identidad de stage_results**: la unique es `(stage_id, match_entry_id)`. Si el PDF de stages usa un nombre de división distinto al del overall (caso real: TFABA — `PISTOLA` en overall, `PRODUCTION` en stages), el matcher hace un fallback: si el tirador tiene **exactamente 1** `match_entry` en el match (en cualquier división), se usa esa entry. Si tiene > 1 se skipea con warning para no asignar al azar.
 
@@ -1299,8 +1299,8 @@ Los candidatos se muestran en `/import?ok=1&matchId=…` como Card "¿Sos alguno
 
 **Reporte de errores**:
 
-- **Capa parser**: `throw new Error(mensaje legible)` → la action lo captura como `Error` y hace `redirectWithError("/import", e.message)`. Mensajes pensados para el usuario final.
-- **Capa import (DB)**: `ImportError` con `code` específico (`UNKNOWN_DISCIPLINE`, `DIVISIONS_FETCH_FAILED`, `MATCH_INSERT_FAILED`, `MATCH_ALREADY_EXISTS`, `MATCH_ENTRIES_INSERT_FAILED`, `STAGE_INSERT_FAILED`, `STAGE_RESULTS_INSERT_FAILED`, `SHOOTER_INSERT_FAILED`, `UNKNOWN_DIVISION`, `MATCH_NOT_FOUND`, `NOT_MATCH_OWNER`). El error sale como banner rojo en `/import?error=…` vía `redirectWithError`. Cualquier `Error` no-`ImportError` se relanza (500 genuino).
+- **Capa parser**: `throw new ParserError(code, params?)` (#148). El texto no vive en el parser: la action traduce con `import.parserError.<code>`.
+- **Capa import (DB)**: `ImportError(code, params?, detail?)` (#203, mismo criterio). La action traduce con `import.importError.<CODE>`; el catálogo completo de códigos está en [`importing.md`](./importing.md#known-errors-codes). El `detail` lleva el mensaje crudo de Postgres, se loguea en el server y **no** llega al usuario. El error sale como banner rojo en `/import?error=…`. Cualquier `Error` que no sea ninguno de los dos se relanza (500 genuino).
 - **Caso especial FAT sin fecha**: en lugar de redirect, el server action devuelve `state = "needsDate"` con el `ParsedMatch` en memoria del state; el form pasa a un segundo paso con `<Input type="date" required>`. Si el segundo submit también falla con `ImportError`, vuelve a la pantalla de fecha con el `error` poblado y el `parsed` preservado (no se vuelve a parsear).
 
 **Casos límite manejados explícitamente**:

@@ -1,4 +1,5 @@
 import type { TypedSupabaseClient } from "@/lib/supabase/types";
+import { ImportError } from "./import-error";
 
 /**
  * Lado server del staging de imports en Supabase Storage.
@@ -118,18 +119,14 @@ export async function downloadImportFiles(
       .download(path);
 
     if (error || !data) {
-      throw new Error(
-        `No pudimos leer "${filename}" del almacenamiento. ` +
-          "Volvé a subirlo e intentá de nuevo.",
-      );
+      throw new ImportError("DOWNLOAD_FAILED", { filename }, error?.message);
     }
 
     totalBytes += data.size;
     if (totalBytes > MAX_IMPORT_TOTAL_BYTES) {
-      throw new Error(
-        `El import supera el máximo de ${formatMb(MAX_IMPORT_TOTAL_BYTES)} ` +
-          "entre todos los archivos. Subilos en tandas más chicas.",
-      );
+      throw new ImportError("IMPORT_TOO_LARGE", {
+        max: formatMb(MAX_IMPORT_TOTAL_BYTES),
+      });
     }
 
     downloaded.push({
