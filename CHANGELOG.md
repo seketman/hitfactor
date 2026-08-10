@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.0](https://github.com/seketman/hitfactor/compare/v1.23.4...v1.24.0) (2026-08-10)
+
+
+### Features
+
+* **audit:** record admin impersonation in the audit log ([#244](https://github.com/seketman/hitfactor/issues/244)) ([967e2ee](https://github.com/seketman/hitfactor/commit/967e2ee36a61c55614fd27a11f8a9b689912a182)), closes [#208](https://github.com/seketman/hitfactor/issues/208)
+
 ## [1.23.4](https://github.com/seketman/hitfactor/compare/v1.23.3...v1.23.4) (2026-08-10)
 
 
