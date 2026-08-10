@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.4](https://github.com/seketman/hitfactor/compare/v1.23.3...v1.23.4) (2026-08-10)
+
+
+### Bug Fixes
+
+* **import:** delete the match when the rest of the import fails ([#242](https://github.com/seketman/hitfactor/issues/242)) ([bdd9a80](https://github.com/seketman/hitfactor/commit/bdd9a802d18667876a5714845c55155e6b181631)), closes [#205](https://github.com/seketman/hitfactor/issues/205)
+
 ## [1.23.3](https://github.com/seketman/hitfactor/compare/v1.23.2...v1.23.3) (2026-08-10)
 
 
