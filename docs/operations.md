@@ -83,9 +83,12 @@ guessing a host and reporting green about something nobody asked it to watch.
 
 This is the free, zero-dependency option, not the good one:
 
-- **`schedule` is best-effort.** GitHub makes no punctuality promise and
-  delays of tens of minutes happen under load. Treat 15 minutes as an upper
-  bound on resolution, not a guarantee.
+- **`schedule` is best-effort, and the gap is much wider than configured.**
+  The cron says every 15 minutes. Measured over a day of real runs, the
+  actual gaps were 55, 50, 96 and 70 minutes. **Treat the real resolution as
+  about an hour**, which means a 40-minute outage can pass unseen. This is
+  GitHub's documented behaviour under load, not a misconfiguration, and
+  tightening the cron does not fix it.
 - **It disables itself after 60 days without repository activity.** If
   development pauses, the monitor stops — silently, and exactly when nobody
   is around to notice the site is down either.

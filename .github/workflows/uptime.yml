@@ -8,9 +8,11 @@ name: Uptime
 # This is the free, zero-dependency option, not the good one. Its limits
 # are real and worth knowing before it is the only thing watching:
 #
-#  - **`schedule` is best-effort.** GitHub does not promise punctuality and
-#    delays of tens of minutes happen under load. Treat the interval as an
-#    upper bound on resolution, not a guarantee.
+#  - **`schedule` is best-effort, and much later than it says.** Measured
+#    over a day of real runs, the gaps were 55, 50, 96 and 70 minutes for a
+#    cron that asks for 15. The real resolution is about an hour, so a
+#    40-minute outage can pass unseen. Shortening the interval does not
+#    help — GitHub delays it anyway.
 #  - **It disables itself after 60 days without repository activity.** If
 #    development pauses, the monitor stops — silently, and precisely when
 #    nobody is around to notice the site is down either.
@@ -59,6 +61,29 @@ jobs:
             exit 1
           fi
 
+          # No `.json`: the extension would be a lie in the one case that
+          # matters. A failing probe gets whatever the host felt like
+          # returning — an HTML error page, a proxy notice, a login.
+          BODY=/tmp/health-body
+          PREVIEW_BYTES=200
+
+          # Print the start of the body, on one line, capped.
+          #
+          # It used to `cat` the whole thing. That was written for the
+          # healthy answer, which is 40 characters of JSON — but the failure
+          # path is exactly where the response is something else. A 404 from
+          # Next is ~4KB of HTML with every Turbopack chunk in it, printed
+          # twice, and it buried the line that actually says what happened.
+          # A probe exists for when things do not answer what you expect, so
+          # its logging cannot assume they did.
+          preview_body() {
+            [ -s "$BODY" ] || return 0
+            printf '  body: '
+            head -c "$PREVIEW_BYTES" "$BODY" | tr -d '\r' | tr '\n' ' '
+            [ "$(wc -c < "$BODY")" -gt "$PREVIEW_BYTES" ] && printf ' …[truncated]'
+            printf '\n'
+          }
+
           # Two attempts before declaring an outage. One failed request from
           # a GitHub runner is as likely to be the runner's network as the
           # site's, and a monitor that cries wolf gets muted — after which
@@ -71,18 +96,21 @@ jobs:
             # written, and --location would have hidden where that went.
             code=$(curl --silent --show-error \
                         --max-time 20 \
-                        --output /tmp/health-body.json \
+                        --output "$BODY" \
                         --write-out '%{http_code}' \
                         "$HEALTH_URL") && rc=0 || rc=$?
 
             if [ "$rc" -eq 0 ] && [ "$code" = "200" ]; then
               echo "Attempt $attempt: HTTP $code"
-              cat /tmp/health-body.json
+              # Capped here too: a 200 is not proof the body is ours. A
+              # misconfigured URL pointing at some other page answers 200
+              # with a full document.
+              preview_body
               exit 0
             fi
 
             echo "Attempt $attempt failed: curl exit $rc, HTTP ${code:-none}"
-            cat /tmp/health-body.json 2>/dev/null || true
+            preview_body
 
             if [ "$attempt" -eq 1 ]; then
               sleep 30
