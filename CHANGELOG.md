@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.0](https://github.com/seketman/hitfactor/compare/v1.26.2...v1.27.0) (2026-08-11)
+
+
+### Features
+
+* **i18n:** translate the ammunition screens, and share the common vocabulary ([#258](https://github.com/seketman/hitfactor/issues/258)) ([4d219c7](https://github.com/seketman/hitfactor/commit/4d219c7cd77bf610365bb6c49eee0dbbc812c397))
+
 ## [1.26.2](https://github.com/seketman/hitfactor/compare/v1.26.1...v1.26.2) (2026-08-11)
 
 
