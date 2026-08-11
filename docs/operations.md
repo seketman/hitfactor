@@ -79,6 +79,27 @@ gh variable set HEALTHCHECK_URL --body "https://<domain>/api/health"
 Without it the workflow fails immediately with that instruction, rather than
 guessing a host and reporting green about something nobody asked it to watch.
 
+### Where the alert has to land
+
+Configured in your **account** notification settings, not the repository's:
+[github.com/settings/notifications](https://github.com/settings/notifications)
+→ **System → Actions** → `on GitHub, Email. (Failed workflows only)`.
+
+The "failed only" part matters. Without it every green run mails you, and a
+channel that is 99% noise stops being read — which costs you the one message
+that was worth reading.
+
+**Check that the email actually reaches somewhere you look.** It arrives from
+`notifications@github.com` with the subject `Run failed: Uptime - main (…)`.
+A mail rule that files GitHub notifications into a folder will catch it too,
+and an alert delivered to a folder nobody opens is the same as no alert. That
+is not hypothetical: it happened here, and it cost forty minutes of believing
+the monitor was broken when it had worked correctly twice.
+
+Keeping **on GitHub** enabled alongside email is worth it for that reason.
+Two delivery paths, and the second one does not depend on what a mail
+provider decides about a sender it has never seen before.
+
 ### Its limits, which are real
 
 This is the free, zero-dependency option, not the good one:
@@ -92,13 +113,45 @@ This is the free, zero-dependency option, not the good one:
 - **It disables itself after 60 days without repository activity.** If
   development pauses, the monitor stops — silently, and exactly when nobody
   is around to notice the site is down either.
-- **Alerting is an email on a failed run.** No escalation, no
-  acknowledgement, no history beyond the Actions tab.
+- **Alerting is a notification on a failed run.** No escalation, no
+  acknowledgement, no history beyond the Actions tab. Nothing tells you the
+  site came back either: you get the failure and then silence, so recovery
+  has to be checked by hand.
 
 An external monitor — UptimeRobot or Better Stack, both free at this scale —
 has none of those problems and points at the same endpoint. The workflow is
 what makes the check exist today; it is not an argument against setting one
 up.
+
+## Testing that the alert alerts
+
+A monitor nobody has watched fire is a monitor being trusted on faith, and
+the failure path is the half that never runs in normal operation. Exercise it
+after any change to the workflow, the endpoint, or the notification settings:
+
+```bash
+# 1. Aim it at something that cannot answer 200
+gh variable set HEALTHCHECK_URL --body "https://<domain>/api/does-not-exist"
+
+# 2. Fire it by hand (this is what `workflow_dispatch` is in the file for)
+gh workflow run uptime.yml
+
+# 3. Confirm it failed, and that the notification arrived
+gh run list --workflow=uptime.yml --limit 1
+gh api /notifications --jq '.[] | select(.subject.type=="CheckSuite") | .subject.title'
+
+# 4. Put it back, and confirm it goes green again
+gh variable set HEALTHCHECK_URL --body "https://<domain>/api/health"
+gh workflow run uptime.yml
+```
+
+Step 4 is not optional. Leaving the variable pointed at a broken URL turns
+the monitor into a permanent false alarm, which is worse than having none:
+the next real failure looks exactly like the noise you have started ignoring.
+
+Both times this was run, the whole chain worked and the exercise still paid
+for itself — once by showing the probe dumped 4KB of HTML into the log on
+failure, once by showing the email was being filed away unread.
 
 ## Deliberately out of scope
 
