@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.1](https://github.com/seketman/hitfactor/compare/v1.26.0...v1.26.1) (2026-08-11)
+
+
+### Bug Fixes
+
+* **ops:** cap the uptime probe's body dump and record the real cron cadence ([#254](https://github.com/seketman/hitfactor/issues/254)) ([c77cac4](https://github.com/seketman/hitfactor/commit/c77cac438c2cf716a97cdca2f499a4edcce0a200))
+
 ## [1.26.0](https://github.com/seketman/hitfactor/compare/v1.25.1...v1.26.0) (2026-08-11)
 
 
