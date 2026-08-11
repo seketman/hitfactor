@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.0](https://github.com/seketman/hitfactor/compare/v1.25.1...v1.26.0) (2026-08-11)
+
+
+### Features
+
+* **i18n:** translate the firearms screens ([#252](https://github.com/seketman/hitfactor/issues/252)) ([4b2bb11](https://github.com/seketman/hitfactor/commit/4b2bb11921faa5a3196db2c2564e17d155c3087b))
+
 ## [1.25.1](https://github.com/seketman/hitfactor/compare/v1.25.0...v1.25.1) (2026-08-10)
 
 
