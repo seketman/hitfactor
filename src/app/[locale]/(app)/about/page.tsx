@@ -1,4 +1,4 @@
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -15,43 +15,55 @@ interface PageProps {
   searchParams: Promise<{ sent?: string; error?: string }>;
 }
 
-const TYPE_LABELS: Record<FeedbackType, string> = {
-  bug: "Bug",
-  suggestion: "Sugerencia",
-  other: "Otro",
-};
+/** Traductor del namespace `about`, inyectado en vez de importado. */
+type AboutT = Awaited<ReturnType<typeof getTranslations<"about">>>;
 
-// Status `done` y `wontdo` cambian de label según el tipo: un bug se "resuelve"
-// pero una sugerencia se "implementa" o se "rechaza". `duplicate` aplica a todos.
-const TERMINAL_LABELS_BY_TYPE: Record<
-  "done" | "wontdo",
-  Record<FeedbackType, string>
-> = {
-  done: {
-    bug: "Resuelto",
-    suggestion: "Implementada",
-    other: "Resuelto",
-  },
-  wontdo: {
-    bug: "No se va a resolver",
-    suggestion: "Rechazada",
-    other: "Descartado",
-  },
-};
-
-function getStatusLabel(status: FeedbackStatus, type: FeedbackType): string {
-  if (status === "done" || status === "wontdo") {
-    return TERMINAL_LABELS_BY_TYPE[status][type];
+/**
+ * Un `switch` con las claves escritas, y no una tabla `type → clave`.
+ *
+ * `t(TYPE_KEYS[type])` funciona igual, pero la clave deja de ser un literal
+ * y con eso desaparece de `tests/translation-keys.test.ts`, que empareja por
+ * texto: un typo en la tabla no lo agarraría nadie y saldría
+ * `about.typeBgu` impreso en pantalla. Mismo motivo por el que los códigos
+ * de `ImportError` se tiran literales (#203).
+ */
+function getTypeLabel(t: AboutT, type: FeedbackType): string {
+  switch (type) {
+    case "bug":
+      return t("typeBug");
+    case "suggestion":
+      return t("typeSuggestion");
+    case "other":
+      return t("typeOther");
   }
+}
+
+/**
+ * `done` y `wontdo` dependen también del tipo: un bug se resuelve, una
+ * sugerencia se implementa o se rechaza. Antes eran una tabla 2D de prosa;
+ * ahora la variación vive en el mensaje, con un `select` de ICU sobre
+ * `type`. Eso deja que cada idioma decida si la distinción existe y con qué
+ * palabras — en inglés también existe ("Fixed" vs "Implemented"), pero una
+ * tabla en español no tenía forma de expresarlo.
+ */
+function getStatusLabel(
+  t: AboutT,
+  status: FeedbackStatus,
+  type: FeedbackType,
+): string {
   switch (status) {
+    case "done":
+      return t("statusDone", { type });
+    case "wontdo":
+      return t("statusWontdo", { type });
     case "new":
-      return "Nuevo";
+      return t("statusNew");
     case "triaged":
-      return "En revisión";
+      return t("statusTriaged");
     case "in_progress":
-      return "En progreso";
+      return t("statusInProgress");
     case "duplicate":
-      return "Duplicado";
+      return t("statusDuplicate");
   }
 }
 
@@ -69,6 +81,7 @@ const STATUS_TONE: Record<
 
 export default async function AboutPage({ searchParams }: PageProps) {
   const locale = await getLocale();
+  const t = await getTranslations("about");
   const timeZone = await getRequestTimeZone();
   const { sent, error } = await searchParams;
   const { supabase, user } = await requireUser();
@@ -82,47 +95,40 @@ export default async function AboutPage({ searchParams }: PageProps) {
     <PageContainer className="max-w-3xl">
       <header className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">
-          Acerca de HitFactor
+          {t("title")}
         </h1>
       </header>
 
       <Card className="mb-8 px-6 py-6">
-        <p className="text-sm leading-relaxed text-fg-muted">
-          HitFactor es una herramienta gratuita para tiradores que quieren
-          llevar el seguimiento de sus resultados en torneos. Importás la
-          planilla del match y te quedás con tu historial, estadísticas y
-          progreso por disciplina.
-        </p>
+        <p className="text-sm leading-relaxed text-fg-muted">{t("intro")}</p>
         <p className="mt-4 text-sm leading-relaxed text-fg-muted">
-          Creado por <span className="font-medium text-fg">Seketman</span> en{" "}
-          <LaPlataLink>La Plata</LaPlataLink>, con la ayuda invaluable de{" "}
-          <a
-            href="https://claude.com/claude-code"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent hover:underline"
-          >
-            Claude
-          </a>
-          .
+          {t.rich("credits", {
+            author: (c) => <span className="font-medium text-fg">{c}</span>,
+            city: (c) => <LaPlataLink>{c}</LaPlataLink>,
+            claude: (c) => (
+              <a
+                href="https://claude.com/claude-code"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                {c}
+              </a>
+            ),
+          })}
         </p>
       </Card>
 
       <section className="mb-6">
         <h2 className="text-lg font-semibold tracking-tight">
-          ¿Encontraste un bug? ¿Tenés una idea?
+          {t("feedbackHeading")}
         </h2>
-        <p className="mt-1 text-sm text-fg-muted">
-          Contame qué pasó o qué te gustaría que mejoremos. Lo voy a sumar al
-          backlog y, si te interesa, podés ver acá abajo el estado de lo que
-          ya reportaste.
-        </p>
+        <p className="mt-1 text-sm text-fg-muted">{t("feedbackIntro")}</p>
       </section>
 
       {sent === "1" && (
-        <Alert tone="success" className="mb-6" title="¡Gracias!">
-          Tu reporte llegó. Lo voy a revisar pronto y vas a ver el estado en
-          la lista de abajo.
+        <Alert tone="success" className="mb-6" title={t("sentTitle")}>
+          {t("sentBody")}
         </Alert>
       )}
 
@@ -138,29 +144,28 @@ export default async function AboutPage({ searchParams }: PageProps) {
         </Card>
       ) : (
         <Card className="mb-10 px-6 py-6">
-          <p className="text-sm font-medium">
-            Reportá cuando tengas un poco más de uso encima
-          </p>
+          <p className="text-sm font-medium">{t("gateHeading")}</p>
           <p className="mt-2 text-sm text-fg-muted">
-            Para mandar bugs o sugerencias necesitás al menos{" "}
-            <span className="font-medium text-fg">
-              {FEEDBACK_MIN_ENTRIES} participaciones
-            </span>{" "}
-            registradas — pueden ser tres torneos distintos, un torneo en tres
-            divisiones, o cualquier combinación. Eso filtra los reportes
-            prematuros y me ayuda a triagear con foco.
+            {t.rich("gateBody", {
+              count: FEEDBACK_MIN_ENTRIES,
+              strong: (c) => <span className="font-medium text-fg">{c}</span>,
+            })}
           </p>
+          {/* Dos mensajes y no uno: "importá tu primero" no es el caso
+              cero de un plural, es otra instrucción. Lo que falta sí es un
+              plural, y lo resuelve ICU en vez de un ternario anidado que
+              en inglés no funcionaría. */}
           <p className="mt-3 text-xs text-fg-subtle">
-            Llevás{" "}
-            <span className="font-mono font-medium text-fg">{entryCount}</span>{" "}
-            de {FEEDBACK_MIN_ENTRIES}.{" "}
+            {t.rich("gateProgress", {
+              count: entryCount,
+              total: FEEDBACK_MIN_ENTRIES,
+              strong: (c) => (
+                <span className="font-mono font-medium text-fg">{c}</span>
+              ),
+            })}{" "}
             {entryCount === 0
-              ? "Importá tu primer match para arrancar."
-              : `Te ${
-                  FEEDBACK_MIN_ENTRIES - entryCount === 1
-                    ? "falta 1 participación"
-                    : `faltan ${FEEDBACK_MIN_ENTRIES - entryCount} participaciones`
-                }.`}
+              ? t("gateNone")
+              : t("gateRemaining", { count: FEEDBACK_MIN_ENTRIES - entryCount })}
           </p>
         </Card>
       )}
@@ -168,7 +173,7 @@ export default async function AboutPage({ searchParams }: PageProps) {
       {myReports.length > 0 && (
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-fg-muted">
-            Tus reportes anteriores
+            {t("reportsHeading")}
           </h2>
           <Card>
             <ul className="divide-y divide-border">
@@ -177,9 +182,9 @@ export default async function AboutPage({ searchParams }: PageProps) {
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs">
                       <span className="rounded-md bg-surface-2 px-2 py-0.5 font-medium text-fg-muted">
-                        {TYPE_LABELS[r.type]}
+                        {getTypeLabel(t, r.type)}
                       </span>
-                      <StatusBadge status={r.status} type={r.type} />
+                      <StatusBadge t={t} status={r.status} type={r.type} />
                     </div>
                     <span className="font-mono text-xs text-fg-subtle">
                       {formatDateTime(r.created_at, locale, timeZone)}
@@ -191,7 +196,7 @@ export default async function AboutPage({ searchParams }: PageProps) {
                   {r.admin_note && (
                     <p className="mt-2 rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-fg-muted">
                       <span className="font-medium text-fg">
-                        Respuesta de Seketman:
+                        {t("adminReply")}
                       </span>{" "}
                       {r.admin_note}
                     </p>
@@ -207,9 +212,11 @@ export default async function AboutPage({ searchParams }: PageProps) {
 }
 
 function StatusBadge({
+  t,
   status,
   type,
 }: {
+  t: AboutT;
   status: FeedbackStatus;
   type: FeedbackType;
 }) {
@@ -224,7 +231,7 @@ function StatusBadge({
     <span
       className={`rounded-md px-2 py-0.5 text-xs font-medium ${toneClass[tone]}`}
     >
-      {getStatusLabel(status, type)}
+      {getStatusLabel(t, status, type)}
     </span>
   );
 }

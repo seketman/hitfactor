@@ -40,9 +40,15 @@ const BINDING =
 const CALL = (variable: string) =>
   new RegExp(`\\b${variable}(?:\\.rich)?\\(\\s*"([^"]+)"`, "g");
 
-/** `t(\`parserError.${code}\`)`: la clave se arma en runtime. */
+/**
+ * Llamada cuya clave NO es un literal: `t(\`ns.${code}\`)`, `t(TABLA[x])`,
+ * `t(variable)`. Se define por descarte —lo que no abre con comilla— en vez
+ * de enumerar formas: enumerar deja afuera la que a nadie se le ocurrió, y
+ * la primera que se escapó fue justamente `t(TYPE_KEYS[r.type])`, que no es
+ * un template literal.
+ */
 const DYNAMIC_CALL = (variable: string) =>
-  new RegExp(`\\b${variable}(?:\\.rich)?\\(\\s*\``, "g");
+  new RegExp(`\\b${variable}(?:\\.rich)?\\(\\s*[^"\\s)]`, "g");
 
 function lookup(messages: unknown, path: string): unknown {
   return path
@@ -148,6 +154,7 @@ describe("claves de traducción usadas en el código", () => {
         "app/[locale]/(app)/import/ImportForm.tsx",
         "app/[locale]/(app)/import/actions.ts",
         "app/[locale]/(auth)/login/page.tsx",
+        "components/HistoryTable.tsx",
         "components/landing/LandingPage.tsx",
       ]
     `);

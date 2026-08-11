@@ -22,6 +22,93 @@ function flatten(obj: unknown, prefix = ""): string[] {
   );
 }
 
+/**
+ * Nombres de los argumentos ICU de un mensaje: los `{name}` y los
+ * `{name, plural|select, ...}`, **sin** los cuerpos de sus ramas.
+ *
+ * Se camina la estructura en vez de aplicar un regex. El que había antes
+ * (`/\{(\w+)\s*[,}]/`) confundía la rama de un `select` con un argumento: en
+ * `{type, select, suggestion {Implementada} other {Resuelto}}` levantaba
+ * `type`, `Implementada` y `Resuelto`, y como esas dos últimas están
+ * traducidas, todo mensaje con `select` daba un falso positivo.
+ *
+ * Los plurales que ya existían se salvaban de casualidad, porque sus ramas
+ * empiezan con `#` y `#` no es `\w`. Una rama de una sola palabra no tiene
+ * esa suerte, y es lo que destapó `about.statusDone` al usar `select` para
+ * que "resuelto" y "implementada" sean decisión de cada idioma.
+ */
+function icuArguments(message: string): string[] {
+  const names: string[] = [];
+  let i = 0;
+
+  const skipSpace = () => {
+    while (i < message.length && /\s/.test(message[i]!)) i++;
+  };
+
+  /** Recorre texto hasta el `}` que lo cierra (o el final). */
+  const parseMessage = (): void => {
+    while (i < message.length) {
+      if (message[i] === "}") return;
+      if (message[i] !== "{") {
+        i++;
+        continue;
+      }
+      parseArgument();
+    }
+  };
+
+  const parseArgument = (): void => {
+    i++; // "{"
+    skipSpace();
+    let name = "";
+    while (i < message.length && /[\w.]/.test(message[i]!)) name += message[i++]!;
+    if (name) names.push(name);
+    skipSpace();
+
+    if (message[i] === "}") {
+      i++;
+      return;
+    }
+    if (message[i] !== ",") return; // malformado: no se inventa nada
+    i++;
+    skipSpace();
+
+    let type = "";
+    while (i < message.length && /\w/.test(message[i]!)) type += message[i++]!;
+    skipSpace();
+
+    if (type === "plural" || type === "select" || type === "selectordinal") {
+      if (message[i] === ",") i++;
+      while (i < message.length) {
+        skipSpace();
+        if (message[i] === "}") {
+          i++;
+          return;
+        }
+        // El selector (`one`, `other`, `=0`, `bug`) NO es un argumento.
+        while (i < message.length && !/[\s{}]/.test(message[i]!)) i++;
+        skipSpace();
+        if (message[i] !== "{") continue;
+        i++;
+        parseMessage(); // una rama puede anidar argumentos de verdad
+        if (message[i] === "}") i++;
+      }
+      return;
+    }
+
+    // number/date/time y cualquier otro: saltar hasta cerrar.
+    let depth = 1;
+    while (i < message.length && depth > 0) {
+      if (message[i] === "{") depth++;
+      else if (message[i] === "}") depth--;
+      i++;
+    }
+  };
+
+  parseMessage();
+  return names;
+}
+
 describe("messages es/en", () => {
   it("tienen exactamente las mismas claves", () => {
     const keysEs = flatten(es).sort();
@@ -33,15 +120,8 @@ describe("messages es/en", () => {
   // Un `{name}` que en un idioma se escribió `{nombre}` compila, pasa el
   // typecheck, y en runtime renderiza el placeholder crudo.
   it("usan los mismos placeholders en cada clave", () => {
-    // Un placeholder es `{nombre}` o `{nombre, plural, ...}`: después del nombre
-    // viene una coma o la llave de cierre. El `\s*[,}]` no es opcional — sin
-    // él, el texto de las ramas de un plural ICU (`{sobre # torneo}`) matchea
-    // como si fuera un placeholder, y como ese texto está traducido, cada
-    // mensaje con plural daría un falso positivo.
     const placeholders = (v: unknown) =>
-      typeof v === "string"
-        ? [...v.matchAll(/\{(\w+)\s*[,}]/g)].map((m) => m[1]!).sort()
-        : [];
+      typeof v === "string" ? icuArguments(v).sort() : [];
     const walk = (a: unknown, b: unknown, path: string): void => {
       if (typeof a === "string" || typeof b === "string") {
         expect(
@@ -248,4 +328,59 @@ describe("ImportError: params ↔ placeholders", () => {
       expect(params).toEqual(placeholders);
     },
   );
+});
+
+/**
+ * El extractor de argumentos ICU es el que sostiene la comparación de
+ * placeholders entre idiomas. Si extrae de menos, esa comparación pasa sin
+ * mirar nada; si extrae de más, marca falsos positivos y termina apagada.
+ * Las dos fallas son silenciosas, así que se prueba contra las formas que
+ * existen en `messages/*.json` y contra la que lo rompió.
+ */
+describe("icuArguments", () => {
+  it("levanta un placeholder simple", () => {
+    expect(icuArguments("Miembro desde {date}")).toEqual(["date"]);
+    expect(icuArguments("{a} y {b}")).toEqual(["a", "b"]);
+  });
+
+  it("no confunde las ramas de un plural con argumentos", () => {
+    expect(
+      icuArguments("{count, plural, one {# torneo} other {# torneos}}"),
+    ).toEqual(["count"]);
+  });
+
+  /** El caso que rompió el regex anterior: ramas de una sola palabra. */
+  it("no confunde las ramas de un select con argumentos", () => {
+    expect(
+      icuArguments("{type, select, suggestion {Implementada} other {Resuelto}}"),
+    ).toEqual(["type"]);
+  });
+
+  it("encuentra argumentos anidados DENTRO de una rama", () => {
+    // Que la rama no sea un argumento no significa que no pueda contener uno.
+    expect(
+      icuArguments("{n, plural, one {vino {name}} other {vinieron {name}}}"),
+    ).toEqual(["n", "name", "name"]);
+  });
+
+  it("soporta selectores `=0` y ramas con markup", () => {
+    expect(
+      icuArguments("{c, plural, =0 {ninguno} one {<b>#</b>} other {#}}"),
+    ).toEqual(["c"]);
+  });
+
+  it("no inventa nada ante un mensaje sin argumentos o malformado", () => {
+    expect(icuArguments("texto sin nada")).toEqual([]);
+    expect(icuArguments("{")).toEqual([]);
+    expect(icuArguments("}")).toEqual([]);
+  });
+
+  /**
+   * Los tags de `t.rich` (`<link>…</link>`) no son argumentos ICU y no
+   * tienen que aparecer: van como props del componente, no del mensaje.
+   */
+  it("ignora los tags de rich text", () => {
+    expect(icuArguments("Sin catálogo. <link>Agregar</link> para asociar.")).toEqual([]);
+    expect(icuArguments("Llevás <strong>{count}</strong> de {total}.")).toEqual(["count", "total"]);
+  });
 });
