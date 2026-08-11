@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { useFormStatus } from "react-dom";
 import { Link } from "@/i18n/navigation";
 import { Loader2 } from "lucide-react";
@@ -41,18 +42,22 @@ export function FirearmSelector({
   current,
   suggestedRounds,
 }: FirearmSelectorProps) {
+  const t = useTranslations("firearms");
+
   if (firearms.length === 0) {
     return (
       <Card className="mb-8 px-5 py-4">
         <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-          Arma usada
+          {t("selectorEmptyHeading")}
         </p>
         <p className="mt-2 text-sm text-fg-muted">
-          Todavía no cargaste ninguna arma en tu catálogo.{" "}
-          <Link href="/firearms" className="text-accent hover:underline">
-            Agregá la primera
-          </Link>{" "}
-          y volvé acá para asignarla a este match.
+          {t.rich("selectorEmptyBody", {
+            link: (chunks) => (
+              <Link href="/firearms" className="text-accent hover:underline">
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
       </Card>
     );
@@ -61,7 +66,7 @@ export function FirearmSelector({
   return (
     <Card className="mb-8 px-5 py-4">
       <p className="mb-3 text-xs font-medium uppercase tracking-wider text-fg-muted">
-        Arma y munición
+        {t("selectorHeading")}
       </p>
       {/*
         key={matchEntryId} fuerza remount cuando cambia la entry (ej: el
@@ -91,6 +96,7 @@ function FirearmForm({
   current,
   suggestedRounds,
 }: FirearmSelectorProps) {
+  const t = useTranslations("firearms");
   const initialFirearmId = current?.firearm_id ?? "";
   const initialAmmoId = current?.ammunition_type_id ?? "";
 
@@ -135,12 +141,12 @@ function FirearmForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Select
-          label="Arma"
+          label={t("selectorFirearm")}
           name="firearm_id"
           value={firearmId}
           onChange={(e) => setFirearmId(e.target.value)}
         >
-          <option value="">— Sin asignar —</option>
+          <option value="">{t("selectorUnassigned")}</option>
           {firearms.map((f) => (
             <option key={f.id} value={f.id}>
               {f.name}
@@ -150,11 +156,11 @@ function FirearmForm({
         </Select>
 
         <Input
-          label="Tiros disparados"
+          label={t("fieldRounds")}
           name="rounds_fired"
           type="number"
           min={0}
-          placeholder="Ej: 100"
+          placeholder={t("selectorRoundsPlaceholder")}
           value={rounds}
           onChange={(e) => setRounds(e.target.value)}
           disabled={isClearing}
@@ -165,7 +171,7 @@ function FirearmForm({
                 onClick={() => setRounds(String(suggestedRounds))}
                 className="text-fg-subtle underline-offset-2 hover:text-accent hover:underline"
               >
-                estimado: {suggestedRounds} (usar)
+                {t("selectorSuggestion", { rounds: suggestedRounds })}
               </button>
             ) : undefined
           }
@@ -177,13 +183,13 @@ function FirearmForm({
           con logs viejos pre-catálogo). */}
       {ammo.length > 0 && (
         <Select
-          label="Munición (opcional)"
+          label={t("ammoOptional")}
           name="ammunition_type_id"
           value={ammoId}
           onChange={(e) => setAmmoId(e.target.value)}
           disabled={isClearing}
         >
-          <option value="">— Sin especificar —</option>
+          <option value="">{t("ammoUnspecified")}</option>
           {ammo.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}
@@ -213,6 +219,7 @@ function SubmitButton({
   isClearing: boolean;
   disabled: boolean;
 }) {
+  const t = useTranslations("firearms");
   const { pending } = useFormStatus();
 
   // Secondary para no robar atención visual — el card ya está enmarcado y la
@@ -228,14 +235,14 @@ function SubmitButton({
       {pending ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Guardando…
+          {t("selectorSaving")}
         </>
       ) : isUpdate ? (
-        "Actualizar"
+        t("selectorUpdate")
       ) : isClearing ? (
-        "Confirmar"
+        t("selectorConfirm")
       ) : (
-        "Guardar"
+        t("save")
       )}
     </Button>
   );

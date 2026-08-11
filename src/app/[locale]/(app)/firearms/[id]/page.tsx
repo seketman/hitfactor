@@ -1,7 +1,7 @@
 import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
 import { QrCode } from "lucide-react";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
@@ -65,6 +65,7 @@ export default async function FirearmDetailPage({
   searchParams,
 }: PageProps) {
   const locale = await getLocale();
+  const t = await getTranslations("firearms");
   const { id } = await params;
   const { error, log } = await searchParams;
 
@@ -115,7 +116,7 @@ export default async function FirearmDetailPage({
         kind: "session",
         key: `session:${l.id}`,
         date: l.used_on,
-        label: l.notes ?? "Práctica",
+        label: l.notes ?? t("sourceSession"),
         href: null,
         discipline: null,
         rounds: l.rounds_fired,
@@ -132,7 +133,7 @@ export default async function FirearmDetailPage({
         href="/firearms"
         className="mb-4 inline-block text-sm text-fg-muted hover:text-accent"
       >
-        ← Tus armas
+        ← {t("title")}
       </Link>
 
       <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -147,10 +148,10 @@ export default async function FirearmDetailPage({
         <Link
           href={`/firearms/${firearm.id}/qr`}
           className="inline-flex items-center gap-1.5 text-sm text-fg-muted hover:text-accent"
-          title="QR para pegar al estuche y registrar consumo con la cámara"
+          title={t("qrLinkTitle")}
         >
           <QrCode className="h-4 w-4" aria-hidden />
-          QR para imprimir
+          {t("qrLink")}
         </Link>
       </header>
 
@@ -161,29 +162,37 @@ export default async function FirearmDetailPage({
       )}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <KpiCard label="Tiros totales" value={totalRounds.toLocaleString("es-AR")} />
-        <KpiCard label="Torneos" value={String(matchHistory.length)} />
-        <KpiCard label="Prácticas" value={String(usageLogs.length)} />
+        <KpiCard
+          label={t("kpiTotalRounds")}
+          value={totalRounds.toLocaleString(locale)}
+        />
+        <KpiCard label={t("kpiMatches")} value={String(matchHistory.length)} />
+        <KpiCard label={t("kpiSessions")} value={String(usageLogs.length)} />
       </div>
 
       <section className="mb-8">
         <details className="group">
-          <CollapsibleHeading label="Editar datos del arma" />
+          <CollapsibleHeading label={t("editHeading")} />
           <Card className="mt-3 p-6">
           <form action={updateFirearm} className="space-y-4">
             <input type="hidden" name="id" value={firearm.id} />
-            <Input label="Nombre" name="name" required defaultValue={firearm.name} />
+            <Input
+              label={t("fieldName")}
+              name="name"
+              required
+              defaultValue={firearm.name}
+            />
             <div className="grid gap-4 sm:grid-cols-3">
-              <Input label="Marca" name="brand" defaultValue={firearm.brand ?? ""} />
-              <Input label="Modelo" name="model" defaultValue={firearm.model ?? ""} />
+              <Input label={t("fieldBrand")} name="brand" defaultValue={firearm.brand ?? ""} />
+              <Input label={t("fieldModel")} name="model" defaultValue={firearm.model ?? ""} />
               <Input
-                label="Calibre"
+                label={t("fieldCaliber")}
                 name="caliber"
                 defaultValue={firearm.caliber ?? ""}
               />
             </div>
-            <Input label="Notas" name="notes" defaultValue={firearm.notes ?? ""} />
-            <Button type="submit">Guardar cambios</Button>
+            <Input label={t("fieldNotes")} name="notes" defaultValue={firearm.notes ?? ""} />
+            <Button type="submit">{t("saveChanges")}</Button>
           </form>
           </Card>
         </details>
@@ -191,22 +200,22 @@ export default async function FirearmDetailPage({
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
-          Historial de uso
+          {t("historyHeading")}
         </h2>
         {history.length === 0 ? (
           <Card className="p-10 text-center text-fg-muted">
-            Todavía no hay sesiones registradas ni asignaciones a matches.
+            {t("historyEmpty")}
           </Card>
         ) : (
           <Card className="overflow-hidden">
             <Table>
               <THead>
                 <TR>
-                  <TH>Fecha</TH>
-                  <TH>Origen</TH>
-                  <TH>Detalle</TH>
-                  <TH>Munición</TH>
-                  <TH className="text-right">Tiros</TH>
+                  <TH>{t("colDate")}</TH>
+                  <TH>{t("colSource")}</TH>
+                  <TH>{t("colDetail")}</TH>
+                  <TH>{t("colAmmo")}</TH>
+                  <TH className="text-right">{t("colRounds")}</TH>
                   <TH />
                 </TR>
               </THead>
@@ -218,9 +227,9 @@ export default async function FirearmDetailPage({
                     </TD>
                     <TD>
                       {h.kind === "match" ? (
-                        <Badge tone="accent">Match</Badge>
+                        <Badge tone="accent">{t("sourceMatch")}</Badge>
                       ) : (
-                        <Badge tone="default">Práctica</Badge>
+                        <Badge tone="default">{t("sourceSession")}</Badge>
                       )}
                     </TD>
                     <TD>
@@ -242,7 +251,7 @@ export default async function FirearmDetailPage({
                     </TD>
                     <TD className="text-fg-muted">{h.ammoName ?? "—"}</TD>
                     <TD className="text-right font-mono">
-                      {h.rounds.toLocaleString("es-AR")}
+                      {h.rounds.toLocaleString(locale)}
                     </TD>
                     <TD>
                       {h.kind === "session" && (
@@ -259,7 +268,7 @@ export default async function FirearmDetailPage({
                             size="sm"
                             className="text-danger hover:text-danger"
                           >
-                            Borrar
+                            {t("delete")}
                           </Button>
                         </form>
                       )}
@@ -274,29 +283,38 @@ export default async function FirearmDetailPage({
 
       <section id="log-form">
         <details className="group" open={autoOpenLog}>
-          <CollapsibleHeading label="Registrar sesión de práctica" />
+          <CollapsibleHeading label={t("logHeading")} />
           <Card className="mt-3 p-6">
           <form action={createFirearmUsage} className="space-y-4">
             <input type="hidden" name="firearm_id" value={firearm.id} />
             <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label="Fecha"
+                label={t("logDate")}
                 name="used_on"
                 type="date"
                 required
                 defaultValue={new Date().toISOString().slice(0, 10)}
               />
               <Input
-                label="Tiros disparados"
+                label={t("fieldRounds")}
                 name="rounds_fired"
                 type="number"
                 min={1}
                 required
-                placeholder="100"
+                placeholder={t("fieldRoundsPlaceholder")}
               />
+              {/* El caso sin catálogo usa `t.rich` en vez de tres fragmentos
+                  concatenados: el orden de las palabras alrededor del link
+                  cambia entre idiomas, y partir la frase obliga a que el
+                  link caiga siempre en el mismo lugar. El `<link>` del
+                  mensaje marca dónde va. */}
               {myAmmo.length > 0 ? (
-                <Select label="Munición (opcional)" name="ammunition_type_id" defaultValue="">
-                  <option value="">— Sin especificar —</option>
+                <Select
+                  label={t("ammoOptional")}
+                  name="ammunition_type_id"
+                  defaultValue=""
+                >
+                  <option value="">{t("ammoUnspecified")}</option>
                   {myAmmo.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
@@ -306,23 +324,22 @@ export default async function FirearmDetailPage({
                 </Select>
               ) : (
                 <div className="text-xs text-fg-subtle">
-                  Sin catálogo de munición.{" "}
-                  <Link
-                    href="/ammo"
-                    className="text-accent hover:underline"
-                  >
-                    Agregar
-                  </Link>{" "}
-                  para asociar al consumo.
+                  {t.rich("ammoEmpty", {
+                    link: (chunks) => (
+                      <Link href="/ammo" className="text-accent hover:underline">
+                        {chunks}
+                      </Link>
+                    ),
+                  })}
                 </div>
               )}
             </div>
             <Input
-              label="Notas (opcional)"
+              label={t("logNotes")}
               name="notes"
-              placeholder="Ej: entrenamiento de draw, polígono TFALP"
+              placeholder={t("logNotesPlaceholder")}
             />
-            <Button type="submit">Registrar</Button>
+            <Button type="submit">{t("logSubmit")}</Button>
           </form>
           </Card>
         </details>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/Button";
  * solo en la página de QR — el resto del flow es Server Components.
  */
 export function PrintButton() {
+  const t = useTranslations("firearms");
   return (
     <Button
       type="button"
@@ -16,7 +18,7 @@ export function PrintButton() {
       className="inline-flex items-center gap-2"
     >
       <Printer className="h-4 w-4" aria-hidden />
-      Imprimir
+      {t("qrPrint")}
     </Button>
   );
 }
