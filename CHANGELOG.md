@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.0](https://github.com/seketman/hitfactor/compare/v1.27.0...v1.28.0) (2026-08-11)
+
+
+### Features
+
+* **i18n:** translate the about screen and its feedback form ([#260](https://github.com/seketman/hitfactor/issues/260)) ([b746392](https://github.com/seketman/hitfactor/commit/b7463926cc5ae90c9fb3571c4791f6b6853af6de))
+
 ## [1.27.0](https://github.com/seketman/hitfactor/compare/v1.26.2...v1.27.0) (2026-08-11)
 
 
