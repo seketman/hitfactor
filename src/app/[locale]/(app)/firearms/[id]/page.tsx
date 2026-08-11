@@ -66,6 +66,7 @@ export default async function FirearmDetailPage({
 }: PageProps) {
   const locale = await getLocale();
   const t = await getTranslations("firearms");
+  const tc = await getTranslations("common");
   const { id } = await params;
   const { error, log } = await searchParams;
 
@@ -163,10 +164,10 @@ export default async function FirearmDetailPage({
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <KpiCard
-          label={t("kpiTotalRounds")}
+          label={tc("kpiTotalRounds")}
           value={totalRounds.toLocaleString(locale)}
         />
-        <KpiCard label={t("kpiMatches")} value={String(matchHistory.length)} />
+        <KpiCard label={tc("kpiMatches")} value={String(matchHistory.length)} />
         <KpiCard label={t("kpiSessions")} value={String(usageLogs.length)} />
       </div>
 
@@ -177,22 +178,22 @@ export default async function FirearmDetailPage({
           <form action={updateFirearm} className="space-y-4">
             <input type="hidden" name="id" value={firearm.id} />
             <Input
-              label={t("fieldName")}
+              label={tc("fieldName")}
               name="name"
               required
               defaultValue={firearm.name}
             />
             <div className="grid gap-4 sm:grid-cols-3">
-              <Input label={t("fieldBrand")} name="brand" defaultValue={firearm.brand ?? ""} />
+              <Input label={tc("fieldBrand")} name="brand" defaultValue={firearm.brand ?? ""} />
               <Input label={t("fieldModel")} name="model" defaultValue={firearm.model ?? ""} />
               <Input
-                label={t("fieldCaliber")}
+                label={tc("fieldCaliber")}
                 name="caliber"
                 defaultValue={firearm.caliber ?? ""}
               />
             </div>
-            <Input label={t("fieldNotes")} name="notes" defaultValue={firearm.notes ?? ""} />
-            <Button type="submit">{t("saveChanges")}</Button>
+            <Input label={tc("fieldNotes")} name="notes" defaultValue={firearm.notes ?? ""} />
+            <Button type="submit">{tc("saveChanges")}</Button>
           </form>
           </Card>
         </details>
@@ -200,7 +201,7 @@ export default async function FirearmDetailPage({
 
       <section className="mb-8">
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
-          {t("historyHeading")}
+          {tc("historyHeading")}
         </h2>
         {history.length === 0 ? (
           <Card className="p-10 text-center text-fg-muted">
@@ -211,11 +212,11 @@ export default async function FirearmDetailPage({
             <Table>
               <THead>
                 <TR>
-                  <TH>{t("colDate")}</TH>
+                  <TH>{tc("colDate")}</TH>
                   <TH>{t("colSource")}</TH>
                   <TH>{t("colDetail")}</TH>
                   <TH>{t("colAmmo")}</TH>
-                  <TH className="text-right">{t("colRounds")}</TH>
+                  <TH className="text-right">{tc("colRounds")}</TH>
                   <TH />
                 </TR>
               </THead>
@@ -268,7 +269,7 @@ export default async function FirearmDetailPage({
                             size="sm"
                             className="text-danger hover:text-danger"
                           >
-                            {t("delete")}
+                            {tc("delete")}
                           </Button>
                         </form>
                       )}
