@@ -1,6 +1,6 @@
 import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { CollapsibleHeading } from "@/components/CollapsibleHeading";
 import { Card } from "@/components/ui/Card";
@@ -25,6 +25,8 @@ export default async function AmmoDetailPage({
   searchParams,
 }: PageProps) {
   const locale = await getLocale();
+  const t = await getTranslations("ammo");
+  const tc = await getTranslations("common");
   const { id } = await params;
   const { error } = await searchParams;
 
@@ -44,14 +46,14 @@ export default async function AmmoDetailPage({
         href="/ammo"
         className="mb-4 inline-block text-sm text-fg-muted hover:text-accent"
       >
-        ← Tus municiones
+        ← {t("title")}
       </Link>
 
       <header className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight">{ammo.name}</h1>
         <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg-muted">
           <Badge tone={ammo.type === "reload" ? "info" : "default"}>
-            {ammo.type === "reload" ? "recarga" : "factory"}
+            {ammo.type === "reload" ? t("typeReload") : t("typeFactory")}
           </Badge>
           {ammo.caliber && <Badge tone="default">{ammo.caliber}</Badge>}
           {ammo.brand && <span>{ammo.brand}</span>}
@@ -80,15 +82,15 @@ export default async function AmmoDetailPage({
       <div className="mb-6 grid gap-3 sm:grid-cols-2">
         <Card className="px-5 py-4">
           <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Tiros totales
+            {tc("kpiTotalRounds")}
           </p>
           <p className="mt-1.5 font-mono text-2xl font-semibold tabular-nums">
-            {totalRounds.toLocaleString("es-AR")}
+            {totalRounds.toLocaleString(locale)}
           </p>
         </Card>
         <Card className="px-5 py-4">
           <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Torneos
+            {tc("kpiMatches")}
           </p>
           <p className="mt-1.5 font-mono text-2xl font-semibold tabular-nums">
             {history.length}
@@ -98,35 +100,35 @@ export default async function AmmoDetailPage({
 
       <section className="mb-8">
         <details className="group">
-          <CollapsibleHeading label="Editar datos de la munición" />
+          <CollapsibleHeading label={t("editHeading")} />
           <Card className="mt-3 p-6">
             <form action={updateAmmo} className="space-y-4">
               <input type="hidden" name="id" value={ammo.id} />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Nombre"
+                  label={tc("fieldName")}
                   name="name"
                   required
                   defaultValue={ammo.name}
                 />
-                <Select label="Tipo" name="type" required defaultValue={ammo.type}>
-                  <option value="factory">Factory</option>
-                  <option value="reload">Recarga</option>
+                <Select label={t("fieldType")} name="type" required defaultValue={ammo.type}>
+                  <option value="factory">{t("optionFactory")}</option>
+                  <option value="reload">{t("optionReload")}</option>
                 </Select>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <Input
-                  label="Calibre"
+                  label={tc("fieldCaliber")}
                   name="caliber"
                   defaultValue={ammo.caliber ?? ""}
                 />
                 <Input
-                  label="Marca"
+                  label={tc("fieldBrand")}
                   name="brand"
                   defaultValue={ammo.brand ?? ""}
                 />
                 <Input
-                  label="Peso de punta (gr)"
+                  label={t("fieldBulletWeight")}
                   name="bullet_weight_grains"
                   type="number"
                   step="0.1"
@@ -135,17 +137,17 @@ export default async function AmmoDetailPage({
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <Input
-                  label="Tipo de punta"
+                  label={t("fieldBulletType")}
                   name="bullet_type"
                   defaultValue={ammo.bullet_type ?? ""}
                 />
                 <Input
-                  label="Pólvora"
+                  label={t("fieldPowder")}
                   name="powder"
                   defaultValue={ammo.powder ?? ""}
                 />
                 <Input
-                  label="Carga (gr)"
+                  label={t("fieldPowderCharge")}
                   name="powder_charge_grains"
                   type="number"
                   step="0.01"
@@ -154,29 +156,29 @@ export default async function AmmoDetailPage({
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Select
-                  label="Factor declarado"
+                  label={t("fieldPowerFactor")}
                   name="power_factor"
                   defaultValue={ammo.power_factor ?? ""}
                 >
-                  <option value="">— Sin declarar —</option>
+                  <option value="">{t("powerFactorNone")}</option>
                   <option value="Min">Min</option>
                   <option value="Maj">Maj</option>
                 </Select>
                 <Input
-                  label="Factor medido (PF)"
+                  label={t("fieldPowerFactorMeasured")}
                   name="power_factor_measured"
                   type="number"
                   step="0.1"
                   defaultValue={ammo.power_factor_measured ?? ""}
-                  hint="peso (gr) × velocidad (fps) / 1000"
+                  hint={t("powerFactorHint")}
                 />
               </div>
               <Input
-                label="Notas"
+                label={tc("fieldNotes")}
                 name="notes"
                 defaultValue={ammo.notes ?? ""}
               />
-              <Button type="submit">Guardar cambios</Button>
+              <Button type="submit">{tc("saveChanges")}</Button>
             </form>
           </Card>
         </details>
@@ -184,23 +186,22 @@ export default async function AmmoDetailPage({
 
       <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
-          Historial de uso
+          {tc("historyHeading")}
         </h2>
         {history.length === 0 ? (
           <Card className="p-10 text-center text-fg-muted">
-            Todavía no asignaste esta munición a ningún match. Hacelo desde la
-            página de tu participación, junto con el arma usada.
+            {t("historyEmpty")}
           </Card>
         ) : (
           <Card className="overflow-hidden">
             <Table>
               <THead>
                 <TR>
-                  <TH>Fecha</TH>
-                  <TH>Disciplina</TH>
-                  <TH>Torneo</TH>
-                  <TH>Arma</TH>
-                  <TH className="text-right">Tiros</TH>
+                  <TH>{tc("colDate")}</TH>
+                  <TH>{t("colDiscipline")}</TH>
+                  <TH>{t("colMatch")}</TH>
+                  <TH>{t("colFirearm")}</TH>
+                  <TH className="text-right">{tc("colRounds")}</TH>
                 </TR>
               </THead>
               <TBody>
@@ -220,7 +221,7 @@ export default async function AmmoDetailPage({
                     </TD>
                     <TD className="text-fg-muted">{h.firearmName}</TD>
                     <TD className="text-right font-mono">
-                      {h.roundsFired.toLocaleString("es-AR")}
+                      {h.roundsFired.toLocaleString(locale)}
                     </TD>
                   </TR>
                 ))}

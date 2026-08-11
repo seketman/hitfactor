@@ -220,6 +220,7 @@ function SubmitButton({
   disabled: boolean;
 }) {
   const t = useTranslations("firearms");
+  const tc = useTranslations("common");
   const { pending } = useFormStatus();
 
   // Secondary para no robar atención visual — el card ya está enmarcado y la
@@ -242,7 +243,7 @@ function SubmitButton({
       ) : isClearing ? (
         t("selectorConfirm")
       ) : (
-        t("save")
+        tc("save")
       )}
     </Button>
   );

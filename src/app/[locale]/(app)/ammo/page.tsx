@@ -1,5 +1,5 @@
 import { Link } from "@/i18n/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +18,8 @@ interface PageProps {
 
 export default async function AmmoPage({ searchParams }: PageProps) {
   const locale = await getLocale();
+  const t = await getTranslations("ammo");
+  const tc = await getTranslations("common");
   const { error, new: showNew } = await searchParams;
 
   const { supabase, user } = await requireUser();
@@ -28,17 +30,13 @@ export default async function AmmoPage({ searchParams }: PageProps) {
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Tus municiones
+            {t("title")}
           </h1>
-          <p className="mt-1 text-sm text-fg-muted">
-            Catálogo personal de tipos de munición — factory (compradas) y
-            recargas. Asignalas a cada match desde tu página de participación
-            para llevar registro de qué munición usaste y cómo te fue.
-          </p>
+          <p className="mt-1 text-sm text-fg-muted">{t("subtitle")}</p>
         </div>
         {!showNew && stats.length > 0 && (
           <Link href="/ammo?new=1">
-            <Button>Agregar munición</Button>
+            <Button>{t("add")}</Button>
           </Link>
         )}
       </header>
@@ -68,7 +66,7 @@ export default async function AmmoPage({ searchParams }: PageProps) {
                   </Link>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-fg-muted">
                     <Badge tone={ammo.type === "reload" ? "info" : "default"}>
-                      {ammo.type === "reload" ? "recarga" : "factory"}
+                      {ammo.type === "reload" ? t("typeReload") : t("typeFactory")}
                     </Badge>
                     {ammo.caliber && <Badge tone="default">{ammo.caliber}</Badge>}
                     {ammo.brand && <span>{ammo.brand}</span>}
@@ -89,13 +87,17 @@ export default async function AmmoPage({ searchParams }: PageProps) {
                     )}
                   </p>
                 </div>
+                {/* Mismo criterio que en firearms: ICU para los conteos.
+                    Formatea el número en el locale activo y resuelve el
+                    plural inglés, que no sale con una `s` condicional. */}
                 <div className="text-right text-sm">
                   <p className="font-mono text-fg">
-                    {totalRounds.toLocaleString("es-AR")} tiros
+                    {tc("roundCount", { count: totalRounds })}
                   </p>
                   <p className="text-xs text-fg-subtle">
-                    {totalMatches} torneo{totalMatches === 1 ? "" : "s"}
-                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate, locale)}`}
+                    {tc("matchCount", { count: totalMatches })}
+                    {lastUsedDate &&
+                      ` · ${tc("lastUsed", { date: formatDate(lastUsedDate, locale) })}`}
                   </p>
                 </div>
                 <form action={deleteAmmo}>
@@ -106,7 +108,7 @@ export default async function AmmoPage({ searchParams }: PageProps) {
                     size="sm"
                     className="text-danger hover:text-danger"
                   >
-                    Borrar
+                    {tc("delete")}
                   </Button>
                 </form>
               </li>
@@ -118,30 +120,32 @@ export default async function AmmoPage({ searchParams }: PageProps) {
   );
 }
 
-function NewAmmoForm({ cancelable }: { cancelable: boolean }) {
+async function NewAmmoForm({ cancelable }: { cancelable: boolean }) {
+  const t = await getTranslations("ammo");
+  const tc = await getTranslations("common");
   return (
     <Card className="mb-6 p-6">
       <h2 className="mb-4 text-sm font-medium uppercase tracking-wider text-fg-muted">
-        Nueva munición
+        {t("newHeading")}
       </h2>
       <form action={createAmmo} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Input
-            label="Nombre"
+            label={tc("fieldName")}
             name="name"
             required
-            placeholder="9mm Hornady 124gr FMJ"
+            placeholder={t("fieldNamePlaceholder")}
           />
-          <Select label="Tipo" name="type" required defaultValue="factory">
-            <option value="factory">Factory</option>
-            <option value="reload">Recarga</option>
+          <Select label={t("fieldType")} name="type" required defaultValue="factory">
+            <option value="factory">{t("optionFactory")}</option>
+            <option value="reload">{t("optionReload")}</option>
           </Select>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Input label="Calibre" name="caliber" placeholder="9x19" />
-          <Input label="Marca" name="brand" placeholder="Hornady" />
+          <Input label={tc("fieldCaliber")} name="caliber" placeholder="9x19" />
+          <Input label={tc("fieldBrand")} name="brand" placeholder="Hornady" />
           <Input
-            label="Peso de punta (gr)"
+            label={t("fieldBulletWeight")}
             name="bullet_weight_grains"
             type="number"
             step="0.1"
@@ -150,13 +154,13 @@ function NewAmmoForm({ cancelable }: { cancelable: boolean }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <Input
-            label="Tipo de punta"
+            label={t("fieldBulletType")}
             name="bullet_type"
-            placeholder="FMJ / HP / JSP…"
+            placeholder={t("fieldBulletTypePlaceholder")}
           />
-          <Input label="Pólvora" name="powder" placeholder="Vihtavuori N320" />
+          <Input label={t("fieldPowder")} name="powder" placeholder="Vihtavuori N320" />
           <Input
-            label="Carga (gr)"
+            label={t("fieldPowderCharge")}
             name="powder_charge_grains"
             type="number"
             step="0.01"
@@ -164,31 +168,31 @@ function NewAmmoForm({ cancelable }: { cancelable: boolean }) {
           />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="Factor declarado" name="power_factor" defaultValue="">
-            <option value="">— Sin declarar —</option>
+          <Select label={t("fieldPowerFactor")} name="power_factor" defaultValue="">
+            <option value="">{t("powerFactorNone")}</option>
             <option value="Min">Min</option>
             <option value="Maj">Maj</option>
           </Select>
           <Input
-            label="Factor medido (PF)"
+            label={t("fieldPowerFactorMeasured")}
             name="power_factor_measured"
             type="number"
             step="0.1"
             placeholder="139.5"
-            hint="peso (gr) × velocidad (fps) / 1000"
+            hint={t("powerFactorHint")}
           />
         </div>
         <Input
-          label="Notas"
+          label={tc("fieldNotes")}
           name="notes"
-          placeholder="Cualquier detalle adicional"
+          placeholder={tc("fieldNotesPlaceholder")}
         />
         <div className="flex gap-2">
-          <Button type="submit">Guardar</Button>
+          <Button type="submit">{tc("save")}</Button>
           {cancelable && (
             <Link href="/ammo">
               <Button type="button" variant="ghost">
-                Cancelar
+                {tc("cancel")}
               </Button>
             </Link>
           )}

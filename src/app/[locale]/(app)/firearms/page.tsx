@@ -18,6 +18,7 @@ interface PageProps {
 export default async function FirearmsPage({ searchParams }: PageProps) {
   const locale = await getLocale();
   const t = await getTranslations("firearms");
+  const tc = await getTranslations("common");
   const { error, new: showNew } = await searchParams;
 
   const { supabase, user } = await requireUser();
@@ -50,7 +51,7 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
           </h2>
           <form action={createFirearm} className="space-y-4">
             <Input
-              label={t("fieldName")}
+              label={tc("fieldName")}
               name="name"
               required
               placeholder={t("fieldNamePlaceholder")}
@@ -59,21 +60,21 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
                 producto, no prosa: "Glock" y "9x19" se escriben igual en
                 los dos idiomas. */}
             <div className="grid gap-4 sm:grid-cols-3">
-              <Input label={t("fieldBrand")} name="brand" placeholder="Glock" />
+              <Input label={tc("fieldBrand")} name="brand" placeholder="Glock" />
               <Input label={t("fieldModel")} name="model" placeholder="17 Gen 5" />
-              <Input label={t("fieldCaliber")} name="caliber" placeholder="9x19" />
+              <Input label={tc("fieldCaliber")} name="caliber" placeholder="9x19" />
             </div>
             <Input
-              label={t("fieldNotes")}
+              label={tc("fieldNotes")}
               name="notes"
-              placeholder={t("fieldNotesPlaceholder")}
+              placeholder={tc("fieldNotesPlaceholder")}
             />
             <div className="flex gap-2">
-              <Button type="submit">{t("save")}</Button>
+              <Button type="submit">{tc("save")}</Button>
               {stats.length > 0 && (
                 <Link href="/firearms">
                   <Button type="button" variant="ghost">
-                    {t("cancel")}
+                    {tc("cancel")}
                   </Button>
                 </Link>
               )}
@@ -113,12 +114,12 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
                     inglés veía "1.500" con el separador español. */}
                 <div className="text-right text-sm">
                   <p className="font-mono text-fg">
-                    {t("roundCount", { count: totalRounds })}
+                    {tc("roundCount", { count: totalRounds })}
                   </p>
                   <p className="text-xs text-fg-subtle">
-                    {t("matchCount", { count: totalMatches })}
+                    {tc("matchCount", { count: totalMatches })}
                     {lastUsedDate &&
-                      ` · ${t("lastUsed", { date: formatDate(lastUsedDate, locale) })}`}
+                      ` · ${tc("lastUsed", { date: formatDate(lastUsedDate, locale) })}`}
                   </p>
                 </div>
                 <form action={deleteFirearm}>
@@ -129,7 +130,7 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
                     size="sm"
                     className="text-danger hover:text-danger"
                   >
-                    {t("delete")}
+                    {tc("delete")}
                   </Button>
                 </form>
               </li>
