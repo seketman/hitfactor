@@ -1,5 +1,6 @@
 import { Link } from "@/i18n/navigation";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import QRCode from "qrcode";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
@@ -27,6 +28,9 @@ interface PageProps {
  */
 export default async function FirearmQrPage({ params }: PageProps) {
   const { id } = await params;
+  const t = await getTranslations("firearms");
+  // "Volver" ya existe en `common`: no se duplica en el namespace nuevo.
+  const tc = await getTranslations("common");
 
   // Si la sesión expiró, mandamos al login con retorno a esta misma página
   // (para que pueda imprimir su QR sin perder el contexto).
@@ -75,7 +79,7 @@ export default async function FirearmQrPage({ params }: PageProps) {
 
       <Card className="p-8 text-center">
         <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-          QR de registro rápido
+          {t("qrKicker")}
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">
           {firearm.name}
@@ -97,9 +101,7 @@ export default async function FirearmQrPage({ params }: PageProps) {
         />
 
         <p className="mx-auto mt-6 max-w-md text-sm text-fg-muted">
-          Pegá este código en el estuche o en el arma. Cuando termines una
-          sesión de práctica, escanealo con la cámara del celular y vas a
-          llegar al form de registro con el arma ya seleccionada.
+          {t("qrInstructions")}
         </p>
 
         <p className="mt-3 break-all font-mono text-xs text-fg-subtle">
@@ -109,7 +111,7 @@ export default async function FirearmQrPage({ params }: PageProps) {
         <div className="mt-6 flex justify-center gap-2 print:hidden">
           <PrintButton />
           <Link href={`/firearms/${id}`}>
-            <Button variant="ghost">Volver</Button>
+            <Button variant="ghost">{tc("back")}</Button>
           </Link>
         </div>
       </Card>

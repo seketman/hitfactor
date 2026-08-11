@@ -1,5 +1,5 @@
 import { Link } from "@/i18n/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +17,7 @@ interface PageProps {
 
 export default async function FirearmsPage({ searchParams }: PageProps) {
   const locale = await getLocale();
+  const t = await getTranslations("firearms");
   const { error, new: showNew } = await searchParams;
 
   const { supabase, user } = await requireUser();
@@ -26,16 +27,12 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
     <PageContainer className="max-w-3xl">
       <header className="mb-8 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tus armas</h1>
-          <p className="mt-1 text-sm text-fg-muted">
-            Catálogo personal. Asignalas a cada match desde tu página de
-            participación para llevar un registro de su uso y disparos
-            efectuados.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+          <p className="mt-1 text-sm text-fg-muted">{t("subtitle")}</p>
         </div>
         {!showNew && stats.length > 0 && (
           <Link href="/firearms?new=1">
-            <Button>Agregar arma</Button>
+            <Button>{t("add")}</Button>
           </Link>
         )}
       </header>
@@ -49,31 +46,34 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
       {(showNew || stats.length === 0) && (
         <Card className="mb-6 p-6">
           <h2 className="mb-4 text-sm font-medium uppercase tracking-wider text-fg-muted">
-            Nueva arma
+            {t("newHeading")}
           </h2>
           <form action={createFirearm} className="space-y-4">
             <Input
-              label="Nombre"
+              label={t("fieldName")}
               name="name"
               required
-              placeholder="Ej: Glock 17 - service"
+              placeholder={t("fieldNamePlaceholder")}
             />
+            {/* Los placeholders de marca/modelo/calibre son ejemplos de
+                producto, no prosa: "Glock" y "9x19" se escriben igual en
+                los dos idiomas. */}
             <div className="grid gap-4 sm:grid-cols-3">
-              <Input label="Marca" name="brand" placeholder="Glock" />
-              <Input label="Modelo" name="model" placeholder="17 Gen 5" />
-              <Input label="Calibre" name="caliber" placeholder="9x19" />
+              <Input label={t("fieldBrand")} name="brand" placeholder="Glock" />
+              <Input label={t("fieldModel")} name="model" placeholder="17 Gen 5" />
+              <Input label={t("fieldCaliber")} name="caliber" placeholder="9x19" />
             </div>
             <Input
-              label="Notas"
+              label={t("fieldNotes")}
               name="notes"
-              placeholder="Cualquier detalle adicional"
+              placeholder={t("fieldNotesPlaceholder")}
             />
             <div className="flex gap-2">
-              <Button type="submit">Guardar</Button>
+              <Button type="submit">{t("save")}</Button>
               {stats.length > 0 && (
                 <Link href="/firearms">
                   <Button type="button" variant="ghost">
-                    Cancelar
+                    {t("cancel")}
                   </Button>
                 </Link>
               )}
@@ -105,13 +105,20 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
                     )}
                   </p>
                 </div>
+                {/* Los conteos van por ICU y no concatenados a mano. El
+                    plural del inglés no se resuelve con `s` condicional
+                    ("match" hace "matches"), y el `#` de ICU además formatea
+                    el número en el locale activo — antes era
+                    `toLocaleString("es-AR")` fijo, así que un usuario en
+                    inglés veía "1.500" con el separador español. */}
                 <div className="text-right text-sm">
                   <p className="font-mono text-fg">
-                    {totalRounds.toLocaleString("es-AR")} tiros
+                    {t("roundCount", { count: totalRounds })}
                   </p>
                   <p className="text-xs text-fg-subtle">
-                    {totalMatches} torneo{totalMatches === 1 ? "" : "s"}
-                    {lastUsedDate && ` · últ. ${formatDate(lastUsedDate, locale)}`}
+                    {t("matchCount", { count: totalMatches })}
+                    {lastUsedDate &&
+                      ` · ${t("lastUsed", { date: formatDate(lastUsedDate, locale) })}`}
                   </p>
                 </div>
                 <form action={deleteFirearm}>
@@ -122,7 +129,7 @@ export default async function FirearmsPage({ searchParams }: PageProps) {
                     size="sm"
                     className="text-danger hover:text-danger"
                   >
-                    Borrar
+                    {t("delete")}
                   </Button>
                 </form>
               </li>
