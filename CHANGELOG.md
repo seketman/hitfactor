@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.26.2](https://github.com/seketman/hitfactor/compare/v1.26.1...v1.26.2) (2026-08-11)
+
+
+### Documentation
+
+* **ops:** say where the alert has to land, and how to test that it does ([#256](https://github.com/seketman/hitfactor/issues/256)) ([bcfa92f](https://github.com/seketman/hitfactor/commit/bcfa92f40ccc3ae971bd0b1eed06cc7b8c38549c))
+
 ## [1.26.1](https://github.com/seketman/hitfactor/compare/v1.26.0...v1.26.1) (2026-08-11)
 
 
