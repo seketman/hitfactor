@@ -212,8 +212,18 @@ export async function getMyClaimAliases(
 
 const DIACRITIC_RANGE = /[̀-ͯ]/gu;
 
-/** Normaliza un nombre: minúsculas, sin acentos, sin puntuación, espacios colapsados. */
-export function normalizeName(s: string): string {
+/**
+ * Key for matching a user's claim against candidate shooters: lowercase,
+ * accents folded, `,` and `.` dropped, whitespace collapsed.
+ *
+ * Loose on purpose — the result is a list of candidates a human confirms, so a
+ * false positive costs a rejected suggestion. **Do not reuse it for anything
+ * that writes without confirmation.** Attaching a parsed row to an existing
+ * `shooters` record is that other case, and it uses `shooterNameKey`
+ * (`lib/names.ts`), which preserves accents; that module compares the three
+ * keys and explains why they differ.
+ */
+export function claimNameKey(s: string): string {
   return s
     .normalize("NFD")
     .replace(DIACRITIC_RANGE, "")
@@ -225,7 +235,7 @@ export function normalizeName(s: string): string {
 
 /** Tokens del nombre, sin duplicados. */
 export function nameTokens(s: string): Set<string> {
-  return new Set(normalizeName(s).split(" ").filter(Boolean));
+  return new Set(claimNameKey(s).split(" ").filter(Boolean));
 }
 
 /**

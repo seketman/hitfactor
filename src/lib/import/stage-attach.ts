@@ -1,5 +1,6 @@
 import type { TypedSupabaseClient } from "../supabase/types";
 import type { ParsedMatch, ParsedStageResult } from "@/lib/types/match";
+import { shooterNameKey } from "../names";
 import { ImportError } from "./import-error";
 import { requireDivision } from "./helpers";
 
@@ -44,7 +45,7 @@ export async function attachStagesToMatch(
     if (!stageId) continue; // no debería pasar tras paso 1
     for (const result of stage.results) {
       const divisionId = requireDivision(divisionByCode, result.divisionCode);
-      const normName = normalizeNameForMatch(result.shooter.fullName);
+      const normName = shooterNameKey(result.shooter.fullName);
 
       let entryId = entryByNameDiv.get(`${normName}|${divisionId}`);
       if (!entryId) {
@@ -190,7 +191,7 @@ async function buildEntryByNameIndex(
   for (const e of allEntriesData ?? []) {
     const fullName = shooterNameById.get(e.shooter_id as string);
     if (!fullName) continue;
-    const normName = normalizeNameForMatch(fullName);
+    const normName = shooterNameKey(fullName);
     const entryId = e.id as string;
     entryByNameDiv.set(`${normName}|${e.division_id}`, entryId);
     const arr = entriesByName.get(normName) ?? [];
@@ -199,18 +200,6 @@ async function buildEntryByNameIndex(
   }
 
   return { entryByNameDiv, entriesByName };
-}
-
-/**
- * Normaliza un nombre para matchear un parsed stage result contra un
- * `shooters.full_name` ya en DB. Lowercase + collapse de whitespace +
- * trim. No strip-ea acentos: dos apellidos que difieren por una tilde
- * son personas distintas. Tampoco strip-ea sufijos: el parser ya corrió
- * `stripNameSuffixes` antes de que llegue acá, así que ambos lados
- * (archivo y DB) tienen el mismo nombre canónico.
- */
-function normalizeNameForMatch(name: string): string {
-  return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function mapStageResultToRow(

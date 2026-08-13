@@ -145,7 +145,7 @@ export function parseFatText(text: string, filename: string): ParsedMatch {
   for (const section of sections) {
     if (!section.meta.category) continue;
     for (const row of section.rows) {
-      const key = normalizeName(row.name);
+      const key = accentFoldedName(row.name);
       if (!categoryByName.has(key)) {
         categoryByName.set(key, section.meta.category);
       }
@@ -188,7 +188,7 @@ export function parseFatText(text: string, filename: string): ParsedMatch {
         divisionCode,
         classification: null,
         powerFactor: null,
-        category: categoryByName.get(normalizeName(row.name)) ?? null,
+        category: categoryByName.get(accentFoldedName(row.name)) ?? null,
         place: row.rank,
         matchPoints: row.points,
         matchPercentage,
@@ -398,11 +398,21 @@ function dateFromFilename(filename: string): string | null {
 // ---------------------------------------------------------------------------
 
 /**
- * Normaliza un nombre para comparar el mismo tirador entre secciones:
- * saca acentos (ñ→n incluida), pasa a MAYÚSCULAS y colapsa espacios. Así
- * "GUSTAVO CASTAGNETO" y "GUSTAVO CASTAGÑETO" matchean.
+ * Key for matching one competitor against themselves across sections of a
+ * single FAT PDF: accents folded (ñ→n included), UPPER, whitespace collapsed.
+ *
+ * Folding is safe *here* because these PDFs spell the same competitor both
+ * ways within one document — "GUSTAVO CASTAGNETO" and "GUSTAVO CASTAGÑETO" are
+ * the same row of the same ranking.
+ *
+ * **It is safe only here.** This repo has three name keys and they must not be
+ * aligned; `lib/names.ts` is the single place that compares them and says why.
+ * Read it before reusing this one.
+ *
+ * Exported so `tests/name-normalization.test.ts` can pin the difference. That
+ * test also fails if anything else imports it.
  */
-function normalizeName(name: string): string {
+export function accentFoldedName(name: string): string {
   return name
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
