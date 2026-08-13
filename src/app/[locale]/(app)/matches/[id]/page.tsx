@@ -20,7 +20,11 @@ import { getRequestTimeZone } from "@/lib/timezone";
 import type { MatchEntryWithRelations } from "@/lib/db/types";
 import { getMyClaimAliases, isClaimCandidate } from "@/lib/import/match-claim";
 import { MatchActionsBar } from "@/components/MatchActionsBar";
-import { isHitsBasedDiscipline, isTimeBasedDiscipline } from "@/lib/disciplines";
+import {
+  fixedMinShots,
+  isHitsBasedDiscipline,
+  isTimeBasedDiscipline,
+} from "@/lib/disciplines";
 import { isInternalAppPath } from "@/lib/paths";
 import { canEditMatch } from "@/lib/permissions";
 import { canToggleEntryAbsent } from "@/lib/matches/entry-status";
@@ -135,6 +139,9 @@ export default async function MatchDetailPage({ params, searchParams }: PageProp
               currentRegion={match.region}
               currentClubCode={parsedClub.clubCode}
               currentMinShots={match.min_shots}
+              minShotsFixedByDiscipline={
+                fixedMinShots(match.disciplines?.code) !== null
+              }
               clubs={clubs}
               isImporter={isImporter}
               isAdmin={isAdmin}

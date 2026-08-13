@@ -108,7 +108,7 @@ See [`architecture.md`](./architecture.md).
 npm run lint && npx tsc --noEmit && npm test && npm run build
 ```
 
-All four have to pass. Currently: 820 tests green, typecheck clean, lint
+All four have to pass. Currently: 832 tests green, typecheck clean, lint
 clean (with the three warnings explained in `eslint.config.mjs`).
 
 Note that `npx tsc --noEmit` and `npm run build` are **not** interchangeable.

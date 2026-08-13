@@ -1203,7 +1203,7 @@ describe("importParsedMatch — min_shots depends on the discipline", () => {
   const FBI_FIXTURES = join(__dirname, "fixtures", "fbi");
   const SOCIAL4 = readFileSync(join(FBI_FIXTURES, "social4.csv"), "utf8");
 
-  it("forces 45 on FBI even when the form sent something else", async () => {
+  it("ignores the form value on FBI and uses 45", async () => {
     const fake = buildFbiSupabase();
     const parsed = parseFbiCsv(SOCIAL4);
 
@@ -1214,13 +1214,91 @@ describe("importParsedMatch — min_shots depends on the discipline", () => {
     expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
   });
 
-  it("forces 45 on FBI when the form sent nothing", async () => {
+  it("uses 45 on FBI when the form sent nothing", async () => {
     const fake = buildFbiSupabase();
     const parsed = parseFbiCsv(SOCIAL4);
 
     await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv");
 
     expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
+  });
+
+  /**
+   * The half of #263 that is reachable from here. Until it was fixed, an FBI
+   * match whose `min_shots` had been cleared through the "edit minimum"
+   * button never recovered: the next import saw a null and wrote whatever the
+   * form carried, because that path never asked what discipline it was in.
+   */
+  it("restores the discipline's round count on a match whose min_shots was cleared", async () => {
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL4);
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv");
+    // Somebody blanked it from the match page.
+    fake.tables.matches.rows[0]!.min_shots = null;
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv", {
+      minShots: 999,
+    });
+
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
+  });
+
+  /**
+   * The self-heal writes whenever the stored figure disagrees, which means it
+   * must not write when it agrees — and that difference is invisible in the
+   * resulting row. Without counting the writes, deleting the early return
+   * (making every re-import of a correct FBI match issue a redundant UPDATE)
+   * passes every other test in this file unchanged.
+   */
+  it("does not write again when the stored value already agrees", async () => {
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL4);
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv");
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
+
+    const writesBefore = fake.writesTo("matches").length;
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv", {
+      minShots: 999,
+    });
+
+    expect(fake.writesTo("matches")).toHaveLength(writesBefore);
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
+  });
+
+  it("overwrites a stored value that disagrees with the discipline", async () => {
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL4);
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv");
+    fake.tables.matches.rows[0]!.min_shots = 30;
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv");
+
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
+  });
+
+  /**
+   * The other side of the same branch: a non-fixed discipline must keep the
+   * "do not overwrite what the user set" behaviour. Repairing FBI by writing
+   * whenever the stored value disagrees would, applied to everyone, undo
+   * every manual correction on the match page.
+   */
+  it("still does not overwrite an existing value on other disciplines", async () => {
+    const fake = buildSupabase();
+    const parsed = parsePractiscoreHtml(
+      read("tp-escopeta-2026-02-20-match.html"),
+    );
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "m.html", {
+      minShots: 116,
+    });
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "m.html", {
+      minShots: 200,
+    });
+
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(116);
   });
 
   it("takes the form value on every other discipline", async () => {

@@ -10,6 +10,7 @@ import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import { getProfile } from "@/lib/db/profiles";
 import * as matchesDb from "@/lib/db/matches";
 import { canDeleteMatch, canEditEntry, canEditMatch } from "@/lib/permissions";
+import { fixedMinShots } from "@/lib/disciplines";
 import { isLikelyAbsent } from "@/lib/matches/entry-status";
 
 /**
@@ -236,6 +237,22 @@ export async function updateMatchMinShots(formData: FormData) {
 
   if (!allowed) {
     redirectWithError(`/matches/${matchId}`, t("onlyImporterOrAdmin"), locale);
+  }
+
+  // Some disciplines fix the round count themselves, and this field is not the
+  // user's to set for them. Checked here and not only in the UI: the button is
+  // hidden for those matches, but a form post is not.
+  //
+  // Refused rather than coerced to the correct figure — someone who typed 30
+  // should be told why it did not take, instead of watching the page come back
+  // with a different number and no explanation.
+  const fixed = fixedMinShots(matchBefore.disciplineCode);
+  if (fixed !== null) {
+    redirectWithError(
+      `/matches/${matchId}`,
+      t("minShotsFixedByDiscipline", { count: fixed }),
+      locale,
+    );
   }
 
   const { affected, error } = await matchesDb.updateMatchMinShots(

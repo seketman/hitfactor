@@ -49,6 +49,22 @@ const EMBEDDED_COUNTS: Record<string, { childTable: string; fk: string }> = {
 export class FakeSupabase {
   tables: Record<string, MockTable> = {};
 
+  /**
+   * Every write the code under test issued, in order.
+   *
+   * Some behaviour is invisible in the final row state: a guard that skips a
+   * write when the stored value already agrees leaves exactly the same table
+   * as a write that sets it to what it already was. Asserting on rows alone
+   * cannot tell those apart, so a redundant write on every re-import would
+   * pass a test suite that only reads `tables` (#263).
+   */
+  writes: Array<{ table: string; mode: "insert" | "update" | "upsert" }> = [];
+
+  /** Writes recorded against one table, for the common single-table assert. */
+  writesTo(table: string): typeof this.writes {
+    return this.writes.filter((w) => w.table === table);
+  }
+
   table(name: string): MockTable {
     if (!this.tables[name]) {
       this.tables[name] = { rows: [], nextId: 1 };
@@ -250,6 +266,7 @@ class QueryBuilder {
   }
 
   private runInsert(): Row[] {
+    this.db.writes.push({ table: this.tableName, mode: "insert" });
     if (this.table.insertError) {
       throw this.table.insertError;
     }
@@ -268,6 +285,7 @@ class QueryBuilder {
   }
 
   private runUpdate(): Row[] {
+    this.db.writes.push({ table: this.tableName, mode: "update" });
     const updated: Row[] = [];
     for (const row of this.table.rows) {
       if (this.filters.every((f) => f(row))) {
@@ -279,6 +297,7 @@ class QueryBuilder {
   }
 
   private runUpsert(): Row[] {
+    this.db.writes.push({ table: this.tableName, mode: "upsert" });
     if (this.table.upsertError) {
       throw this.table.upsertError;
     }
