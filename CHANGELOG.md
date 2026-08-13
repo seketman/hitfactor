@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.2](https://github.com/seketman/hitfactor/compare/v1.28.1...v1.28.2) (2026-08-13)
+
+
+### Bug Fixes
+
+* **matches:** enforce the fixed round count wherever min_shots is written ([#267](https://github.com/seketman/hitfactor/issues/267)) ([91f315f](https://github.com/seketman/hitfactor/commit/91f315f996babf03bdb514ee618ac3bdc2026bb0)), closes [#263](https://github.com/seketman/hitfactor/issues/263)
+
 ## [1.28.1](https://github.com/seketman/hitfactor/compare/v1.28.0...v1.28.1) (2026-08-13)
 
 
