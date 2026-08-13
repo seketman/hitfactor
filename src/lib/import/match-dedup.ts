@@ -1,5 +1,21 @@
 import type { TypedSupabaseClient } from "../supabase/types";
 
+/**
+ * The two lookups below run the same filter — discipline + name + date,
+ * oldest first, one row — and differ only in whether they scope to the
+ * importer. They are deliberately **not** merged behind an optional user
+ * parameter.
+ *
+ * What they share is five chained calls. What they do not share is the shape:
+ * one needs the embedded `match_entries(count)` aggregate to tell a real match
+ * from the leftovers of a half-failed import, the other needs `region` to
+ * decide whether two imports describe the same real tournament. Merging them
+ * means selecting different columns per branch, and `supabase-js` infers the
+ * row type from the select string as a literal — so a computed select gives up
+ * that inference and pushes the result straight into an `as` cast. That trade
+ * buys five lines and costs type safety, which is the wrong direction (#122).
+ */
+
 export interface MatchLookupRow {
   id: string;
   name: string;

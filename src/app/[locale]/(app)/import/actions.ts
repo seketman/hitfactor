@@ -7,6 +7,7 @@ import { parseFile, parsePdf, parsePdfBatch } from "@/lib/parsers";
 import type { ParsedMatch } from "@/lib/types/match";
 import { redirectWithError } from "@/lib/redirects";
 import { isValidIsoDate } from "@/lib/dates";
+import { DISCIPLINE, type DisciplineCode } from "@/lib/disciplines";
 import { requireUser } from "@/lib/supabase/require-user";
 import { AUDIT_ACTION, logAction } from "@/lib/audit/log-action";
 import type { TypedSupabaseClient } from "@/lib/supabase/types";
@@ -112,13 +113,24 @@ export type ImportFormState =
       error?: string;
     };
 
-/** Etiqueta legible de disciplina para la pantalla de "falta la fecha". */
+/**
+ * Readable discipline name for the "missing date" screen.
+ *
+ * Keyed off `DISCIPLINE` rather than the raw codes so a rename in the enum
+ * breaks here instead of silently falling through to the code itself. The
+ * `satisfies` is what forces a new discipline to get a label — the annotation
+ * alone would accept a partial map, and indexing stays `string`-keyed because
+ * `parsed.discipline` is a plain string and narrowing it would cost a cast.
+ *
+ * These are proper names of the sports, not UI copy, which is why they are not
+ * in `messages/*.json`. If that ever stops being true, they move.
+ */
 const DISCIPLINE_LABELS: Record<string, string> = {
-  tiro_fbi: "Tiro FBI",
-  ipsc: "Tiro Práctico (IPSC)",
-  steel_challenge: "Steel Challenge",
-  combat_solutions: "Combat Solutions",
-};
+  [DISCIPLINE.FBI]: "Tiro FBI",
+  [DISCIPLINE.IPSC]: "Tiro Práctico (IPSC)",
+  [DISCIPLINE.STEEL]: "Steel Challenge",
+  [DISCIPLINE.COMBAT]: "Combat Solutions",
+} satisfies Record<DisciplineCode, string>;
 
 export async function importHtml(
   prevState: ImportFormState,
