@@ -3,6 +3,7 @@ import type {
   ParsedMatch,
   ParsedMatchEntry,
 } from "@/lib/types/match";
+import { DISCIPLINE, FBI_MIN_SHOTS } from "@/lib/disciplines";
 import { ImportError } from "./import-error";
 import { requireDivision } from "./helpers";
 import { resolveShootersBulk, shooterCacheKey } from "./shooter-resolution";
@@ -254,12 +255,14 @@ async function importMatchOverall(
 
   // Insertamos. Si igual pega contra la unique constraint (race entre
   // dos imports concurrentes con misma region), reportamos error claro.
-  //
-  // `min_shots`: FBI siempre 45 (regla fija de la disciplina, ignoramos
-  // lo que venga del form). Resto usa el valor del form (puede ser null
-  // si el importer no lo completó — admin lo edita después).
+
+  // FBI overrides the form: the round count is fixed by the discipline (see
+  // `FBI_MIN_SHOTS`). Every other discipline takes the form value, which may
+  // be null if the importer left it blank — an admin can fill it in later.
   const minShots =
-    discipline.code === "tiro_fbi" ? 45 : (options.minShots ?? null);
+    discipline.code === DISCIPLINE.FBI
+      ? FBI_MIN_SHOTS
+      : (options.minShots ?? null);
 
   const { data: matchRow, error: matchErr } = await supabase
     .from("matches")

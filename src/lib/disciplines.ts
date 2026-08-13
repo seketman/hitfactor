@@ -19,6 +19,23 @@ export const DISCIPLINE = {
 
 export type DisciplineCode = (typeof DISCIPLINE)[keyof typeof DISCIPLINE];
 
+/**
+ * Rounds an FBI match requires, by rule of the discipline itself.
+ *
+ * Unlike every other discipline, this is not something the importer reports or
+ * gets to choose: an FBI match is 45 rounds, so the import overrides whatever
+ * the form carried instead of trusting it. It lives here, next to the codes,
+ * because it is a property of the discipline and not of the import.
+ *
+ * **Enforced on import only, today.** `updateMatchMinShots` (the "edit
+ * minimum" button) and `maybeApplyMinShots` (stage imports) both write
+ * `matches.min_shots` without reading the discipline, so an FBI match can
+ * still end up with another figure. That is a hole rather than an escape
+ * hatch, and closing it is #263 — do not read this constant as a guarantee
+ * about what is already in the database.
+ */
+export const FBI_MIN_SHOTS = 45;
+
 const TIME_BASED: Set<string> = new Set([DISCIPLINE.STEEL, DISCIPLINE.COMBAT]);
 
 const HITS_BASED: Set<string> = new Set([DISCIPLINE.FBI]);

@@ -31,6 +31,20 @@ function buildSupabase(): FakeSupabase {
   return fake;
 }
 
+function buildFbiSupabase(): FakeSupabase {
+  const fake = new FakeSupabase();
+  fake.seed("disciplines", [
+    { id: 5, code: "tiro_fbi", name: "Tiro FBI", scoring_type: "points" },
+  ]);
+  fake.seed("divisions", [
+    { id: 50, discipline_id: 5, code: "PIS", name: "Pistola" },
+    { id: 51, discipline_id: 5, code: "REV", name: "Revólver" },
+    { id: 52, discipline_id: 5, code: "MINI", name: "Minirifle" },
+    { id: 53, discipline_id: 5, code: "PCC", name: "PCC" },
+  ]);
+  return fake;
+}
+
 describe("importParsedMatch — Match overall", () => {
   let fake: FakeSupabase;
   beforeEach(() => {
@@ -872,20 +886,6 @@ describe("importParsedMatch — Re-upload de FBI CSV agrega stages al match exis
     "utf8",
   );
 
-  function buildFbiSupabase(): FakeSupabase {
-    const fake = new FakeSupabase();
-    fake.seed("disciplines", [
-      { id: 5, code: "tiro_fbi", name: "Tiro FBI", scoring_type: "points" },
-    ]);
-    fake.seed("divisions", [
-      { id: 50, discipline_id: 5, code: "PIS", name: "Pistola" },
-      { id: 51, discipline_id: 5, code: "REV", name: "Revólver" },
-      { id: 52, discipline_id: 5, code: "MINI", name: "Minirifle" },
-      { id: 53, discipline_id: 5, code: "PCC", name: "PCC" },
-    ]);
-    return fake;
-  }
-
   it("agrega stages a un match existente cuando el INSERT de matches falla con 23505", async () => {
     const fake = buildFbiSupabase();
     const parsed = parseFbiCsv(SOCIAL3);
@@ -1185,5 +1185,54 @@ describe("importParsedMatch — lista de candidatos acotada (#203)", () => {
       code: "MATCH_NOT_FOUND",
       params: { candidates: '"Torneo Ajeno"' },
     });
+  });
+});
+
+describe("importParsedMatch — min_shots depends on the discipline", () => {
+  /**
+   * FBI is the one discipline whose round count is fixed by its own rules, so
+   * the import overrides the form instead of trusting it. Nothing covered
+   * that: the rule lived as a bare `discipline.code === "tiro_fbi" ? 45 : ...`
+   * and every test went through IPSC, which takes the other branch.
+   *
+   * The literal 45 is asserted on purpose rather than `FBI_MIN_SHOTS`.
+   * Comparing the code against the constant it already uses would pass no
+   * matter what the constant said; 45 is the actual rule of the discipline,
+   * and changing it should have to be deliberate.
+   */
+  const FBI_FIXTURES = join(__dirname, "fixtures", "fbi");
+  const SOCIAL4 = readFileSync(join(FBI_FIXTURES, "social4.csv"), "utf8");
+
+  it("forces 45 on FBI even when the form sent something else", async () => {
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL4);
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv", {
+      minShots: 999,
+    });
+
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
+  });
+
+  it("forces 45 on FBI when the form sent nothing", async () => {
+    const fake = buildFbiSupabase();
+    const parsed = parseFbiCsv(SOCIAL4);
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "social4.csv");
+
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(45);
+  });
+
+  it("takes the form value on every other discipline", async () => {
+    const fake = buildSupabase();
+    const parsed = parsePractiscoreHtml(
+      read("tp-escopeta-2026-02-20-match.html"),
+    );
+
+    await importParsedMatch(fake.asClient(), parsed, USER_ID, "m.html", {
+      minShots: 116,
+    });
+
+    expect(fake.tables.matches.rows[0]!.min_shots).toBe(116);
   });
 });
