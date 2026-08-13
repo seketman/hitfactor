@@ -5,29 +5,29 @@ import {
   findClaimCandidates,
   isClaimCandidate,
   nameTokens,
-  normalizeName,
+  claimNameKey,
 } from "@/lib/import/match-claim";
 import { FakeSupabase } from "./helpers/supabase-mock";
 
-describe("normalizeName", () => {
+describe("claimNameKey", () => {
   it("baja a minúsculas y saca puntuación", () => {
-    expect(normalizeName("Demarziani, Diego")).toBe("demarziani diego");
+    expect(claimNameKey("Demarziani, Diego")).toBe("demarziani diego");
   });
 
   it("colapsa espacios múltiples", () => {
-    expect(normalizeName("FERRARO,  Martin   Miguel")).toBe(
+    expect(claimNameKey("FERRARO,  Martin   Miguel")).toBe(
       "ferraro martin miguel",
     );
   });
 
   it("ignora acentos", () => {
-    expect(normalizeName("Pérez, José")).toBe("perez jose");
-    expect(normalizeName("Núñez, Iván")).toBe("nunez ivan");
+    expect(claimNameKey("Pérez, José")).toBe("perez jose");
+    expect(claimNameKey("Núñez, Iván")).toBe("nunez ivan");
   });
 
   it("devuelve string vacío para input vacío", () => {
-    expect(normalizeName("")).toBe("");
-    expect(normalizeName("   ")).toBe("");
+    expect(claimNameKey("")).toBe("");
+    expect(claimNameKey("   ")).toBe("");
   });
 });
 

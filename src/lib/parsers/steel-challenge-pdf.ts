@@ -7,6 +7,7 @@ import type {
   ParsedStageResult,
 } from "../types/match";
 import type { PdfPage } from "./pdf-extract";
+import { shooterNameKey } from "../names";
 import { resolveDivisionCode, normalizeDivisionName } from "./division-registry";
 import {
   extractClubFromTitle,
@@ -165,7 +166,7 @@ export function parseSteelChallengePdfs(files: SteelPdfFile[]): ParsedMatch {
   // Set de (divisionCode, stageNumber) ya vistos: si un archivo trae el
   // mismo (división, stage) que otro, es un dup y no sabemos cuál creer.
   const seenDivStage = new Set<string>();
-  // shooterKey = `${divisionCode}|${normalizeName(name)}` → datos persistentes
+  // shooterKey = `${divisionCode}|${shooterNameKey(name)}` → datos persistentes
   // del tirador (memberNumber y category, que toman el primer no-null visto).
   const shooterInfo = new Map<
     string,
@@ -202,7 +203,7 @@ export function parseSteelChallengePdfs(files: SteelPdfFile[]): ParsedMatch {
       }
 
       for (const row of section.rows) {
-        const key = `${section.divisionCode}|${normalizeName(row.name)}`;
+        const key = `${section.divisionCode}|${shooterNameKey(row.name)}`;
         const shooter: ParsedShooter = {
           fullName: row.name,
           memberNumber: null,
@@ -475,7 +476,7 @@ function extractCategoryAssignments(
     const [, , rawName] = m;
     const { fullName: stripped } = stripDqPrefix(rawName);
     const cleanedName = stripNameSuffixes(stripped);
-    const key = `${fileDivisionCode}|${normalizeName(cleanedName)}`;
+    const key = `${fileDivisionCode}|${shooterNameKey(cleanedName)}`;
     out.set(key, currentCategory);
   }
 
@@ -521,13 +522,3 @@ function joinFileText(file: SteelPdfFile): string {
   return file.pages.map((p) => p.text).join("\n");
 }
 
-/**
- * Normaliza nombre para usarlo como clave de identidad cuando agregamos
- * resultados de múltiples archivos. Quitamos espacios extra y normalizamos
- * mayúsculas — los acentos los preservamos porque la DB sí los conserva
- * y queremos que el shooter resuelva al mismo registro tanto si vino de un
- * stage como del overall.
- */
-function normalizeName(name: string): string {
-  return name.replace(/\s+/g, " ").trim().toLowerCase();
-}

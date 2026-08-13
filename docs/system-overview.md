@@ -888,7 +888,7 @@ Algoritmo en `src/lib/db/claim-suggestions.ts` + `src/lib/import/match-claim.ts`
 1. **`reason: "member_number"`** — coincidencia exacta (con `trim`) entre el `member_number` del shooter y algún alias.
 2. **`reason: "name"`** — `areNamesSimilar(alias, shooter.full_name)` devuelve true.
 
-**`areNamesSimilar`** (`normalizeName` → minúsculas, sin acentos NFD, sin `,` ni `.`, espacios colapsados, `trim`):
+**`areNamesSimilar`** (`claimNameKey` → minúsculas, sin acentos NFD, sin `,` ni `.`, espacios colapsados, `trim`):
 
 - Tokeniza ambos nombres (`nameTokens`).
 - El set más chico debe estar contenido en el más grande.
@@ -1234,7 +1234,7 @@ No se mira el MIME type. Tampoco hay hint por extensión más allá del filtro g
 - **La disciplina viene del filename**, no del contenido. `detectDisciplineFromFilename` normaliza (NFD, lowercase, replace non-alnum por espacio) y matchea contra `[{keyword: /\bfbi\b/, ...}, {keyword: /\bipsc\b/, ...}, {keyword: /\b(steel|steelchallenge)\b/, ...}, {keyword: /\bcombat\b/, ...}]`. Si matchean 0 o 2+ → throw con mensaje accionable.
 - Secciones: una sección es un header (no-fila) seguido de filas. El header de una sección es la **última** línea no-ignorable que NO es fila antes de que empiecen las filas. `isIgnorableLine` descarta `RANKING OFICIAL`, `PAGINA *`, y líneas que son solo dígitos.
 - `classifyHeader`: longest-prefix match (3→2→1 tokens) contra `DIVISION_NAME_TO_CODE[discipline]`. Lo que sobra después de la división es la `category` (`GENERAL` o vacío → null). Solo el set FBI (`PISTOLA → PIS, REVOLVER → REV, MINIRIFLE → MINI, PCC → PCC`) está verificado contra archivos reales; los demás son best-effort.
-- Una sola sección "GENERAL" por división aporta los `match_entries`; las secciones subranking (`VETERANO, DAMAS, CADETE...`) solo aportan la `category` al tirador (por `normalizeName(name)`). El "ranking canónico" por división es la sección con **más filas** — la `GENERAL` es siempre el superconjunto.
+- Una sola sección "GENERAL" por división aporta los `match_entries`; las secciones subranking (`VETERANO, DAMAS, CADETE...`) solo aportan la `category` al tirador (por `accentFoldedName(name)`). El "ranking canónico" por división es la sección con **más filas** — la `GENERAL` es siempre el superconjunto.
 - `matchEntries`: el ranking ya viene ordenado en el PDF. `matchPercentage = (row.points / winnerPoints) * 100`. `hits` solo se setea para disciplinas hits-based (FBI); para IPSC/Steel/Combat queda `null`.
 - **Sin fecha en el archivo**: se intenta `dateFromFilename` (formatos `YYYY-MM-DD` o `DD-MM-YYYY` con o sin separadores); si falla, el flujo de import bloquea en estado `needsDate` y la pide al usuario.
 - `matchNameFromFilename`: saca extensión, palabra de disciplina, palabras de ruido (`FILENAME_NOISE = /\b(resultados?|ranking|oficial|fat)\b/gi`), tokens numéricos de 2–4 dígitos; title-case del resto. Fallback `"Match FAT"`.
