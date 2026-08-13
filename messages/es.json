@@ -631,6 +631,7 @@
     "entryNotFound": "Entry no encontrada",
     "matchNotFound": "Match no encontrado",
     "minShotsFormat": "Ingresá un número entero positivo o vacío para limpiar",
+    "minShotsFixedByDiscipline": "Esta disciplina usa siempre {count} tiros, así que el mínimo no se puede editar",
     "updateClubFailed": "No se pudo actualizar el club. Intentá de nuevo.",
     "updateFailed": "No se pudo actualizar. Intentá de nuevo.",
     "deleteFailed": "No se pudo borrar. Intentá de nuevo.",

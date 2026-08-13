@@ -27,14 +27,26 @@ export type DisciplineCode = (typeof DISCIPLINE)[keyof typeof DISCIPLINE];
  * the form carried instead of trusting it. It lives here, next to the codes,
  * because it is a property of the discipline and not of the import.
  *
- * **Enforced on import only, today.** `updateMatchMinShots` (the "edit
- * minimum" button) and `maybeApplyMinShots` (stage imports) both write
- * `matches.min_shots` without reading the discipline, so an FBI match can
- * still end up with another figure. That is a hole rather than an escape
- * hatch, and closing it is #263 — do not read this constant as a guarantee
- * about what is already in the database.
+ * Reach for `fixedMinShots` rather than this constant: every writer of
+ * `matches.min_shots` has to ask the same question, and asking it in one place
+ * is what keeps the three of them from drifting again (#263).
  */
 export const FBI_MIN_SHOTS = 45;
+
+/**
+ * The round count a discipline fixes by its own rules, or `null` when the
+ * figure is the importer's to report.
+ *
+ * This is the single predicate behind the rule. `matches.min_shots` is written
+ * from three places — the initial import, stage imports, and the "edit
+ * minimum" button — and for a while only the first of them applied it, so an
+ * FBI match could be edited to any number or cleared outright. The value feeds
+ * the "extra rounds" KPI against `rounds_fired`, which means a wrong figure
+ * renders a plausible number rather than an error (#263, #75).
+ */
+export function fixedMinShots(code: string | null | undefined): number | null {
+  return code === DISCIPLINE.FBI ? FBI_MIN_SHOTS : null;
+}
 
 const TIME_BASED: Set<string> = new Set([DISCIPLINE.STEEL, DISCIPLINE.COMBAT]);
 

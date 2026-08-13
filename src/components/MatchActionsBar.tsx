@@ -26,6 +26,13 @@ interface MatchActionsBarProps {
    * por el importer.
    */
   currentMinShots: number | null;
+  /**
+   * True when the discipline fixes the round count itself, so `min_shots` is
+   * not the user's to set. The button is not rendered at all — offering an
+   * edit that the server action then refuses is worse than not offering it.
+   * The action checks independently; hiding a button is not enforcement.
+   */
+  minShotsFixedByDiscipline: boolean;
   clubs: Club[];
   /** True si el usuario actual es el importador del match. */
   isImporter: boolean;
@@ -55,6 +62,7 @@ export function MatchActionsBar({
   currentRegion,
   currentClubCode,
   currentMinShots,
+  minShotsFixedByDiscipline,
   clubs,
   isImporter,
   isAdmin,
@@ -105,7 +113,7 @@ export function MatchActionsBar({
           {currentRegion ? t("editClub") : t("assignClub")}
         </Button>
       )}
-      {canEdit && (
+      {canEdit && !minShotsFixedByDiscipline && (
         <Button
           variant="ghost"
           size="sm"

@@ -3,7 +3,7 @@ import type {
   ParsedMatch,
   ParsedMatchEntry,
 } from "@/lib/types/match";
-import { DISCIPLINE, FBI_MIN_SHOTS } from "@/lib/disciplines";
+import { fixedMinShots } from "@/lib/disciplines";
 import { ImportError } from "./import-error";
 import { requireDivision } from "./helpers";
 import { resolveShootersBulk, shooterCacheKey } from "./shooter-resolution";
@@ -181,6 +181,7 @@ async function importMatchOverall(
     await maybeApplyMinShots(
       supabase,
       existingForUser.id,
+      discipline.code,
       existingForUser.min_shots,
       options.minShots,
     );
@@ -256,13 +257,10 @@ async function importMatchOverall(
   // Insertamos. Si igual pega contra la unique constraint (race entre
   // dos imports concurrentes con misma region), reportamos error claro.
 
-  // FBI overrides the form: the round count is fixed by the discipline (see
-  // `FBI_MIN_SHOTS`). Every other discipline takes the form value, which may
-  // be null if the importer left it blank — an admin can fill it in later.
-  const minShots =
-    discipline.code === DISCIPLINE.FBI
-      ? FBI_MIN_SHOTS
-      : (options.minShots ?? null);
+  // A discipline that fixes its own round count overrides the form. Every
+  // other one takes the form value, which may be null if the importer left it
+  // blank — an admin can fill it in later.
+  const minShots = fixedMinShots(discipline.code) ?? options.minShots ?? null;
 
   const { data: matchRow, error: matchErr } = await supabase
     .from("matches")
@@ -461,7 +459,13 @@ async function importStages(
   // Si el form trae min_shots y el match todavía no lo tiene, lo aplicamos
   // ahora. Cubre el caso del usuario que omite min_shots en el primer
   // upload (overall) y lo completa en alguno posterior (stage import).
-  await maybeApplyMinShots(supabase, matchId, matchRow.min_shots, options.minShots);
+  await maybeApplyMinShots(
+    supabase,
+    matchId,
+    discipline.code,
+    matchRow.min_shots,
+    options.minShots,
+  );
 
   // Si el archivo trae entries (en stages-only de WinMSS, son las DQs que
   // aparecen en la página "Disqualified Shooters" al final del PDF), las
@@ -585,21 +589,41 @@ async function upsertMatchEntries(
 // ---------------------------------------------------------------------------
 
 /**
- * Aplica `min_shots` a un match existente sólo si el match todavía no lo
- * tiene seteado en DB y el usuario lo proveyó en el form. Esto permite
- * "completarlo después" del primer import (caso típico: el usuario sube
- * primero el overall sin min_shots, después lo agrega al subir un stage).
+ * Applies `min_shots` to an existing match, on two different rules depending
+ * on whether the discipline fixes the round count. See `fixedMinShots` in
+ * `lib/disciplines.ts` for which do and why.
  *
- * No pisa un valor existente. Si el usuario quiere cambiar un min_shots
- * ya seteado, debe usar el botón "Editar mínimo" de la página del match
- * (que además queda registrado en el audit log con before/after).
+ * **Fixed disciplines**: the stored figure is corrected whenever it disagrees.
+ * The form never gets a say, and neither does anything that wrote the column
+ * earlier — which is what lets a match repair itself.
+ *
+ * **Everyone else**: the form's value is applied only when the match has none
+ * yet, so it can be filled in after the fact (the usual case: the overall goes
+ * up without it and a later stage upload supplies it). An existing value is
+ * never overwritten here — changing one is what the "Editar mínimo" button on
+ * the match page is for, and that route records before/after in the audit log.
  */
 async function maybeApplyMinShots(
   supabase: TypedSupabaseClient,
   matchId: string,
+  disciplineCode: string,
   currentMinShots: number | null,
   optionsMinShots: number | null | undefined,
 ): Promise<void> {
+  // A discipline that fixes its own round count does not take the form's value
+  // here either. Writing whenever the stored figure disagrees also repairs a
+  // match whose `min_shots` was cleared or edited before the rule was enforced
+  // everywhere — without this, a blanked FBI match never recovers (#263).
+  const fixed = fixedMinShots(disciplineCode);
+  if (fixed !== null) {
+    if (currentMinShots === fixed) return;
+    await supabase
+      .from("matches")
+      .update({ min_shots: fixed })
+      .eq("id", matchId);
+    return;
+  }
+
   if (optionsMinShots == null) return;
   if (currentMinShots != null) return;
   await supabase

@@ -578,6 +578,7 @@
     "entryNotFound": "Entry not found",
     "matchNotFound": "Match not found",
     "minShotsFormat": "Enter a positive whole number, or leave it empty to clear it",
+    "minShotsFixedByDiscipline": "This discipline always uses {count} rounds, so the minimum cannot be edited",
     "updateClubFailed": "The club couldn't be updated. Try again.",
     "updateFailed": "That couldn't be updated. Try again.",
     "deleteFailed": "That couldn't be deleted. Try again.",

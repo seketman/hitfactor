@@ -150,7 +150,14 @@ export async function updateMatchClub(
   };
 }
 
-/** Snapshot (name + min_shots + importador) para validar/auditar min_shots. */
+/**
+ * Snapshot (name + min_shots + importador + disciplina) para validar/auditar
+ * min_shots.
+ *
+ * The discipline is part of the snapshot because some disciplines fix the
+ * round count themselves, and the edit has to be refused rather than written
+ * — see `updateMatchMinShots` in the match's server actions (#263).
+ */
 export async function getMatchMinShotsSnapshot(
   supabase: TypedSupabaseClient,
   matchId: string,
@@ -158,13 +165,16 @@ export async function getMatchMinShotsSnapshot(
   name: string;
   min_shots: number | null;
   imported_by_user_id: string | null;
+  disciplineCode: string | null;
 } | null> {
   const { data } = await supabase
     .from("matches")
-    .select("name, min_shots, imported_by_user_id")
+    .select("name, min_shots, imported_by_user_id, disciplines(code)")
     .eq("id", matchId)
     .maybeSingle();
-  return data ?? null;
+  if (!data) return null;
+  const { disciplines, ...rest } = data;
+  return { ...rest, disciplineCode: disciplines?.code ?? null };
 }
 
 /**
