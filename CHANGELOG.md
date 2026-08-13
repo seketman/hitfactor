@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.1](https://github.com/seketman/hitfactor/compare/v1.28.0...v1.28.1) (2026-08-13)
+
+
+### Refactors
+
+* **names:** split the shooter-name keys by what they compare ([#265](https://github.com/seketman/hitfactor/issues/265)) ([9411ade](https://github.com/seketman/hitfactor/commit/9411ade7febc0624cb79f6d0a4b55dc3d33e25de)), closes [#124](https://github.com/seketman/hitfactor/issues/124)
+
 ## [1.28.0](https://github.com/seketman/hitfactor/compare/v1.27.0...v1.28.0) (2026-08-11)
 
 
