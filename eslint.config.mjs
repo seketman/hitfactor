@@ -23,6 +23,17 @@ import nextTs from "eslint-config-next/typescript";
  * its own decision and its own PR.
  */
 export default defineConfig([
+  /**
+   * Supabase Edge Functions run on Deno, not on the Node/Next toolchain this
+   * config describes: `Deno.serve`, `jsr:` specifiers, no `node_modules`.
+   * Linting them here reports failures of the runtime rather than of the code.
+   *
+   * It also means their defects are invisible to `npm run lint`. That is the
+   * price of the directory being a record of what is deployed rather than
+   * something this repo builds — see `supabase/functions/README.md`.
+   */
+  globalIgnores(["supabase/functions/**"]),
+
   ...nextVitals,
   ...nextTs,
 

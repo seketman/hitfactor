@@ -47,6 +47,17 @@ Apply **all** the migrations in Supabase, in numeric order:
 > `qr_code`, `is_admin`, the ammunition and firearm usage tables, or the
 > Storage bucket for imports. Run **all** of them, in order.
 
+> **0025 does not paste and run on its own.** It installs a webhook whose
+> shared secret cannot live in this repository — the repository is public — so
+> it reads the secret and your project URL from two session settings and
+> **aborts if either is missing**. Its header has the two `set_config` lines to
+> run first, in the same editor tab.
+>
+> If it aborts, that is the migration working. **Do not make it apply by
+> pasting the secret into the file**: that puts a live credential in a public
+> repository, where rotating it is the least of the problems. Everything else
+> here really is paste-and-run.
+
 | # | File | What it does |
 |---|---|---|
 | 0001 | [`0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) | Consolidated base schema: profiles, disciplines, divisions, shooters, matches, stages, match_entries, stage_results, firearms, match_firearm_log, clubs, audit_log, feedback + indexes, triggers, RLS and seeds |
@@ -73,6 +84,7 @@ Apply **all** the migrations in Supabase, in numeric order:
 | 0022 | [`0022_matches_delete_admin.sql`](../supabase/migrations/0022_matches_delete_admin.sql) | `matches_delete_admin` — completes the admin scope over matches that 0014 started, so admin authority matches what the app offers (#197) |
 | 0023 | [`0023_rls_to_clause_and_initplan.sql`](../supabase/migrations/0023_rls_to_clause_and_initplan.sql) | Rewrites every pre-0021 policy to `to authenticated` + `(select auth.uid())` — drops the deprecated `auth.role()` and clears the `auth_rls_initplan` advisory. No predicate changes (#207) |
 | 0024 | [`0024_steel_rfri_division.sql`](../supabase/migrations/0024_steel_rfri_division.sql) | `RFRI` (rimfire rifle, labelled Minirifle) for Steel Challenge — the division was missing, so any match running it failed to import |
+| 0025 | [`0025_feedback_telegram_webhook.sql`](../supabase/migrations/0025_feedback_telegram_webhook.sql) | `feedback_to_telegram` — the trigger that posts new feedback to the `feedback-telegram` Edge Function. Existed in production since June, created by hand and never committed. **Needs two session settings to apply; see the file's header** |
 
 If you add a migration, add its row here: there is a test
 (`tests/migrations-doc.test.ts`) that fails if the directory and this table
