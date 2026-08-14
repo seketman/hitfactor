@@ -273,7 +273,7 @@ export async function listStagesByMatch(
       .order("stage_number"),
     "listStagesByMatch",
   );
-  return (data as Stage[] | null) ?? [];
+  return data ?? [];
 }
 
 /**
@@ -305,6 +305,8 @@ export async function listEntriesByMatch(
   );
   // `power_factor` es `text` en la DB; el parser de import garantiza que solo
   // sea "Min" | "Maj" | null, así que estrechamos el tipo acá.
+  // `power_factor` is narrower than its `text` column; the CHECK constraint
+  // is what makes that sound. See `db/types.ts`.
   return (data ?? []) as MatchEntryWithRelations[];
 }
 
@@ -364,6 +366,7 @@ export async function listEntriesByShooters(
     "listEntriesByShooters",
   );
   // `power_factor` es `text` en la DB; el parser garantiza "Min" | "Maj" | null.
+  // Narrowed on the same `power_factor` CHECK as `listMatchEntries`.
   return (data ?? []) as MyEntryRow[];
 }
 
@@ -395,6 +398,7 @@ export async function listMyEntriesInMatch(
   );
 
   // `power_factor` es `text` en la DB; el parser garantiza "Min" | "Maj" | null.
+  // Narrowed on the same `power_factor` CHECK as `listMatchEntries`.
   return (data ?? []) as MyMatchSummary["entry"][];
 }
 
@@ -447,5 +451,5 @@ export async function listMyStageResultsForEntries(
       .in("match_entry_id", entryIds),
     "listMyStageResultsForEntries",
   );
-  return (data as MyStageRow[] | null) ?? [];
+  return data ?? [];
 }

@@ -54,5 +54,7 @@ export async function listMyFeedback(
     "listMyFeedback",
   );
 
+  // `type` and `status` are narrower than their `text` columns; the CHECK
+  // constraints are what make that sound. See `db/types.ts`.
   return (data as FeedbackRow[] | null) ?? [];
 }

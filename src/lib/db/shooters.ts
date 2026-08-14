@@ -150,6 +150,6 @@ export async function listMyShooters(
       .eq("linked_user_id", userId),
     "listMyShooters",
   );
-  return (data as Shooter[] | null) ?? [];
+  return data ?? [];
 }
 
