@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.3](https://github.com/seketman/hitfactor/compare/v1.28.2...v1.28.3) (2026-08-14)
+
+
+### Refactors
+
+* **db:** drop the casts that hid nothing, pin the ones that hide a CHECK ([#270](https://github.com/seketman/hitfactor/issues/270)) ([896e065](https://github.com/seketman/hitfactor/commit/896e065183a926903f1fddfe43e32a98a3e56dac)), closes [#122](https://github.com/seketman/hitfactor/issues/122)
+
 ## [1.28.2](https://github.com/seketman/hitfactor/compare/v1.28.1...v1.28.2) (2026-08-13)
 
 
