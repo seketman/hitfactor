@@ -209,7 +209,7 @@ export async function listMyFirearms(
       .order("created_at", { ascending: true }),
     "listMyFirearms",
   );
-  return (data as Firearm[] | null) ?? [];
+  return data ?? [];
 }
 
 export async function getFirearmById(
@@ -224,7 +224,7 @@ export async function getFirearmById(
       .maybeSingle(),
     "getFirearmById",
   );
-  return (data as Firearm | null) ?? null;
+  return data ?? null;
 }
 
 export async function getMatchFirearmLog(
@@ -239,7 +239,7 @@ export async function getMatchFirearmLog(
       .maybeSingle(),
     "getMatchFirearmLog",
   );
-  return (data as MatchFirearmLog | null) ?? null;
+  return data ?? null;
 }
 
 /**
@@ -349,9 +349,7 @@ export async function listFirearmUsageLog(
       .order("used_on", { ascending: false }),
     "listFirearmUsageLog",
   );
-  return (data ?? []) as Array<
-    FirearmUsageLog & { ammunition_types: { name: string } | null }
-  >;
+  return data ?? [];
 }
 
 /**

@@ -22,6 +22,6 @@ export const listClubs = cache(
         .order("name", { ascending: true }),
       "listClubs",
     );
-    return (data as Club[] | null) ?? [];
+    return data ?? [];
   },
 );

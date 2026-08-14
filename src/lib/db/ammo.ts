@@ -105,6 +105,8 @@ export async function listMyAmmo(
       .order("created_at", { ascending: true }),
     "listMyAmmo",
   );
+  // `type` and `power_factor` are narrower than their `text` columns; the
+  // CHECK constraints are what make that sound. See `db/types.ts`.
   return (data as AmmunitionType[] | null) ?? [];
 }
 
@@ -120,6 +122,7 @@ export async function getAmmoById(
       .maybeSingle(),
     "getAmmoById",
   );
+  // Narrowed on the same CHECK constraints as `listAmmo` above.
   return (data as AmmunitionType | null) ?? null;
 }
 

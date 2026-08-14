@@ -24,7 +24,7 @@ export const getProfile = cache(
         .maybeSingle(),
       "getProfile",
     );
-    return (data as Profile | null) ?? null;
+    return data ?? null;
   },
 );
 
