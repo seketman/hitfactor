@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.4](https://github.com/seketman/hitfactor/compare/v1.28.3...v1.28.4) (2026-08-16)
+
+
+### Bug Fixes
+
+* **i18n:** translate the copy the screen-by-screen issues missed ([#274](https://github.com/seketman/hitfactor/issues/274)) ([f5318cc](https://github.com/seketman/hitfactor/commit/f5318cc52cf13efa55694c3c40e0af2d062150f4))
+
 ## [1.28.3](https://github.com/seketman/hitfactor/compare/v1.28.2...v1.28.3) (2026-08-14)
 
 
