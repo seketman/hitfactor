@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.5](https://github.com/seketman/hitfactor/compare/v1.28.4...v1.28.5) (2026-08-16)
+
+
+### Bug Fixes
+
+* **i18n:** close the two locale gaps a third locale would expose ([#280](https://github.com/seketman/hitfactor/issues/280)) ([24c7ecc](https://github.com/seketman/hitfactor/commit/24c7ecce6060fd97b65f9ecc70f6e18ec68ea5af)), closes [#278](https://github.com/seketman/hitfactor/issues/278)
+
 ## [1.28.4](https://github.com/seketman/hitfactor/compare/v1.28.3...v1.28.4) (2026-08-16)
 
 
