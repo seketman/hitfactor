@@ -35,22 +35,14 @@ export default async function ActivityPage({ searchParams }: PageProps) {
   return (
     <PageContainer className="max-w-3xl">
       <header className="mb-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Tu actividad</h1>
-        <p className="mt-1 text-sm text-fg-muted">
-          Registro cronológico de los cambios que hiciste sobre tus datos.
-          Solo vos podés ver esta lista.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight">{t("title")}</h1>
+        <p className="mt-1 text-sm text-fg-muted">{t("subtitle")}</p>
       </header>
 
       {rows.length === 0 ? (
         <Card className="p-10 text-center">
-          <p className="text-fg-muted">
-            Todavía no hay actividad registrada.
-          </p>
-          <p className="mt-2 text-xs text-fg-subtle">
-            Cualquier acción que hagas (importar un match, asignar un arma,
-            asociar una participación a tu cuenta, etc.) va a aparecer acá.
-          </p>
+          <p className="text-fg-muted">{t("emptyTitle")}</p>
+          <p className="mt-2 text-xs text-fg-subtle">{t("emptyBody")}</p>
         </Card>
       ) : (
         <Card>
@@ -95,7 +87,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
   );
 }
 
-function Pagination({
+async function Pagination({
   page,
   totalPages,
   total,
@@ -104,35 +96,36 @@ function Pagination({
   totalPages: number;
   total: number;
 }) {
+  const t = await getTranslations("activityLog");
   const prev = page > 1 ? page - 1 : null;
   const next = page < totalPages ? page + 1 : null;
 
   return (
     <nav className="mt-6 flex items-center justify-between gap-3 text-sm">
       <span className="text-xs text-fg-subtle">
-        {total} acciones · página {page} de {totalPages}
+        {t("paginationCaption", { total, page, totalPages })}
       </span>
       <div className="flex gap-2">
         {prev ? (
           <Link href={`/activity?page=${prev}`}>
             <Button variant="ghost" size="sm">
-              ← Anterior
+              {t("prev")}
             </Button>
           </Link>
         ) : (
           <Button variant="ghost" size="sm" disabled>
-            ← Anterior
+            {t("prev")}
           </Button>
         )}
         {next ? (
           <Link href={`/activity?page=${next}`}>
             <Button variant="ghost" size="sm">
-              Siguiente →
+              {t("next")}
             </Button>
           </Link>
         ) : (
           <Button variant="ghost" size="sm" disabled>
-            Siguiente →
+            {t("next")}
           </Button>
         )}
       </div>

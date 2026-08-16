@@ -1,5 +1,5 @@
 import { Link } from "@/i18n/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -38,11 +38,6 @@ import {
   type StageColumn,
 } from "@/components/matches/StageResultsTable";
 
-const POWER_FACTOR_LABELS: Record<string, string> = {
-  Maj: "Major",
-  Min: "Minor",
-};
-
 interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ entry?: string }>;
@@ -53,6 +48,7 @@ export default async function PersonalMatchPage({
   searchParams,
 }: PageProps) {
   const locale = await getLocale();
+  const t = await getTranslations("matches");
   const { id } = await params;
   const { entry: entryParam } = await searchParams;
 
@@ -69,8 +65,8 @@ export default async function PersonalMatchPage({
     return (
       <PageContainer>
         <BackLink fallbackHref="/dashboard" />
-        <Alert tone="warning" title="Match no encontrado">
-          El torneo que estás buscando no existe o fue eliminado.
+        <Alert tone="warning" title={t("me.notFoundTitle")}>
+          {t("me.notFoundBody")}
         </Alert>
       </PageContainer>
     );
@@ -80,11 +76,10 @@ export default async function PersonalMatchPage({
     return (
       <PageContainer>
         <BackLink fallbackHref="/dashboard" />
-        <Alert tone="warning" title="Asociá una participación a tu cuenta">
-          Para ver tu detalle del match, primero buscá tu nombre en el ranking
-          público y hacé click en “Soy yo”.{" "}
+        <Alert tone="warning" title={t("me.linkTitle")}>
+          {t("me.linkBody")}{" "}
           <Link href={`/matches/${id}`} className="underline hover:text-fg">
-            Ir al ranking del match
+            {t("me.linkCta")}
           </Link>
         </Alert>
       </PageContainer>
@@ -103,10 +98,10 @@ export default async function PersonalMatchPage({
     return (
       <PageContainer>
         <BackLink fallbackHref="/dashboard" />
-        <Alert tone="warning" title="No participaste de este match">
-          Ninguna de tus identidades aparece en el ranking de este torneo.{" "}
+        <Alert tone="warning" title={t("me.noEntryTitle")}>
+          {t("me.noEntryBody")}{" "}
           <Link href={`/matches/${id}`} className="underline hover:text-fg">
-            Ver ranking público
+            {t("me.noEntryCta")}
           </Link>
         </Alert>
       </PageContainer>
@@ -162,7 +157,7 @@ export default async function PersonalMatchPage({
           href={`/matches/${id}`}
           className="text-sm text-fg-muted hover:text-accent"
         >
-          Ver ranking público →
+          {t("me.publicRanking")}
         </Link>
       </header>
 
@@ -198,17 +193,16 @@ export default async function PersonalMatchPage({
 
       <section>
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-fg-muted">
-          Tus resultados por stage
+          {t("me.stageResults")}
         </h2>
 
         {stageResults.length === 0 ? (
           <Card className="p-10 text-center">
-            <p className="text-fg-muted">
-              Los stages todavía no fueron importados para este match.
-            </p>
+            <p className="text-fg-muted">{t("me.stagesEmpty")}</p>
             <p className="mt-2 text-xs text-fg-subtle">
-              Subí los archivos <code>Stage Results</code> desde la página de
-              import para verlos acá.
+              {t.rich("me.stagesEmptyHint", {
+                code: (chunks) => <code>{chunks}</code>,
+              })}
             </p>
           </Card>
         ) : isTimeBased ? (
@@ -229,10 +223,12 @@ export default async function PersonalMatchPage({
 
 type EntrySummary = MyMatchSummary["entry"];
 
-function IpscSummaryCard({ entry }: { entry: EntrySummary }) {
+async function IpscSummaryCard({ entry }: { entry: EntrySummary }) {
+  const t = await getTranslations("matches");
+  const tc = await getTranslations("common");
   return (
     <MatchSummaryCard>
-      <Stat label="División">
+      <Stat label={t("summary.division")}>
         {entry.divisions ? (
           <span title={entry.divisions.name}>
             {entry.divisions.code}
@@ -244,16 +240,24 @@ function IpscSummaryCard({ entry }: { entry: EntrySummary }) {
           "—"
         )}
       </Stat>
-      <Stat label="Factor">
-        {entry.power_factor ? POWER_FACTOR_LABELS[entry.power_factor] : "—"}
+      <Stat label={t("summary.factor")}>
+        {/* Spelled out rather than a lookup table: a computed key cannot be
+            checked against the catalogue — see `translation-keys.test.ts`. */}
+        {entry.power_factor === "Maj"
+          ? tc("powerFactorMajor")
+          : entry.power_factor === "Min"
+            ? tc("powerFactorMinor")
+            : "—"}
       </Stat>
-      <Stat label="Categoría">{entry.category ?? "General"}</Stat>
+      <Stat label={t("detail.colCategory")}>
+        {entry.category ?? tc("categoryGeneral")}
+      </Stat>
       <PlacementStat
         isDq={entry.is_dq}
         isAbsent={entry.is_absent}
         place={entry.place}
       />
-      <Stat label="Match %" mono>
+      <Stat label={t("summary.matchPercent")} mono>
         {entry.is_dq || entry.is_absent
           ? "—"
           : formatPercent(entry.match_percentage)}
@@ -262,28 +266,32 @@ function IpscSummaryCard({ entry }: { entry: EntrySummary }) {
   );
 }
 
-function SteelSummaryCard({ entry }: { entry: EntrySummary }) {
+async function SteelSummaryCard({ entry }: { entry: EntrySummary }) {
+  const t = await getTranslations("matches");
+  const tc = await getTranslations("common");
   return (
     <MatchSummaryCard>
-      <Stat label="División">
+      <Stat label={t("summary.division")}>
         {entry.divisions ? (
           <span title={entry.divisions.name}>{entry.divisions.name}</span>
         ) : (
           "—"
         )}
       </Stat>
-      <Stat label="Categoría">{entry.category ?? "General"}</Stat>
+      <Stat label={t("detail.colCategory")}>
+        {entry.category ?? tc("categoryGeneral")}
+      </Stat>
       <PlacementStat
         isDq={entry.is_dq}
         isAbsent={entry.is_absent}
         place={entry.place}
       />
-      <Stat label="Tiempo total" mono>
+      <Stat label={t("summary.totalTime")} mono>
         {entry.is_dq || entry.is_absent || entry.total_time_seconds == null
           ? "—"
           : `${formatNumber(entry.total_time_seconds, 2)}s`}
       </Stat>
-      <Stat label="Match %" mono>
+      <Stat label={t("summary.matchPercent")} mono>
         {entry.is_dq || entry.is_absent
           ? "—"
           : formatPercent(entry.match_percentage)}
@@ -292,33 +300,34 @@ function SteelSummaryCard({ entry }: { entry: EntrySummary }) {
   );
 }
 
-function IpscStagesTable({ stageResults }: { stageResults: MyMatchSummary["stageResults"] }) {
+async function IpscStagesTable({ stageResults }: { stageResults: MyMatchSummary["stageResults"] }) {
+  const t = await getTranslations("matches");
   const columns: StageColumn[] = [
     {
-      header: "Stage",
-      cell: (r) => <span className="font-medium">{stageLabel(r)}</span>,
+      header: t("detail.colStage"),
+      cell: (r) => <span className="font-medium">{stageLabel(r, t)}</span>,
     },
     {
-      header: "Puesto",
+      header: t("summary.place"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) => <PlaceCell isDq={r.is_dq} place={r.place} showAbsent={false} />,
     },
     {
-      header: "Tiempo",
+      header: t("detail.colTime"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono text-fg-muted",
       cell: (r) =>
         r.time_seconds != null ? `${formatNumber(r.time_seconds, 2)}s` : "—",
     },
     {
-      header: "Points",
+      header: t("detail.colPoints"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono text-fg-muted",
       cell: (r) => formatNumber(r.points, 0),
     },
     {
-      header: "Pen.",
+      header: t("detail.colPenalties"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono text-fg-muted",
       cell: (r) =>
@@ -329,19 +338,19 @@ function IpscStagesTable({ stageResults }: { stageResults: MyMatchSummary["stage
         ),
     },
     {
-      header: "Hit Factor",
+      header: t("detail.colHitFactor"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) => formatNumber(r.hit_factor, 4),
     },
     {
-      header: "Stage Pts",
+      header: t("detail.colStagePoints"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) => formatNumber(r.stage_points, 2),
     },
     {
-      header: "Stage %",
+      header: t("detail.colStagePercent"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) => (r.is_dq ? "—" : formatPercent(r.stage_percentage)),
@@ -350,13 +359,14 @@ function IpscStagesTable({ stageResults }: { stageResults: MyMatchSummary["stage
   return <StageResultsTable stageResults={stageResults} columns={columns} />;
 }
 
-function SteelStagesTable({ stageResults }: { stageResults: MyMatchSummary["stageResults"] }) {
+async function SteelStagesTable({ stageResults }: { stageResults: MyMatchSummary["stageResults"] }) {
+  const t = await getTranslations("matches");
   const columns: StageColumn[] = [
     {
-      header: "Stage",
+      header: t("detail.colStage"),
       cell: (r) => (
         <>
-          <span className="font-medium">{stageLabel(r)}</span>
+          <span className="font-medium">{stageLabel(r, t)}</span>
           {r.stages?.name && r.stages.stage_number != null && (
             <span className="ml-2 text-xs text-fg-muted">{r.stages.name}</span>
           )}
@@ -364,20 +374,20 @@ function SteelStagesTable({ stageResults }: { stageResults: MyMatchSummary["stag
       ),
     },
     {
-      header: "Puesto",
+      header: t("summary.place"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) => <PlaceCell isDq={r.is_dq} place={r.place} showAbsent={false} />,
     },
     {
-      header: "Tiempo",
+      header: t("detail.colTime"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) =>
         r.time_seconds != null ? `${formatNumber(r.time_seconds, 2)}s` : "—",
     },
     {
-      header: "Stage %",
+      header: t("detail.colStagePercent"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) => (r.is_dq ? "—" : formatPercent(r.stage_percentage)),
@@ -390,28 +400,32 @@ function SteelStagesTable({ stageResults }: { stageResults: MyMatchSummary["stag
  * Resumen FBI: el dato primario es Impactos (criterio de ranking). Puntos y %
  * quedan más muteados — coherente con el detalle público del match.
  */
-function FbiSummaryCard({ entry }: { entry: EntrySummary }) {
+async function FbiSummaryCard({ entry }: { entry: EntrySummary }) {
+  const t = await getTranslations("matches");
+  const tc = await getTranslations("common");
   return (
     <MatchSummaryCard>
-      <Stat label="División">
+      <Stat label={t("summary.division")}>
         {entry.divisions ? (
           <span title={entry.divisions.name}>{entry.divisions.name}</span>
         ) : (
           "—"
         )}
       </Stat>
-      <Stat label="Categoría">{entry.category ?? "General"}</Stat>
+      <Stat label={t("detail.colCategory")}>
+        {entry.category ?? tc("categoryGeneral")}
+      </Stat>
       <PlacementStat
         isDq={entry.is_dq}
         isAbsent={entry.is_absent}
         place={entry.place}
       />
-      <Stat label="Impactos" mono>
+      <Stat label={t("detail.colHits")} mono>
         {entry.is_dq || entry.is_absent || entry.hits == null
           ? "—"
           : `${entry.hits}/40`}
       </Stat>
-      <Stat label="Puntos" mono>
+      <Stat label={t("detail.colPoints")} mono>
         {entry.is_dq || entry.is_absent
           ? "—"
           : formatNumber(entry.match_points, 0)}
@@ -424,36 +438,37 @@ function FbiSummaryCard({ entry }: { entry: EntrySummary }) {
  * Tabla de stages para FBI. Muestra impactos por stage (0..5) destacados,
  * más puntos y % como datos secundarios. No hay tiempo ni hit factor.
  */
-function FbiStagesTable({
+async function FbiStagesTable({
   stageResults,
 }: {
   stageResults: MyMatchSummary["stageResults"];
 }) {
+  const t = await getTranslations("matches");
   const columns: StageColumn[] = [
     {
-      header: "Stage",
-      cell: (r) => <span className="font-medium">{stageLabel(r)}</span>,
+      header: t("detail.colStage"),
+      cell: (r) => <span className="font-medium">{stageLabel(r, t)}</span>,
     },
     {
-      header: "Puesto",
+      header: t("summary.place"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono",
       cell: (r) => <PlaceCell isDq={r.is_dq} place={r.place} showAbsent={false} />,
     },
     {
-      header: "Impactos",
+      header: t("detail.colHits"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono font-semibold text-fg",
       cell: (r) => (r.is_dq || r.hits == null ? "—" : `${r.hits}/5`),
     },
     {
-      header: "Puntos",
+      header: t("detail.colPoints"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono text-fg-muted",
       cell: (r) => (r.is_dq ? "—" : formatNumber(r.stage_points, 0)),
     },
     {
-      header: "Stage %",
+      header: t("detail.colStagePercent"),
       headerClassName: "text-right",
       cellClassName: "text-right font-mono text-fg-muted",
       cell: (r) => (r.is_dq ? "—" : formatPercent(r.stage_percentage)),
@@ -485,7 +500,7 @@ const EXTRAS_TIER_CLASS: Record<AmmoExtrasTier, string> = {
   danger: "text-danger",
 };
 
-function AmmoEfficiencyCard({
+async function AmmoEfficiencyCard({
   minShots,
   roundsFired,
 }: {
@@ -493,6 +508,7 @@ function AmmoEfficiencyCard({
   roundsFired: number | null;
 }) {
   if (minShots == null || roundsFired == null) return null;
+  const t = await getTranslations("matches");
   const extras = roundsFired - minShots;
   const tier = getAmmoExtrasTier(extras, minShots);
   return (
@@ -500,7 +516,7 @@ function AmmoEfficiencyCard({
       <div className="flex items-baseline justify-between gap-4">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-fg-muted">
-            Disparos extra
+            {t("me.extraShots")}
           </p>
           <p
             className={cn(
@@ -512,21 +528,25 @@ function AmmoEfficiencyCard({
           </p>
         </div>
         <p className="text-right text-sm text-fg-muted">
-          <span className="font-mono">{minShots}</span> mín
+          <span className="font-mono">{minShots}</span> {t("me.extrasMin")}
           <span className="mx-1.5 text-fg-subtle">/</span>
-          <span className="font-mono">{roundsFired}</span> usados
+          <span className="font-mono">{roundsFired}</span> {t("me.extrasUsed")}
         </p>
       </div>
     </Card>
   );
 }
 
-function stageLabel(r: MyMatchSummary["stageResults"][number]) {
-  if (r.stages?.stage_number != null) return `Stage ${r.stages.stage_number}`;
+function stageLabel(
+  r: MyMatchSummary["stageResults"][number],
+  t: (key: "detail.stage", values: { n: number }) => string,
+) {
+  if (r.stages?.stage_number != null)
+    return t("detail.stage", { n: r.stages.stage_number });
   return r.stages?.name ?? "—";
 }
 
-function DivisionSelector({
+async function DivisionSelector({
   matchId,
   entries,
   activeEntryId,
@@ -535,10 +555,11 @@ function DivisionSelector({
   entries: MyMatchSummary["entry"][];
   activeEntryId: string;
 }) {
+  const t = await getTranslations("matches");
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
       <span className="text-fg-muted">
-        Tenés {entries.length} participaciones en este match:
+        {t("me.multipleEntries", { count: entries.length })}
       </span>
       {entries.map((e) => {
         const isActive = e.id === activeEntryId;

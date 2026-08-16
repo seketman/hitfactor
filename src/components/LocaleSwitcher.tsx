@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { routing, type Locale } from "@/i18n/routing";
@@ -26,6 +27,7 @@ export function LocaleSwitcher({
   className?: string;
   stretch?: boolean;
 }) {
+  const t = useTranslations("common");
   const pathname = usePathname();
   const router = useRouter();
   const params = useParams();
@@ -35,7 +37,7 @@ export function LocaleSwitcher({
   return (
     <div
       role="radiogroup"
-      aria-label="Idioma / Language"
+      aria-label={t("localeLabel")}
       className={cn(
         "items-center gap-0.5 rounded-md border border-border bg-surface-2 p-0.5",
         stretch ? "flex w-full" : "inline-flex",

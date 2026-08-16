@@ -1,5 +1,6 @@
+import type { ReactNode } from "react";
 import { Link } from "@/i18n/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -44,43 +45,32 @@ export async function ClaimSuggestions({
   if (suggestions.length === 0) return null;
 
   const locale = await getLocale();
+  const t = await getTranslations("matches");
 
-  const tiradores =
-    suggestions.length === 1 ? "un tirador" : `${suggestions.length} tiradores`;
+  const shooters = t("claimSuggestions.shooterCount", {
+    count: suggestions.length,
+  });
+
+  // Both branches spelled out instead of `t(condition ? a : b)`: a computed
+  // key cannot be checked against the catalogue, and `translation-keys.test.ts`
+  // tracks every file that builds one.
+  const strong = (chunks: ReactNode) => (
+    <span className="font-medium text-fg">{chunks}</span>
+  );
+  const title = hasExistingClaims
+    ? t("claimSuggestions.titleMore")
+    : t("claimSuggestions.titleFirst");
+  const body = hasExistingClaims
+    ? t.rich("claimSuggestions.bodyMore", { shooters, strong })
+    : t.rich("claimSuggestions.bodyFirst", { shooters, strong });
 
   return (
     <Card className="mb-6 border-accent/40 bg-accent-soft/40">
       <div className="px-5 py-4">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-fg">
-              {hasExistingClaims
-                ? "¿Encontramos más identidades tuyas?"
-                : "¿Sos vos en alguno de estos matches?"}
-            </h2>
-            <p className="mt-1 text-sm text-fg-muted">
-              {hasExistingClaims ? (
-                <>
-                  Detectamos {tiradores} con nombre parecido a tus identidades
-                  ya linkeadas — probablemente sea el mismo tirador tipeado
-                  distinto en otro torneo. Hacé click en{" "}
-                  <span className="font-medium text-fg">
-                    &ldquo;Soy yo&rdquo;
-                  </span>{" "}
-                  para sumar esas participaciones a tus stats.
-                </>
-              ) : (
-                <>
-                  Encontramos {tiradores} con nombre parecido al tuyo. Si sos
-                  vos, hacé click en{" "}
-                  <span className="font-medium text-fg">
-                    &ldquo;Soy yo&rdquo;
-                  </span>{" "}
-                  para asociar esa participación a tu cuenta y empezar a ver
-                  tus resultados.
-                </>
-              )}
-            </p>
+            <h2 className="text-base font-semibold text-fg">{title}</h2>
+            <p className="mt-1 text-sm text-fg-muted">{body}</p>
           </div>
         </div>
 
@@ -112,7 +102,9 @@ export async function ClaimSuggestions({
                     </>
                   )}
                   <span className="text-fg-subtle">·</span>
-                  <span>Puesto {s.place}</span>
+                  <span>
+                    {t("claimSuggestions.place", { place: s.place })}
+                  </span>
                 </p>
               </div>
               <form action={claimShooter}>
@@ -123,7 +115,7 @@ export async function ClaimSuggestions({
                 />
                 <input type="hidden" name="redirect_to" value="/matches" />
                 <Button type="submit" size="sm">
-                  Soy yo
+                  {t("detail.imYou")}
                 </Button>
               </form>
             </li>
@@ -133,7 +125,7 @@ export async function ClaimSuggestions({
         <div className="mt-3 flex justify-end">
           <form action={dismissClaimSuggestions}>
             <Button type="submit" variant="ghost" size="sm">
-              No soy ninguno · Ocultar sugerencias
+              {t("claimSuggestions.dismiss")}
             </Button>
           </form>
         </div>
