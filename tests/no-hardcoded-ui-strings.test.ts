@@ -25,6 +25,15 @@ import { describe, expect, it } from "vitest";
  * runtime (a ternary over two variables, a string built from a template) is
  * out of reach, and so is anything outside the two directories below.
  * Widening it is cheap; pretending it is total is not.
+ *
+ * **Literal lookup tables are deliberately out of scope** (#278). A
+ * `Record<string, string>` feeding the render is invisible here, and one
+ * really did hide copy — `HistoryTable`'s `POWER_FACTOR_LABELS`. But of the
+ * eleven such tables in the rendering layer, eight hold CSS classes; a rule
+ * that flags eight correct ones to catch a ninth is a rule someone turns
+ * off. The two cases that matter are covered where they are cheaper to
+ * catch: copy belongs in `messages/`, and anything keyed *by* locale is
+ * guarded by the compiler — see `no-loosely-typed-locale-maps.test.ts`.
  */
 
 const ROOTS = ["app/[locale]", "components"];
