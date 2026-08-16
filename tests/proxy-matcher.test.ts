@@ -54,6 +54,11 @@ const ALSO_MUST_NOT_MATCH = [
   "/sitemap.xml",
   "/manifest.webmanifest",
   "/opengraph-image",
+  // The per-locale metadata routes (#275). The manifest is a Route Handler
+  // and owns its response; it is excluded by the extension rule rather than
+  // by name, which is why it is listed here and not above.
+  "/es/manifest.webmanifest",
+  "/en/manifest.webmanifest",
   "/apple-icon",
   "/icon",
 ];
@@ -70,6 +75,12 @@ const MUST_MATCH = [
   "/login",
   "/es/dashboard",
   "/en/matches",
+  // The generated OG image moved under `[locale]`, so its URL gained the
+  // prefix and no longer hits the root `opengraph-image` exclusion. It is
+  // expected to pass through the proxy untouched — next-intl sees a valid
+  // prefix and leaves it alone. Verified by request, not by reading: this
+  // exact class of change is what shipped `/api/health` broken.
+  "/es/opengraph-image/og",
 ];
 
 describe("proxy matcher", () => {

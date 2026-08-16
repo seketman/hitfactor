@@ -34,12 +34,18 @@ export async function generateMetadata({
     metadataBase: new URL(getSiteUrl()),
     title: "HitFactor",
     description: t("description"),
-    // hreflang: relaciona las versiones es/en de la home para Google.
+    // Emits the `<link rel="manifest">`. It points at this locale's Route
+    // Handler because the `app/manifest.ts` convention only exists at the
+    // root of `app`, and therefore cannot vary by language.
+    manifest: `/${locale}/manifest.webmanifest`,
+    // hreflang: relates the versions of the home page for Google. Derived
+    // from `routing.locales` rather than written out — the previous list was
+    // a literal `{ es, en }`, so a new language would have shipped with no
+    // hreflang of its own and nothing failing.
     alternates: {
-      languages: {
-        es: "/es",
-        en: "/en",
-      },
+      languages: Object.fromEntries(
+        routing.locales.map((l) => [l, `/${l}`]),
+      ),
     },
     // Verificación de propiedad en Google Search Console y Bing Webmaster Tools.
     verification: {

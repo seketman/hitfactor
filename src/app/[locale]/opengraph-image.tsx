@@ -1,13 +1,39 @@
 import { ImageResponse } from "next/og";
+import { getTranslations } from "next-intl/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { resolveLocale, routing } from "@/i18n/routing";
 
 // La generación lee el archivo de fuente del filesystem → runtime Node.
 export const runtime = "nodejs";
 
-export const alt = "HitFactor — Tu historial de tiro deportivo";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
+/**
+ * The alt text, per locale.
+ *
+ * `export const alt` is a static value and this file now sits under
+ * `[locale]`, so it cannot be one — hence `generateImageMetadata`, whose
+ * returned items carry their own `alt`. A single item: this route has one
+ * image, the function is here for the metadata, not the multiplicity.
+ *
+ * Note the asymmetry the Next docs call out — `params` arrives plain here
+ * and as a promise on the default export below.
+ */
+export async function generateImageMetadata({
+  params,
+}: {
+  params: { locale: string };
+}) {
+  const locale = resolveLocale(params.locale);
+  const t = await getTranslations({ locale, namespace: "meta" });
+  return [{ id: "og", alt: t("ogAlt"), size, contentType }];
+}
 
 // Paleta de la marca (constitución): ámbar de acento + fondo oscuro del logo.
 const AMBER = "#d97706";
@@ -21,7 +47,13 @@ const MUTED = "#a1a1aa";
  * HitFactor: la diana ámbar del logo + el wordmark + el tagline, sobre el
  * fondo oscuro de la marca. Sin dependencias externas (FR-015).
  */
-export default async function Image() {
+export default async function Image({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const locale = resolveLocale((await params).locale);
+  const t = await getTranslations({ locale, namespace: "meta" });
   const geistBold = await readFile(
     join(
       process.cwd(),
@@ -94,7 +126,7 @@ export default async function Image() {
             HitFactor
           </div>
           <div style={{ fontSize: 40, fontWeight: 700, color: MUTED }}>
-            Tu historial de tiro deportivo
+            {t("ogTagline")}
           </div>
         </div>
       </div>

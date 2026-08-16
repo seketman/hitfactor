@@ -1,6 +1,9 @@
 {
   "meta": {
-    "description": "Track your practical shooting match and stage history."
+    "description": "Track your practical shooting match and stage history.",
+    "ogAlt": "HitFactor — Your practical shooting history",
+    "ogTagline": "Your practical shooting history",
+    "manifestDescription": "Your practical shooting history, all in one place."
   },
   "landingMeta": {
     "title": "HitFactor — Your practical shooting history",

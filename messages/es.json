@@ -1,6 +1,9 @@
 {
   "meta": {
-    "description": "Tu historial de matches y stages de tiro deportivo."
+    "description": "Tu historial de matches y stages de tiro deportivo.",
+    "ogAlt": "HitFactor — Tu historial de tiro deportivo",
+    "ogTagline": "Tu historial de tiro deportivo",
+    "manifestDescription": "Tu historial de tiro deportivo, en un solo lugar."
   },
   "landingMeta": {
     "title": "HitFactor — Tu historial de tiro deportivo",
