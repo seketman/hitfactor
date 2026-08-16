@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.0](https://github.com/seketman/hitfactor/compare/v1.29.0...v1.30.0) (2026-08-16)
+
+
+### Features
+
+* **i18n:** add pt-BR as a third locale ([#284](https://github.com/seketman/hitfactor/issues/284)) ([189e1cc](https://github.com/seketman/hitfactor/commit/189e1cc1396e4b0834eaa7038192bb9fcc04eb67))
+
 ## [1.29.0](https://github.com/seketman/hitfactor/compare/v1.28.5...v1.29.0) (2026-08-16)
 
 
