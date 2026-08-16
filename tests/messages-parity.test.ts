@@ -1,8 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import es from "../messages/es.json";
-import en from "../messages/en.json";
+import { routing } from "@/i18n/routing";
 
 /**
  * Guardas contra desincronización de los mensajes.
@@ -13,7 +12,49 @@ import en from "../messages/en.json";
  *
  * Es el mismo criterio que `migrations-doc.test.ts`: si algo tiene que
  * mantenerse en sincronía a mano, hay un test que lo verifica.
+ *
+ * The locale list is derived from `routing`, never written here. This file
+ * used to `import es from "../messages/es.json"` and the same for `en`, and
+ * repeat the pair in `it.each(["es", "en"])`. A third catalogue was therefore
+ * invisible to it: a `messages/pt-BR.json` holding `{}` passed every check
+ * below while the app served no Portuguese at all (#278). A guardrail that
+ * has to be edited to cover new data does not cover it by default.
  */
+
+const MESSAGES_DIR = join(process.cwd(), "messages");
+
+const filesOnDisk = readdirSync(MESSAGES_DIR)
+  .filter((f) => f.endsWith(".json"))
+  .map((f) => f.replace(/\.json$/, ""))
+  .sort();
+
+/**
+ * Declared locales that actually have a file. The two ways this can disagree
+ * with `routing` — a declared locale with no file, a file nobody declared —
+ * are each their own test below rather than a crash at import time.
+ */
+const catalogues = new Map<string, unknown>(
+  routing.locales
+    .filter((locale) => filesOnDisk.includes(locale))
+    .map((locale) => [
+      locale,
+      JSON.parse(readFileSync(join(MESSAGES_DIR, `${locale}.json`), "utf8")),
+    ]),
+);
+
+const localesWithFile = [...catalogues.keys()];
+const reference = catalogues.get(routing.defaultLocale) ?? {};
+const secondary = localesWithFile.filter((l) => l !== routing.defaultLocale);
+
+/** `import.parserError` / `import.importError` of a catalogue, or `{}`. */
+function errorMessages(
+  catalogue: unknown,
+  group: "parserError" | "importError",
+): Record<string, string> {
+  const section = (catalogue as { import?: Record<string, unknown> } | undefined)
+    ?.import;
+  return (section?.[group] as Record<string, string> | undefined) ?? {};
+}
 
 function flatten(obj: unknown, prefix = ""): string[] {
   if (typeof obj !== "object" || obj === null) return [prefix];
@@ -109,24 +150,51 @@ function icuArguments(message: string): string[] {
   return names;
 }
 
-describe("messages es/en", () => {
-  it("tienen exactamente las mismas claves", () => {
-    const keysEs = flatten(es).sort();
-    const keysEn = flatten(en).sort();
-    expect(keysEs.filter((k) => !keysEn.includes(k))).toEqual([]);
-    expect(keysEn.filter((k) => !keysEs.includes(k))).toEqual([]);
+describe("messages: routing y el catálogo", () => {
+  /**
+   * Without this the whole file can pass in a vacuum: no files, no
+   * catalogues, nothing to compare, every `it.each` below empty.
+   */
+  it("hay un default y al menos un locale más que contrastar (sanity check)", () => {
+    expect(Object.keys(reference).length).toBeGreaterThan(5);
+    expect(secondary.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * The two halves of "a locale exists" — declared in routing, present on
+   * disk — checked in both directions. A declared locale with no file 500s
+   * on `i18n/request.ts`; a file nobody declared is a translation sitting
+   * there looking finished while its URL 404s.
+   */
+  it("routing declara exactamente los archivos que hay en messages/", () => {
+    expect(filesOnDisk).toEqual([...routing.locales].sort());
+  });
+});
+
+describe("messages: cada locale contra el default", () => {
+  it.each(secondary)("%s tiene exactamente las mismas claves", (locale) => {
+    const keysRef = flatten(reference).sort();
+    const keysOther = flatten(catalogues.get(locale)).sort();
+    expect(
+      keysRef.filter((k) => !keysOther.includes(k)),
+      `claves de ${routing.defaultLocale} que faltan en ${locale}`,
+    ).toEqual([]);
+    expect(
+      keysOther.filter((k) => !keysRef.includes(k)),
+      `claves de ${locale} que no existen en ${routing.defaultLocale}`,
+    ).toEqual([]);
   });
 
   // Un `{name}` que en un idioma se escribió `{nombre}` compila, pasa el
   // typecheck, y en runtime renderiza el placeholder crudo.
-  it("usan los mismos placeholders en cada clave", () => {
+  it.each(secondary)("%s usa los mismos placeholders en cada clave", (locale) => {
     const placeholders = (v: unknown) =>
       typeof v === "string" ? icuArguments(v).sort() : [];
     const walk = (a: unknown, b: unknown, path: string): void => {
       if (typeof a === "string" || typeof b === "string") {
         expect(
           { [path]: placeholders(a) },
-          `placeholders distintos en ${path}`,
+          `placeholders distintos en ${path} (${locale})`,
         ).toEqual({ [path]: placeholders(b) });
         return;
       }
@@ -139,7 +207,7 @@ describe("messages es/en", () => {
         );
       }
     };
-    walk(es, en, "");
+    walk(reference, catalogues.get(locale), "");
   });
 });
 
@@ -157,16 +225,13 @@ describe("ParserErrorCode ↔ messages", () => {
     expect(codes.length).toBeGreaterThan(10);
   });
 
-  it.each(["es", "en"])("cada código tiene mensaje en %s", (locale) => {
-    const messages = (locale === "es" ? es : en).import.parserError as Record<
-      string,
-      string
-    >;
+  it.each(localesWithFile)("cada código tiene mensaje en %s", (locale) => {
+    const messages = errorMessages(catalogues.get(locale), "parserError");
     expect(codes.filter((c) => !(c in messages))).toEqual([]);
   });
 
   it("no hay mensajes de error sin código que los use", () => {
-    const declared = Object.keys(es.import.parserError);
+    const declared = Object.keys(errorMessages(reference, "parserError"));
     expect(declared.filter((k) => !codes.includes(k))).toEqual([]);
   });
 });
@@ -210,7 +275,7 @@ describe("ParserError: params ↔ placeholders", () => {
   it.each(calls.map((c) => [c.code, c.params] as const))(
     "%s pasa exactamente los params que su mensaje usa",
     (code, params) => {
-      const message = (es.import.parserError as Record<string, string>)[code];
+      const message = errorMessages(reference, "parserError")[code];
       expect(message, `falta el mensaje de "${code}"`).toBeDefined();
       const placeholders = [...message!.matchAll(/\{(\w+)\s*[,}]/g)]
         .map((m) => m[1]!)
@@ -236,16 +301,13 @@ describe("ImportErrorCode ↔ messages", () => {
     expect(codes.length).toBeGreaterThan(10);
   });
 
-  it.each(["es", "en"])("cada código tiene mensaje en %s", (locale) => {
-    const messages = (locale === "es" ? es : en).import.importError as Record<
-      string,
-      string
-    >;
+  it.each(localesWithFile)("cada código tiene mensaje en %s", (locale) => {
+    const messages = errorMessages(catalogues.get(locale), "importError");
     expect(codes.filter((c) => !(c in messages))).toEqual([]);
   });
 
   it("no hay mensajes de error sin código que los use", () => {
-    const declared = Object.keys(es.import.importError);
+    const declared = Object.keys(errorMessages(reference, "importError"));
     expect(declared.filter((k) => !codes.includes(k))).toEqual([]);
   });
 });
@@ -320,7 +382,7 @@ describe("ImportError: params ↔ placeholders", () => {
   it.each(calls.map((c) => [c.code, c.params] as const))(
     "%s pasa exactamente los params que su mensaje usa",
     (code, params) => {
-      const message = (es.import.importError as Record<string, string>)[code];
+      const message = errorMessages(reference, "importError")[code];
       expect(message, `falta el mensaje de "${code}"`).toBeDefined();
       const placeholders = [...message!.matchAll(/\{(\w+)\s*[,}]/g)]
         .map((m) => m[1]!)
