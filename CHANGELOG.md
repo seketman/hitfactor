@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.29.0](https://github.com/seketman/hitfactor/compare/v1.28.5...v1.29.0) (2026-08-16)
+
+
+### Features
+
+* **i18n:** serve the manifest and the OG image per locale ([#282](https://github.com/seketman/hitfactor/issues/282)) ([0b39ac1](https://github.com/seketman/hitfactor/commit/0b39ac12f5d81591ab6d81f7370c256af14414da))
+
 ## [1.28.5](https://github.com/seketman/hitfactor/compare/v1.28.4...v1.28.5) (2026-08-16)
 
 
