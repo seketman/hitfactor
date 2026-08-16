@@ -4,22 +4,41 @@ import { hasLocale } from "next-intl";
 /**
  * Configuración de routing i18n (next-intl).
  *
- *  - `locales`: español e inglés.
+ *  - `locales`: la lista de idiomas servidos. De acá la derivan hreflang,
+ *    el sitemap, los catálogos y sus guardrails. El switcher itera esta
+ *    lista pero sus etiquetas (`LABELS`) siguen siendo un mapa a mano —
+ *    igual que `WIKIPEDIA_URL`—, tipado `Record<Locale, …>` para que el
+ *    compilador exija la entrada nueva en vez de servir un default.
  *  - `defaultLocale: "es"`: el idioma original de la app; se usa como fallback.
- *  - `localePrefix: "always"`: ambos idiomas van con prefijo en la URL
- *    (`/es/...` y `/en/...`). La raíz `/` redirige al locale detectado.
+ *  - `localePrefix: "always"`: todos los idiomas van con prefijo en la URL
+ *    (`/es/...`, `/en/...`, `/pt-BR/...`). La raíz `/` redirige al locale
+ *    detectado.
  *  - `localeDetection: true`: para visitantes nuevos sin cookie, next-intl elige
  *    el locale por el header `Accept-Language` del browser. El switcher de la UI
  *    persiste la elección en la cookie `NEXT_LOCALE`.
  */
 export const routing = defineRouting({
-  locales: ["es", "en"],
+  locales: ["es", "en", "pt-BR"],
   defaultLocale: "es",
   localePrefix: "always",
   localeDetection: true,
 });
 
 export type Locale = (typeof routing.locales)[number];
+
+/**
+ * The `alternates.languages` map for a page that exists at `/<locale><path>`.
+ *
+ * Derived rather than written out. Both call sites held a literal
+ * `{ es: "/es", en: "/en" }`, so a new locale shipped with no hreflang of its
+ * own and nothing failed — and two copies of the same literal drift one at a
+ * time. `sitemap.ts` builds absolute URLs and keeps its own version.
+ */
+export function localeAlternates(path = ""): Record<Locale, string> {
+  return Object.fromEntries(
+    routing.locales.map((locale) => [locale, `/${locale}${path}`]),
+  ) as Record<Locale, string>;
+}
 
 /**
  * Estrecha el segmento `[locale]` de la URL a un `Locale`, cayendo al default
@@ -36,20 +55,6 @@ export type Locale = (typeof routing.locales)[number];
  * Que devuelvan el default no contradice al 404: la metadata de una ruta que
  * después va a 404ear no se sirve nunca.
  */
-/**
- * The `alternates.languages` map for a page that exists at `/<locale><path>`.
- *
- * Derived rather than written out. Both call sites held a literal
- * `{ es: "/es", en: "/en" }`, so a new locale shipped with no hreflang of its
- * own and nothing failed — and two copies of the same literal drift one at a
- * time. `sitemap.ts` builds absolute URLs and keeps its own version.
- */
-export function localeAlternates(path = ""): Record<Locale, string> {
-  return Object.fromEntries(
-    routing.locales.map((locale) => [locale, `/${locale}${path}`]),
-  ) as Record<Locale, string>;
-}
-
 export function resolveLocale(requested: string | undefined): Locale {
   return hasLocale(routing.locales, requested)
     ? requested

@@ -45,8 +45,8 @@ export function formatNumber(
 
 /**
  * Construir un `Intl.DateTimeFormat` es caro y estas funciones corren una vez
- * por fila de tabla. Memoizamos por locale — son dos, así que el Map no
- * crece.
+ * por fila de tabla. Memoizamos por locale — son los de `routing.locales`,
+ * un puñado acotado, así que el Map no crece sin control.
  *
  * `DATE_TIME_FORMATTERS` se indexa además por time zone (#190), así que ése
  * sí puede crecer: una entrada por par (locale, zona) que la app haya visto.

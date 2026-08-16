@@ -3,8 +3,9 @@ import { absoluteUrl } from "@/lib/seo/site-url";
 import { routing } from "@/i18n/routing";
 
 /**
- * Sitemap con las rutas públicas en ambos locales. Cada entrada declara sus
- * alternates `hreflang` (es/en) para que Google indexe las dos versiones y
+ * Sitemap con las rutas públicas en todos los locales. Cada entrada declara sus
+ * alternates `hreflang` (uno por locale de `routing`) para que Google
+ * indexe todas las versiones y
  * las relacione entre sí.
  */
 export default function sitemap(): MetadataRoute.Sitemap {

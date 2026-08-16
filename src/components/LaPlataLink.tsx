@@ -13,6 +13,7 @@ import type { Locale } from "@/i18n/routing";
 const WIKIPEDIA_URL: Record<Locale, string> = {
   es: "https://es.wikipedia.org/wiki/La_Plata",
   en: "https://en.wikipedia.org/wiki/La_Plata",
+  "pt-BR": "https://pt.wikipedia.org/wiki/La_Plata",
 };
 
 /**
