@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.1](https://github.com/seketman/hitfactor/compare/v1.30.0...v1.30.1) (2026-08-16)
+
+
+### Bug Fixes
+
+* **feedback:** stop a Markdown character dropping the Telegram notification ([#286](https://github.com/seketman/hitfactor/issues/286)) ([ebf12fc](https://github.com/seketman/hitfactor/commit/ebf12fc5177e2095a244d059038be406f304014b)), closes [#272](https://github.com/seketman/hitfactor/issues/272)
+
 ## [1.30.0](https://github.com/seketman/hitfactor/compare/v1.29.0...v1.30.0) (2026-08-16)
 
 
