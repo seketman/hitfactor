@@ -36,11 +36,6 @@ const SORT_OPTIONS: { key: SortKey; labelKey: string }[] = [
   { key: "place_asc", labelKey: "sortPlaceAsc" },
 ];
 
-const POWER_FACTOR_LABELS: Record<string, string> = {
-  Maj: "Major",
-  Min: "Minor",
-};
-
 interface HistoryTableProps {
   entries: MyEntryRow[];
   /**
@@ -293,9 +288,11 @@ export function HistoryTable({
                       )}
                     </TD>
                     <TD className="text-fg-muted">
-                      {e.power_factor
-                        ? POWER_FACTOR_LABELS[e.power_factor]
-                        : "—"}
+                      {e.power_factor === "Maj"
+                        ? tc("powerFactorMajor")
+                        : e.power_factor === "Min"
+                          ? tc("powerFactorMinor")
+                          : "—"}
                     </TD>
                     <TD className="text-right font-mono">
                       {e.is_dq ? (
