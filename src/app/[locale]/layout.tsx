@@ -7,7 +7,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { getSiteUrl } from "@/lib/seo/site-url";
-import { resolveLocale, routing } from "@/i18n/routing";
+import { localeAlternates, resolveLocale, routing } from "@/i18n/routing";
 import "../globals.css";
 
 const geistSans = Geist({
@@ -38,15 +38,8 @@ export async function generateMetadata({
     // Handler because the `app/manifest.ts` convention only exists at the
     // root of `app`, and therefore cannot vary by language.
     manifest: `/${locale}/manifest.webmanifest`,
-    // hreflang: relates the versions of the home page for Google. Derived
-    // from `routing.locales` rather than written out — the previous list was
-    // a literal `{ es, en }`, so a new language would have shipped with no
-    // hreflang of its own and nothing failing.
-    alternates: {
-      languages: Object.fromEntries(
-        routing.locales.map((l) => [l, `/${l}`]),
-      ),
-    },
+    // hreflang: relates the versions of the home page for Google.
+    alternates: { languages: localeAlternates() },
     // Verificación de propiedad en Google Search Console y Bing Webmaster Tools.
     verification: {
       google: "3gnfzDn0WL6Gj0br1QOHIKMvNc3FGRYsFYKbNiHREHU",

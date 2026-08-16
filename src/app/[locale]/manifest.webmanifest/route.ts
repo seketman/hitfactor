@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
+import { hasLocale } from "next-intl";
 import { getTranslations } from "next-intl/server";
-import { resolveLocale, routing } from "@/i18n/routing";
+import { routing } from "@/i18n/routing";
 
 /**
  * Web app manifest, one per locale.
@@ -20,6 +21,16 @@ import { resolveLocale, routing } from "@/i18n/routing";
  *
  * `name`/`short_name` stay literal: the product is called HitFactor in every
  * language, which is why they are not in `messages/`.
+ *
+ * The locale is validated here rather than leaned on from elsewhere. The
+ * `notFound()` guard in `[locale]/layout.tsx` does not cover this file —
+ * Route Handlers are not wrapped by the segment layout — and next-intl's
+ * proxy does not either, because the matcher in `src/proxy.ts` drops any
+ * path containing a dot, which is every URL this route answers. Without
+ * the check, `resolveLocale` quietly falls back and
+ * `/anything/manifest.webmanifest` returns 200 with the Spanish manifest.
+ * The sibling `opengraph-image` route has no dot in its URL, so the proxy
+ * does reach it and redirects an unknown locale before it gets there.
  */
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -29,7 +40,11 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ locale: string }> },
 ) {
-  const locale = resolveLocale((await params).locale);
+  const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) {
+    return new Response(null, { status: 404 });
+  }
+
   const t = await getTranslations({ locale, namespace: "meta" });
 
   const manifest: MetadataRoute.Manifest = {
@@ -47,6 +62,12 @@ export async function GET(
   };
 
   return Response.json(manifest, {
-    headers: { "content-type": "application/manifest+json" },
+    headers: {
+      "content-type": "application/manifest+json",
+      // Next's own `manifest.ts` codegen sends this. Hand-rolling the route
+      // means hand-rolling the header, or the manifest silently inherits
+      // whatever the CDN defaults to.
+      "cache-control": "public, max-age=0, must-revalidate",
+    },
   });
 }

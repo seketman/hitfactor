@@ -36,6 +36,20 @@ export type Locale = (typeof routing.locales)[number];
  * Que devuelvan el default no contradice al 404: la metadata de una ruta que
  * después va a 404ear no se sirve nunca.
  */
+/**
+ * The `alternates.languages` map for a page that exists at `/<locale><path>`.
+ *
+ * Derived rather than written out. Both call sites held a literal
+ * `{ es: "/es", en: "/en" }`, so a new locale shipped with no hreflang of its
+ * own and nothing failed — and two copies of the same literal drift one at a
+ * time. `sitemap.ts` builds absolute URLs and keeps its own version.
+ */
+export function localeAlternates(path = ""): Record<Locale, string> {
+  return Object.fromEntries(
+    routing.locales.map((locale) => [locale, `/${locale}${path}`]),
+  ) as Record<Locale, string>;
+}
+
 export function resolveLocale(requested: string | undefined): Locale {
   return hasLocale(routing.locales, requested)
     ? requested

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { resolveLocale, routing } from "@/i18n/routing";
+import { localeAlternates, resolveLocale } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -26,7 +26,7 @@ export async function generateMetadata({
     authors: [{ name: "Seketman" }],
     alternates: {
       canonical: `/${locale}`,
-      languages: Object.fromEntries(routing.locales.map((l) => [l, `/${l}`])),
+      languages: localeAlternates(),
     },
     robots: { index: true, follow: true },
     openGraph: {
