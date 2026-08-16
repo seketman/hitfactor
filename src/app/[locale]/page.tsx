@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { resolveLocale } from "@/i18n/routing";
+import { localeAlternates, resolveLocale } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 import { LandingPage } from "@/components/landing/LandingPage";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -26,7 +26,7 @@ export async function generateMetadata({
     authors: [{ name: "Seketman" }],
     alternates: {
       canonical: `/${locale}`,
-      languages: { es: "/es", en: "/en" },
+      languages: localeAlternates(),
     },
     robots: { index: true, follow: true },
     openGraph: {
@@ -36,13 +36,15 @@ export async function generateMetadata({
       siteName: "HitFactor",
       locale: t("ogLocale"),
       type: "website",
-      images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "HitFactor" }],
+      // No `images`: the `[locale]/opengraph-image.tsx` convention emits
+      // them, with its own size and its translated `alt`. Writing them here
+      // overrode it, and the hand-written URL kept pointing at the root
+      // `/opengraph-image` after the file moved — a 404 on every share.
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/opengraph-image"],
     },
   };
 }

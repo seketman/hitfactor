@@ -7,7 +7,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { getSiteUrl } from "@/lib/seo/site-url";
-import { resolveLocale, routing } from "@/i18n/routing";
+import { localeAlternates, resolveLocale, routing } from "@/i18n/routing";
 import "../globals.css";
 
 const geistSans = Geist({
@@ -34,13 +34,12 @@ export async function generateMetadata({
     metadataBase: new URL(getSiteUrl()),
     title: "HitFactor",
     description: t("description"),
-    // hreflang: relaciona las versiones es/en de la home para Google.
-    alternates: {
-      languages: {
-        es: "/es",
-        en: "/en",
-      },
-    },
+    // Emits the `<link rel="manifest">`. It points at this locale's Route
+    // Handler because the `app/manifest.ts` convention only exists at the
+    // root of `app`, and therefore cannot vary by language.
+    manifest: `/${locale}/manifest.webmanifest`,
+    // hreflang: relates the versions of the home page for Google.
+    alternates: { languages: localeAlternates() },
     // Verificación de propiedad en Google Search Console y Bing Webmaster Tools.
     verification: {
       google: "3gnfzDn0WL6Gj0br1QOHIKMvNc3FGRYsFYKbNiHREHU",
