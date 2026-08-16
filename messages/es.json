@@ -28,7 +28,16 @@
     "kpiMatches": "Torneos",
     "historyHeading": "Historial de uso",
     "colDate": "Fecha",
-    "colRounds": "Tiros"
+    "colRounds": "Tiros",
+    "themeLabel": "Modo de color",
+    "themeLight": "Claro",
+    "themeSystem": "Sistema",
+    "themeDark": "Oscuro",
+    "localeLabel": "Idioma / Language",
+    "connecting": "Conectando…",
+    "powerFactorMajor": "Major",
+    "powerFactorMinor": "Minor",
+    "categoryGeneral": "General"
   },
   "nav": {
     "openMenu": "Abrir menú",
@@ -305,10 +314,20 @@
       "imYou": "Soy yo",
       "alreadyLinked": "ya asociado",
       "markPresent": "Sí asistió",
-      "markAbsent": "Marcar ausente"
+      "markAbsent": "Marcar ausente",
+      "colStage": "Stage",
+      "colPenalties": "Pen.",
+      "colHitFactor": "Hit Factor",
+      "colStagePoints": "Stage Pts",
+      "colStagePercent": "Stage %"
     },
     "summary": {
-      "place": "Puesto"
+      "place": "Puesto",
+      "absent": "Ausente",
+      "division": "División",
+      "factor": "Factor",
+      "matchPercent": "Match %",
+      "totalTime": "Tiempo total"
     },
     "actions": {
       "editClub": "Editar club",
@@ -330,6 +349,33 @@
       "saving": "Guardando…",
       "save": "Guardar",
       "cancel": "Cancelar"
+    },
+    "me": {
+      "notFoundTitle": "Match no encontrado",
+      "notFoundBody": "El torneo que estás buscando no existe o fue eliminado.",
+      "linkTitle": "Asociá una participación a tu cuenta",
+      "linkBody": "Para ver tu detalle del match, primero buscá tu nombre en el ranking público y hacé click en “Soy yo”.",
+      "linkCta": "Ir al ranking del match",
+      "noEntryTitle": "No participaste de este match",
+      "noEntryBody": "Ninguna de tus identidades aparece en el ranking de este torneo.",
+      "noEntryCta": "Ver ranking público",
+      "publicRanking": "Ver ranking público →",
+      "stageResults": "Tus resultados por stage",
+      "stagesEmpty": "Los stages todavía no fueron importados para este match.",
+      "stagesEmptyHint": "Subí los archivos <code>Stage Results</code> desde la página de import para verlos acá.",
+      "extraShots": "Disparos extra",
+      "extrasMin": "mín",
+      "extrasUsed": "usados",
+      "multipleEntries": "{count, plural, one {Tenés # participación en este match:} other {Tenés # participaciones en este match:}}"
+    },
+    "claimSuggestions": {
+      "titleFirst": "¿Sos vos en alguno de estos matches?",
+      "titleMore": "¿Encontramos más identidades tuyas?",
+      "shooterCount": "{count, plural, one {un tirador} other {# tiradores}}",
+      "bodyFirst": "Encontramos {shooters} con nombre parecido al tuyo. Si sos vos, hacé click en <strong>“Soy yo”</strong> para asociar esa participación a tu cuenta y empezar a ver tus resultados.",
+      "bodyMore": "Detectamos {shooters} con nombre parecido a tus identidades ya linkeadas — probablemente sea el mismo tirador tipeado distinto en otro torneo. Hacé click en <strong>“Soy yo”</strong> para sumar esas participaciones a tus stats.",
+      "place": "Puesto {place}",
+      "dismiss": "No soy ninguno · Ocultar sugerencias"
     }
   },
   "firearms": {
@@ -614,7 +660,14 @@
       "powder_charge_grains": "carga de pólvora (gr)",
       "power_factor": "power factor",
       "power_factor_measured": "power factor medido"
-    }
+    },
+    "title": "Tu actividad",
+    "subtitle": "Registro cronológico de los cambios que hiciste sobre tus datos. Solo vos podés ver esta lista.",
+    "emptyTitle": "Todavía no hay actividad registrada.",
+    "emptyBody": "Cualquier acción que hagas (importar un match, asignar un arma, asociar una participación a tu cuenta, etc.) va a aparecer acá.",
+    "paginationCaption": "{total, plural, one {# acción} other {# acciones}} · página {page} de {totalPages}",
+    "prev": "← Anterior",
+    "next": "Siguiente →"
   },
   "actionError": {
     "incompleteData": "Datos incompletos",

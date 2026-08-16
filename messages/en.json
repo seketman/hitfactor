@@ -28,7 +28,16 @@
     "kpiMatches": "Matches",
     "historyHeading": "Usage history",
     "colDate": "Date",
-    "colRounds": "Rounds"
+    "colRounds": "Rounds",
+    "themeLabel": "Color mode",
+    "themeLight": "Light",
+    "themeSystem": "System",
+    "themeDark": "Dark",
+    "localeLabel": "Idioma / Language",
+    "connecting": "Connecting…",
+    "powerFactorMajor": "Major",
+    "powerFactorMinor": "Minor",
+    "categoryGeneral": "General"
   },
   "nav": {
     "openMenu": "Open menu",
@@ -305,10 +314,20 @@
       "imYou": "It's me",
       "alreadyLinked": "already linked",
       "markPresent": "Did attend",
-      "markAbsent": "Mark absent"
+      "markAbsent": "Mark absent",
+      "colStage": "Stage",
+      "colPenalties": "Pen.",
+      "colHitFactor": "Hit Factor",
+      "colStagePoints": "Stage Pts",
+      "colStagePercent": "Stage %"
     },
     "summary": {
-      "place": "Place"
+      "place": "Place",
+      "absent": "Absent",
+      "division": "Division",
+      "factor": "Factor",
+      "matchPercent": "Match %",
+      "totalTime": "Total time"
     },
     "actions": {
       "editClub": "Edit club",
@@ -330,6 +349,33 @@
       "saving": "Saving…",
       "save": "Save",
       "cancel": "Cancel"
+    },
+    "me": {
+      "notFoundTitle": "Match not found",
+      "notFoundBody": "The match you are looking for does not exist or was deleted.",
+      "linkTitle": "Link an entry to your account",
+      "linkBody": "To see your match detail, first find your name in the public ranking and click “It’s me”.",
+      "linkCta": "Go to the match ranking",
+      "noEntryTitle": "You did not shoot this match",
+      "noEntryBody": "None of your identities appear in this match’s ranking.",
+      "noEntryCta": "View public ranking",
+      "publicRanking": "View public ranking →",
+      "stageResults": "Your stage results",
+      "stagesEmpty": "Stages have not been imported for this match yet.",
+      "stagesEmptyHint": "Upload the <code>Stage Results</code> files from the import page to see them here.",
+      "extraShots": "Extra shots",
+      "extrasMin": "min",
+      "extrasUsed": "used",
+      "multipleEntries": "{count, plural, one {You have # entry in this match:} other {You have # entries in this match:}}"
+    },
+    "claimSuggestions": {
+      "titleFirst": "Are you in any of these matches?",
+      "titleMore": "Did we find more of your identities?",
+      "shooterCount": "{count, plural, one {one shooter} other {# shooters}}",
+      "bodyFirst": "We found {shooters} with a name close to yours. If that is you, click <strong>“It’s me”</strong> to link that entry to your account and start seeing your results.",
+      "bodyMore": "We spotted {shooters} with a name close to your linked identities — probably the same shooter typed differently at another match. Click <strong>“It’s me”</strong> to add those entries to your stats.",
+      "place": "Place {place}",
+      "dismiss": "None of these · Hide suggestions"
     }
   },
   "firearms": {
@@ -654,6 +700,13 @@
       "powder_charge_grains": "powder charge (gr)",
       "power_factor": "power factor",
       "power_factor_measured": "measured power factor"
-    }
+    },
+    "title": "Your activity",
+    "subtitle": "A chronological record of the changes you made to your data. Only you can see this list.",
+    "emptyTitle": "No activity recorded yet.",
+    "emptyBody": "Anything you do (importing a match, assigning a firearm, linking an entry to your account, and so on) will show up here.",
+    "paginationCaption": "{total, plural, one {# action} other {# actions}} · page {page} of {totalPages}",
+    "prev": "← Previous",
+    "next": "Next →"
   }
 }
