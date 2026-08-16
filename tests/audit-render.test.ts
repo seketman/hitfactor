@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { createTranslator } from "use-intl";
 import { describeAuditEntry, type AuditTranslator } from "@/lib/audit/render";
-import es from "../messages/es.json";
-import en from "../messages/en.json";
+import { loadCatalogues } from "./helpers/catalogues";
 
 /**
- * Se usa el traductor **real** sobre `messages/es.json` en vez de un fake tipo
- * `(k) => k`. Un fake haría pasar los tests aunque falte una clave: next-intl
- * devuelve `<namespace>.<clave>` cuando no la encuentra, así que el assert
- * sobre el texto final es lo único que detecta un mensaje sin traducir.
+ * Se usan los traductores **reales** sobre los catálogos de todos los locales
+ * de `routing`, en vez de un fake tipo `(k) => k`. Un fake haría pasar los
+ * tests aunque falte una clave: next-intl devuelve `<namespace>.<clave>`
+ * cuando no la encuentra, así que el assert sobre el texto final es lo único
+ * que detecta un mensaje sin traducir.
  */
+const CATALOGUES = loadCatalogues();
+
 /**
  * `createTranslator` infiere las claves del JSON importado, así que su `key`
  * es una unión literal y no `string`. `AuditTranslator` acepta cualquier
@@ -29,8 +31,9 @@ function auditTranslator(
   return translate;
 }
 
-const t = auditTranslator("es", es);
-const tEn = auditTranslator("en", en);
+const t = auditTranslator("es", CATALOGUES.es!);
+const tEn = auditTranslator("en", CATALOGUES.en!);
+const tPt = auditTranslator("pt-BR", CATALOGUES["pt-BR"]!);
 import type { AuditLogRow } from "@/lib/db/types";
 import { AUDIT_ACTION } from "@/lib/audit/log-action";
 
@@ -391,7 +394,7 @@ describe("describeAuditEntry — i18n", () => {
 
   // Los conteos usan plural ICU. Con un fake `(k) => k` esto pasaría igual;
   // con el traductor real, un `{count}` mal escrito se ve.
-  it("pluraliza los conteos en los dos idiomas", () => {
+  it("pluraliza los conteos en todos los idiomas", () => {
     const one = row({
       action: "match.import",
       metadata: { match_name: "X", entries_count: 1, stages_count: 1 },
@@ -406,6 +409,36 @@ describe("describeAuditEntry — i18n", () => {
     expect(describeAuditEntry(many, tEn).detail).toBe(
       "12 shooters · 4 stages",
     );
+    expect(describeAuditEntry(one, tPt).detail).toBe("1 atirador · 1 stage");
+    expect(describeAuditEntry(many, tPt).detail).toBe(
+      "12 atiradores · 4 stages",
+    );
+  });
+
+  /**
+   * `pt-BR` puts zero in the `one` plural category; `es` and `en` put it in
+   * `other`:
+   *
+   *     Intl.PluralRules("pt-BR").select(0) === "one"
+   *     Intl.PluralRules("es").select(0)    === "other"
+   *
+   * So every `{count, plural, one {…} other {…}}` in the catalogue renders a
+   * different branch at zero depending on the locale, and nothing else here
+   * would notice. `messages-parity` cannot: its ICU walker extracts argument
+   * *names* and discards branch bodies by design.
+   *
+   * `describeAuditEntry` reaches this — it guards `entries != null`, not
+   * `entries > 0` (`lib/audit/render.ts`), unlike `stages` right below it.
+   */
+  it("renderiza el cero con la rama que cada idioma pide", () => {
+    const zero = row({
+      action: "match.import",
+      metadata: { match_name: "X", entries_count: 0, stages_count: 0 },
+    });
+    expect(describeAuditEntry(zero, t).detail).toBe("0 tiradores");
+    expect(describeAuditEntry(zero, tEn).detail).toBe("0 shooters");
+    // Singular on purpose: CLDR's `one` category for Portuguese covers 0..1.
+    expect(describeAuditEntry(zero, tPt).detail).toBe("0 atirador");
   });
 
   /**

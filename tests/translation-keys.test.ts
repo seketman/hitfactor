@@ -1,15 +1,17 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import es from "../messages/es.json";
-import en from "../messages/en.json";
+import { routing } from "@/i18n/routing";
+import { loadCatalogues } from "./helpers/catalogues";
+
+const CATALOGUES = loadCatalogues();
 
 /**
- * Toda clave que el código le pide a next-intl tiene que existir en los dos
- * idiomas.
+ * Toda clave que el código le pide a next-intl tiene que existir en todos los
+ * idiomas que sirve `routing`.
  *
- * `messages-parity` ya cubre la otra mitad —que `es` y `en` tengan las
- * mismas claves— pero nada verificaba que las claves que **usa el código**
+ * `messages-parity` ya cubre la otra mitad —que los catálogos tengan las
+ * mismas claves entre sí— pero nada verificaba que las claves que **usa el código**
  * existan. Es el mismo modo de falla silencioso de siempre: next-intl no
  * tira ante una clave faltante, devuelve `"<namespace>.<clave>"`, así que
  * un typo se renderiza literal en la pantalla y no rompe ningún test, ni el
@@ -118,8 +120,8 @@ describe("claves de traducción usadas en el código", () => {
     expect(new Set(usages.flatMap((u) => u.namespaces)).size).toBeGreaterThan(4);
   });
 
-  it.each(["es", "en"])("todas existen en %s", (locale) => {
-    const messages = locale === "es" ? es : en;
+  it.each(routing.locales)("todas existen en %s", (locale) => {
+    const messages = CATALOGUES[locale]!;
     const missing = usages
       .filter(
         (u) =>

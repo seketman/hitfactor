@@ -501,7 +501,7 @@
     "fileByDivisionName": "Match Results — by division",
     "fileCombinedBody": ": overall ranking of all divisions in a single file.",
     "fileCombinedName": "Match Results — Combined",
-    "fileCsvBody": ": sheet exported from Google Sheets (File → Download → CSV) with the columns Shooter, Club, Category, Discipline, Hits and Points.",
+    "fileCsvBody": ": a spreadsheet exported from Google Sheets (File → Download → CSV). The headers are in Spanish, exactly as written: Tirador, Club, Categoría, Disciplina, Impactos and Puntos.",
     "fileCsvName": "FBI Shooting CSV",
     "fileFatBody": ": the “Official Ranking” PDF with the match's overall results (no stages). The discipline is taken from the file name (e.g.: ",
     "fileFatBodyEnd": "). Since that format doesn't include the match date, we'll ask you for it before finishing the import.",

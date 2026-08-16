@@ -10,10 +10,12 @@ import { usePathname, useRouter } from "@/i18n/navigation";
 const LABELS: Record<Locale, string> = {
   es: "ES",
   en: "EN",
+  "pt-BR": "BR",
 };
 
 /**
- * Selector de idioma (es/en). Navega al mismo path en el otro locale usando
+ * Selector de idioma. Ofrece un botón por locale de `routing` y navega al
+ * mismo path en el elegido, usando
  * los wrappers locale-aware de next-intl, que además persisten la elección en
  * la cookie `NEXT_LOCALE` — así sobrevive a recargas y futuras visitas.
  *

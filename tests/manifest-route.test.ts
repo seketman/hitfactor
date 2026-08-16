@@ -2,8 +2,20 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { localeAlternates, routing } from "@/i18n/routing";
-import es from "../messages/es.json";
-import en from "../messages/en.json";
+import { loadCatalogues } from "./helpers/catalogues";
+
+/**
+ * Catalogues are read off disk by locale rather than imported by name.
+ *
+ * The first version of this file did `import es from "../messages/es.json"`
+ * and built a two-entry map beside it — the same hardcoded pair that made
+ * `messages-parity` blind to a third locale (#279), reintroduced in the test
+ * written to guard against it. Adding pt-BR failed here, on the fixture,
+ * while the route it covers was already correct.
+ */
+function catalogue(locale: string): Record<string, Record<string, string>> {
+  return loadCatalogues()[locale] as Record<string, Record<string, string>>;
+}
 
 /**
  * `next-intl/server` resolves to its client build under vitest — the
@@ -21,14 +33,10 @@ import en from "../messages/en.json";
  * JSON keeps the assertion honest.
  */
 vi.mock("next-intl/server", async () => {
-  // `Record<string, unknown>` per namespace, not `Record<string, string>`:
-  // several namespaces nest (`auth.login.title`), so the narrower type does
-  // not describe the catalogue and the build's type check rejects it — a
-  // failure `npm test` does not surface, since vitest does not type check.
-  const catalogues: Record<string, Record<string, unknown>> = {
-    es: (await import("../messages/es.json")).default,
-    en: (await import("../messages/en.json")).default,
-  };
+  // Imported inside the factory because `vi.mock` is hoisted above the file's
+  // own imports — the outer binding is not visible here yet.
+  const { loadCatalogues: load } = await import("./helpers/catalogues");
+  const catalogues = load();
   return {
     getTranslations: async ({
       locale,
@@ -84,8 +92,6 @@ const { GET, generateStaticParams } = await import(
  * lesson `tests/proxy-matcher.test.ts` records about `/api/health`.
  */
 
-const CATALOGUES = { es, en } as const;
-
 async function fetchManifest(locale: string) {
   const response = await GET(new Request(`https://example.test/${locale}/manifest.webmanifest`), {
     params: Promise.resolve({ locale }),
@@ -112,7 +118,7 @@ describe("per-locale web app manifest", () => {
     // just be a second place to update, and would pass while the route
     // served a hardcoded string.
     expect(body.description).toBe(
-      CATALOGUES[locale as keyof typeof CATALOGUES].meta.manifestDescription,
+      catalogue(locale).meta!.manifestDescription,
     );
     // Installing from a locale opens the app in it, rather than sending the
     // user back through detection.

@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import en from "../messages/en.json";
-import es from "../messages/es.json";
+import { routing } from "@/i18n/routing";
+import { loadCatalogues } from "./helpers/catalogues";
+
+const CATALOGUES = loadCatalogues();
 
 /**
  * Guardrail against handing raw SDK errors to the user (#199).
@@ -73,10 +75,13 @@ describe("raw SDK errors never reach the user", () => {
   });
 
   it("no message interpolates a raw {error}", () => {
-    const offenders = [
-      ...messageEntries(es).map(([k, v]) => [`es.${k}`, v] as const),
-      ...messageEntries(en).map(([k, v]) => [`en.${k}`, v] as const),
-    ].filter(([, value]) => /\{\s*error\s*\}/.test(value));
+    const offenders = routing.locales
+      .flatMap((locale) =>
+        messageEntries(CATALOGUES[locale]).map(
+          ([k, v]) => [`${locale}.${k}`, v] as const,
+        ),
+      )
+      .filter(([, value]) => /\{\s*error\s*\}/.test(value));
 
     expect(
       offenders.map(([key]) => key),
