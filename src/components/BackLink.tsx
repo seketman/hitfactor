@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 
 /**
@@ -29,12 +30,13 @@ import { useRouter } from "@/i18n/navigation";
  */
 export function BackLink({
   fallbackHref,
-  label = "Volver",
+  label,
 }: {
   fallbackHref: string;
-  /** Texto del link. Default "Volver" — generic on purpose. */
+  /** Link text. Defaults to `common.back` — generic on purpose. */
   label?: string;
 }) {
+  const t = useTranslations("common");
   const router = useRouter();
 
   return (
@@ -49,7 +51,7 @@ export function BackLink({
       }}
       className="mb-4 inline-block cursor-pointer bg-transparent p-0 text-sm text-fg-muted hover:text-accent"
     >
-      ← {label}
+      ← {label ?? t("back")}
     </button>
   );
 }

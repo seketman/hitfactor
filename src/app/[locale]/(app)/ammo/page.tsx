@@ -170,8 +170,8 @@ async function NewAmmoForm({ cancelable }: { cancelable: boolean }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Select label={t("fieldPowerFactor")} name="power_factor" defaultValue="">
             <option value="">{t("powerFactorNone")}</option>
-            <option value="Min">Min</option>
-            <option value="Maj">Maj</option>
+            <option value="Min">{tc("powerFactorMinor")}</option>
+            <option value="Maj">{tc("powerFactorMajor")}</option>
           </Select>
           <Input
             label={t("fieldPowerFactorMeasured")}

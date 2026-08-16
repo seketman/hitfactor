@@ -161,8 +161,8 @@ export default async function AmmoDetailPage({
                   defaultValue={ammo.power_factor ?? ""}
                 >
                   <option value="">{t("powerFactorNone")}</option>
-                  <option value="Min">Min</option>
-                  <option value="Maj">Maj</option>
+                  <option value="Min">{tc("powerFactorMinor")}</option>
+                  <option value="Maj">{tc("powerFactorMajor")}</option>
                 </Select>
                 <Input
                   label={t("fieldPowerFactorMeasured")}

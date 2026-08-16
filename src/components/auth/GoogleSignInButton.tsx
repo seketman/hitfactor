@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
+import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { signInWithGoogle } from "@/app/[locale]/(auth)/oauth";
@@ -22,6 +23,7 @@ export function GoogleSignInButton({ label }: { label: string }) {
 }
 
 function SubmitButton({ label }: { label: string }) {
+  const t = useTranslations("common");
   const { pending } = useFormStatus();
   return (
     <Button
@@ -34,7 +36,7 @@ function SubmitButton({ label }: { label: string }) {
       {pending ? (
         <>
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Conectando…
+          {t("connecting")}
         </>
       ) : (
         <>

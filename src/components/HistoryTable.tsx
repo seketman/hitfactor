@@ -62,6 +62,7 @@ export function HistoryTable({
   showDisciplineFilter = true,
 }: HistoryTableProps) {
   const t = useTranslations("dashboard.history");
+  const tc = useTranslations("common");
   const locale = useLocale();
   const clubLookup = useMemo(() => buildClubLookup(clubs), [clubs]);
   const [discipline, setDiscipline] = useState<string>("all");
@@ -197,8 +198,8 @@ export function HistoryTable({
           onChange={(e) => setFactor(e.target.value)}
         >
           <option value="all">{t("allMasc")}</option>
-          <option value="Maj">Major</option>
-          <option value="Min">Minor</option>
+          <option value="Maj">{tc("powerFactorMajor")}</option>
+          <option value="Min">{tc("powerFactorMinor")}</option>
         </Select>
 
         <Select
