@@ -15,6 +15,10 @@
 # Nota: las "Dependabot security updates" (alertas críticas de CVE) son
 # automáticas y van por canal aparte — siempre se abren incluso para
 # majors si la vuln lo amerita.
+#
+# One exception, added later: an `ignore` entry filters the security channel
+# too, not only version updates. The npm block below ignores eslint majors and
+# therefore does carry that gap - see the comment there for why it is accepted.
 
 version: 2
 updates:
@@ -23,6 +27,25 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 3
+    # `update-types` under `groups` below only decides what gets bundled into a
+    # shared PR - it does not stop a major from being proposed. Whatever matches
+    # no group still opens its own PR, which is how eslint 10 arrived and broke
+    # `npm run lint` in CI: eslint-plugin-react, pulled in transitively by
+    # eslint-config-next, does not support eslint 10 yet.
+    #
+    # Scoped to eslint rather than a blanket "*" on purpose: `ignore` applies to
+    # security updates as well as version updates and has no `applies-to` key to
+    # narrow it, so a blanket major-ignore would also swallow a CVE fix whose
+    # only patched release is a new major. eslint is dev-only and eslint 10 is
+    # unusable here regardless, so this one entry stays cheap. It covers
+    # `eslint` alone - a major of eslint-config-next or eslint-plugin-react is
+    # unaffected and could break CI the same way.
+    #
+    # Remove once eslint-config-next ships an eslint 10 compatible
+    # eslint-plugin-react.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       production-dependencies:
         dependency-type: "production"
