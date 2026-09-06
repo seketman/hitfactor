@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.2](https://github.com/seketman/hitfactor/compare/v1.30.1...v1.30.2) (2026-09-06)
+
+
+### Bug Fixes
+
+* **parsers:** accept "Setiembre" as a WinMSS month name ([#296](https://github.com/seketman/hitfactor/issues/296)) ([3e195a1](https://github.com/seketman/hitfactor/commit/3e195a147f495e3a98df6f126856015ae4e87455))
+
 ## [1.30.1](https://github.com/seketman/hitfactor/compare/v1.30.0...v1.30.1) (2026-08-16)
 
 
