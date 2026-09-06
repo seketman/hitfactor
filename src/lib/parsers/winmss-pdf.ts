@@ -66,6 +66,9 @@ const SPANISH_MONTHS: Record<string, number> = {
   julio: 7,
   agosto: 8,
   septiembre: 9,
+  // Rioplatense spelling of "septiembre". WinMSS prints it verbatim in
+  // PDFs from Argentine and Uruguayan clubs.
+  setiembre: 9,
   octubre: 10,
   noviembre: 11,
   diciembre: 12,
