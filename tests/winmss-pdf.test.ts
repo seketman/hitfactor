@@ -927,3 +927,65 @@ World Classification System used Page 1`;
     expect(z!.shooter.region).toBe("ARG");
   });
 });
+
+describe("parseWinmssText — 'Printed Setiembre' (Rioplatense month spelling)", () => {
+  // Real import failure (Torneo Nível 2 IPSC, September 2026): WinMSS prints
+  // "Setiembre", the Rioplatense spelling of "septiembre", and the month
+  // table only carried the peninsular one. The date resolved to "" and the
+  // import died with `noPrintedDate` — after `isWinmssFormat` had already
+  // accepted the file, since that check only requires *some* word after
+  // "Printed". Both exports of the match, overall and by-stage, carry the
+  // same "Printed Setiembre" line, so neither file could be imported.
+  //
+  // Fixtures based on the page-1 output of `extractPdfPages` on the real PDFs,
+  // so the line order is the one the parser actually receives. The overall
+  // page is complete — OPTICS had two entrants in this match; the by-stage one
+  // keeps the first two of eleven result rows.
+  const opticsOverallPage = `OPTICS -- Overall Match Results
+Torneo Nível 2 IPSC
+Printed Setiembre 5, 2026 at 19:17
+% Points Competitor Cat Reg Cls Tag ICS
+1 100,00 940,0000 13 Mercado, Ariel ARG
+2 49,24 462,8626 9 Sarmiento, Maria Paz L ARG
+Regional Classification System used
+Page 1`;
+
+  const productionStagePage = `PRODUCTION -- Overall Stage Results
+Torneo Nível 2 IPSC
+Printed Setiembre 5, 2026 at 19:19
+Stage 1 -- ETAPA 1
+HIT STAGE STAGE COMPETITOR
+PTS TIME FACTOR POINTS PERCENT # Name
+1 146 22,26 6,5588 160,0000 100,00 12 Marrero, Cristian Osvald
+2 138 22,80 6,0526 147,6510 92,28 10 Sansot, David
+Page 1`;
+
+  // This one passes with or without the month-table fix — `isWinmssFormat`
+  // only requires *some* word after "Printed". That is the point: it pins the
+  // two-stage failure (detection accepts the file, date extraction then
+  // rejected it), not the fix itself.
+  it("detects the format", () => {
+    expect(isWinmssFormat(opticsOverallPage)).toBe(true);
+  });
+
+  it("extracts the date from the overall export", () => {
+    expect(parseWinmssText(pages(opticsOverallPage)).date).toBe("2026-09-05");
+  });
+
+  it("extracts the date from the by-stage export", () => {
+    expect(parseWinmssText(pages(productionStagePage)).date).toBe("2026-09-05");
+  });
+
+  it("strips the 'Printed Setiembre' line instead of taking it as the title", () => {
+    expect(parseWinmssText(pages(opticsOverallPage)).name).toBe(
+      "Torneo Nível 2 IPSC",
+    );
+  });
+
+  it("parses the rows once the date no longer blocks the import", () => {
+    const parsed = parseWinmssText(pages(opticsOverallPage));
+    expect(parsed.matchEntries).toHaveLength(2);
+    expect(parsed.matchEntries[0]?.shooter.fullName).toBe("Mercado, Ariel");
+    expect(parsed.matchEntries[1]?.category).toBe("L");
+  });
+});
