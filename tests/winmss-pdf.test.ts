@@ -989,3 +989,173 @@ Page 1`;
     expect(parsed.matchEntries[1]?.category).toBe("L");
   });
 });
+
+describe("parseWinmssText — division header capture across rows (#299)", () => {
+  // The six division-header regexes capture with `[A-Z\s]`, and `\s` matches
+  // a newline. That is load-bearing in one direction and a trap in the other,
+  // so both directions are pinned here.
+  //
+  // Load-bearing: `reconstructTextByPosition` groups items into rows with a
+  // 2pt Y tolerance, and `pdfjs` sometimes emits a division name as separate
+  // items on kerning. A header whose glyphs straddle that tolerance lands on
+  // two rows, and only the newline-tolerant class still reads it.
+  //
+  // The trap: the same tolerance lets the capture START on the row above, so
+  // a title ending in letters is swallowed together with the real division.
+  // The page then resolves to no division and is dropped with a warn —
+  // indistinguishable from a genuinely unknown division, which is why this
+  // would never have surfaced on its own.
+  //
+  // Real `extractPdfPages` output puts the header row first (see the
+  // "Printed Setiembre" fixtures above, taken from real PDFs), so the
+  // title-first cases below are constructed, not observed.
+
+  const titleFirstPage = (title: string, division: string) => `${title}
+${division} -- Overall Match Results
+Printed mayo 2, 2026 at 16:17
+% Points CompetitorCompetitor Cat Reg Cls Tag ICS
+1 100,00 502,4867 30 Lanza, Claudio Alejand ARG
+2 95,17 478,2079 28 GONZALEZ, Diego Fabian S CAN RO
+World Classification System used Page 1`;
+
+  it("still reads a header split across two rows (P + ISTOLA)", () => {
+    // Same breakage as the "kerning roto" test above, except the two halves
+    // land on different rows. This is the case that forbids tightening the
+    // character class to `[A-Z \t]`: doing so would turn this quiet success
+    // into a silently dropped page.
+    const splitKerning = overallPistolaPage.replace(
+      "PISTOLA --",
+      "P\nISTOLA --",
+    );
+    const parsed = parseWinmssText(pages(splitKerning));
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PIS");
+    expect(parsed.matchEntries).toHaveLength(4);
+  });
+
+  it("does not swallow a title ending in letters", () => {
+    // "Copa Sur\nPISTOLA -- Overall Match Results" captures "Copa Sur\nPISTOLA".
+    const parsed = parseWinmssText(pages(titleFirstPage("Copa Sur", "PISTOLA")));
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PIS");
+    expect(parsed.matchEntries).toHaveLength(2);
+  });
+
+  it("does not swallow a title ending in another division's name", () => {
+    // The worst shape, because the captured text looks plausible: the title
+    // ends in "IPSC" and the capture returns "IPSC\nPISTOLA".
+    const parsed = parseWinmssText(
+      pages(titleFirstPage("Torneo Nivel 2 IPSC", "PISTOLA")),
+    );
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PIS");
+  });
+
+  it("keeps working for a title ending in a digit", () => {
+    // The accident that spared every fixture we have: a digit is outside
+    // `[A-Z\s]`, so the match cannot start before it. Unchanged by the fix.
+    const parsed = parseWinmssText(
+      pages(titleFirstPage("NOCTURNO ABRIL ATGQ 2026", "PISTOLA")),
+    );
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PIS");
+  });
+
+  it("drops rather than guesses when the rows above the header are ambiguous", () => {
+    // The retry sheds leading rows, and sometimes more than one of the
+    // resulting suffixes names a real division. Nothing in the text says
+    // which is right, and the two shapes that produce the conflict are
+    // indistinguishable:
+    //
+    //   Club ABC / PRODUCTION / OPTICS   title, then a division split by
+    //                                    kerning -> truth is PO
+    //   Copa / Pistola / OPTICS          a title wrapped across two rows,
+    //                                    then the whole division -> truth is CO
+    //
+    // Both offer the same two candidates, PO and CO, and picking either
+    // ordering is wrong for the other shape. So the page is dropped, which
+    // is what happened before this fix too: the call site warns and loses
+    // one page. The failure being avoided is worse — a silently mislabeled
+    // page files real scores under a division that did not shoot them.
+    const body = `Printed mayo 2, 2026 at 16:17
+% Points CompetitorCompetitor Cat Reg Cls Tag ICS
+1 100,00 502,4867 30 Lanza, Claudio Alejand ARG
+World Classification System used Page 1`;
+
+    for (const rowsAbove of ["Club ABC\nPRODUCTION", "Copa\nPistola"]) {
+      expectParserError(
+        () =>
+          parseWinmssText(
+            pages(`${rowsAbove}\nOPTICS -- Overall Match Results\n${body}`),
+          ),
+        "noWinmssMatchName",
+      );
+    }
+  });
+
+  it("resolves each ambiguous shape correctly once its title cannot bleed", () => {
+    // The same two pages, with the bleed removed, to show the candidates the
+    // test above refuses to choose between are both genuinely reachable — the
+    // ambiguity is real, not an artifact of the fixtures.
+    const body = `Printed mayo 2, 2026 at 16:17
+% Points CompetitorCompetitor Cat Reg Cls Tag ICS
+1 100,00 502,4867 30 Lanza, Claudio Alejand ARG
+World Classification System used Page 1`;
+
+    // A division split by kerning, with a title that ends in a digit.
+    const split = parseWinmssText(
+      pages(`Club ABC 2026\nPRODUCTION\nOPTICS -- Overall Match Results\n${body}`),
+    );
+    expect(split.matchEntries[0]?.divisionCode).toBe("PO");
+
+    // A whole division, with a title that ends in a digit.
+    const whole = parseWinmssText(
+      pages(`Copa Pistola 2026\nOPTICS -- Overall Match Results\n${body}`),
+    );
+    expect(whole.matchEntries[0]?.divisionCode).toBe("CO");
+  });
+
+  it("applies to the ESS single-dash header too, not just the '--' one", () => {
+    // The retry lives in shared code after the six header regexes, so it must
+    // hold for all of them; the cases above only exercise the `--` variant.
+    // Here the title row ends in "Handgun", so the capture is
+    // "Handgun\nCLASSIC" — the joined form resolves to nothing and only
+    // shedding the title row gets to CL.
+    const parsed = parseWinmssText(
+      pages(`TFABA - SEGUNDO SOCIAL PISTOLA - Handgun
+CLASSIC - Results Overall
+% Points Competitor Cat Reg Cls Tag ICS
+1 100.00 970.0000 58 SILVA, Lucas ARG
+Printed May 11, 2026 21:33:24 ESS - Electronic Scoring System 1 of 8`),
+    );
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("CL");
+  });
+
+  it("trusts the header's own row whole, which widens what resolves", () => {
+    // The retry sheds whole rows, so whatever remains on the header's own row
+    // is taken as the division. Here the base parser dropped the page — the
+    // joined "COPA PRODUCTION OPTICS" is not a division — and it now resolves
+    // to PO. That is right under the ordinary reading, "Copa" being the title
+    // and "PRODUCTION OPTICS" the division.
+    //
+    // Pinned because it is the edge of the rule above, not an illustration of
+    // it: a single candidate satisfies the agreement check trivially, and if
+    // a title word were ever fused onto the header row this would confidently
+    // return the wrong division instead of dropping. No real PDF is known to
+    // do that, and nothing in the text would distinguish it if one did.
+    const parsed = parseWinmssText(
+      pages(`Copa
+PRODUCTION OPTICS -- Overall Match Results
+Printed mayo 2, 2026 at 16:17
+% Points CompetitorCompetitor Cat Reg Cls Tag ICS
+1 100,00 502,4867 30 Lanza, Claudio Alejand ARG
+World Classification System used Page 1`),
+    );
+    expect(parsed.matchEntries[0]?.divisionCode).toBe("PO");
+  });
+
+  it("still drops a page whose division is genuinely unknown", () => {
+    // The retry must not become a way to resolve nonsense: with no row that
+    // names a real division, the page is still dropped.
+    expectParserError(
+      () => parseWinmssText(pages(titleFirstPage("Copa Sur", "NOTADIVISION"))),
+      "noWinmssMatchName",
+    );
+  });
+});
