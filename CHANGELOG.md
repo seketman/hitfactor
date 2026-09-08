@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.3](https://github.com/seketman/hitfactor/compare/v1.30.2...v1.30.3) (2026-09-08)
+
+
+### Bug Fixes
+
+* **parsers:** recover a WinMSS division swallowed by the row above it ([#301](https://github.com/seketman/hitfactor/issues/301)) ([a426824](https://github.com/seketman/hitfactor/commit/a42682488580088c6d2a44b8358445dedbf3fb2b)), closes [#299](https://github.com/seketman/hitfactor/issues/299)
+
 ## [1.30.2](https://github.com/seketman/hitfactor/compare/v1.30.1...v1.30.2) (2026-09-06)
 
 
