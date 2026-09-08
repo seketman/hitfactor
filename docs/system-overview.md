@@ -333,28 +333,24 @@ Convención: **Server Components por default**. `"use client"` solo en component
 
 ### 5.5 Sesión y proxy (Next 16)
 
-**Next 16 reemplazó `middleware.ts` por `proxy.ts`** en el build output ("Proxy (Middleware)"). En este repo, el archivo que respalda al proxy es `src/proxy.ts`:
+**Next 16 reemplazó `middleware.ts` por `proxy.ts`** en el build output ("Proxy (Middleware)"). En este repo el archivo que respalda al proxy es `src/proxy.ts`, y es el único: no existe `middleware.ts` ni en root ni en `src/`.
+
+`proxy()` compone dos cosas, en un orden que importa:
+
+1. **next-intl** (`createMiddleware(routing)`) detecta el locale (cookie `NEXT_LOCALE` → `Accept-Language`), redirige las URLs sin prefijo al locale correspondiente y **arma la respuesta base**.
+2. **Supabase** refresca la sesión escribiendo las cookies de auth renovadas **sobre esa misma respuesta**: `createServerClient` recibe un `getAll` que lee las cookies de la request y un `setAll` que las persiste en `response.cookies`. Llama `supabase.auth.getUser()` inmediatamente después (no se debe meter código entre `createServerClient` y `getUser`: los problemas de auth son difíciles de debuggear), lo que refresca los tokens por expirar y persiste las cookies nuevas.
+
+El orden es el patrón canónico de composición: i18n produce el response —posible redirect más cookie de locale— y Supabase le pega sus `Set-Cookie` encima, así no se pierde ninguno de los dos.
+
+**El matcher** corre en todas las rutas excepto infra de Next/Vercel (`_next`, `_vercel`), los route handlers que se manejan solos y no deben prefijarse con locale (`auth/*` para OAuth/Supabase, `q/*` para el shortlink QR público, `api/*` para el health check), los special files sin extensión (`opengraph-image`, `apple-icon`, `icon`) y cualquier archivo con extensión (`.svg`, `.png`, `sitemap.xml`, `robots.txt`, `manifest.webmanifest`):
 
 ```ts
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
-
-export async function proxy(request: NextRequest) {
-  return await updateSession(request);
-}
-
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
-};
+"/((?!(?:_next|_vercel|auth|q|api|opengraph-image|apple-icon|icon)(?:/|$)|.*\\..*).*)"
 ```
 
-No existe `middleware.ts` ni en root ni en `src/` — solo `proxy.ts`.
+El `(?:/|$)` ancla cada exclusión a un segmento completo. Sin él la lista excluía por **prefijo**: `q` se comía `/quiz`, `auth` se comía `/authors` e `icon` se comía `/iconography`, dejándolos sin locale en silencio.
 
-**`updateSession(request)`** (`src/lib/supabase/middleware.ts`) instancia un `createServerClient` con un `getAll`/`setAll` que copia cookies entrantes a la request y persiste las salientes en `NextResponse`. Llama `supabase.auth.getUser()` inmediatamente después (no se debe meter código entre `createServerClient` y `getUser`): refresca tokens si están por expirar y persiste las cookies nuevas. Sin esto, los tokens podrían expirar entre navegaciones y dejar al usuario en un estado raro.
-
-El matcher excluye assets estáticos y rutas de imagen Next; todo el resto pasa por el refresh.
+Una ruta que falte en el matcher tampoco falla ruidosamente: se la redirige a `/<locale>/<ruta>`, que no existe, y devuelve 404. Así entró `/api/health` —307 a `/es/api/health`— con toda la suite en verde, porque a un matcher no lo prueba nada más que ejercitarlo. `tests/proxy-matcher.test.ts` lo cubre ahora.
 
 ### 5.6 Tema y diseño
 
@@ -1350,7 +1346,7 @@ Otras acciones del dominio match conviven en `AUDIT_ACTION` pero **no** se emite
 | Server action de import | `src/app/(app)/import/actions.ts` |
 | Estimación de rounds | `src/lib/firearms/estimate-rounds.ts` |
 | Tipos generados de DB | `src/lib/supabase/database.types.ts` (regenerar con `npm run db:types`) |
-| Clientes Supabase | `src/lib/supabase/{server,client,middleware}.ts` |
-| Proxy (Next 16) | `src/proxy.ts` + `src/lib/supabase/middleware.ts` |
+| Clientes Supabase | `src/lib/supabase/{server,client}.ts` |
+| Proxy (Next 16) | `src/proxy.ts` |
 | Tema y tokens | `src/app/globals.css` |
 | Convenciones del repo | `AGENTS.md`, `CLAUDE.md` |
