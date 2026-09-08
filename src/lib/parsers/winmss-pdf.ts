@@ -373,6 +373,15 @@ function countUnparsedDataRows(text: string, parsedRows: number): number {
   return Math.max(0, candidates - parsedRows);
 }
 
+/**
+ * Collapses a raw division-header capture into the form `resolveDivisionCode`
+ * expects. Whitespace collapsing is what folds a captured line break into a
+ * single space, so a header split across two rows still reads as one name.
+ */
+function normalizeDivisionCapture(raw: string): string {
+  return raw.trim().replace(/\s+/g, " ").toUpperCase();
+}
+
 function parsePage(
   text: string,
 ): OverallPageResult | StagePageResult | DqPageResult | null {
@@ -414,22 +423,93 @@ function parsePage(
 
   if (!overallMatch && !stageHeaderMatch && !essByStageMatch) return null;
 
-  const divisionRaw = (
-    overallMatch?.[1] ??
-    stageHeaderMatch?.[1] ??
-    essByStageMatch?.[1] ??
-    ""
-  )
-    .trim()
-    .replace(/\s+/g, " ")
-    .toUpperCase();
-  // `resolveDivisionCode` ya prueba el texto tal como vino y su variante sin
-  // espacios — cubre el caso de `pdfjs` rompiendo "PISTOLA" en "P" + "ISTOLA"
-  // por kerning que la reconstrucción posicional junta con un espacio.
-  const divisionCode = resolveDivisionCode(DISCIPLINE.IPSC, divisionRaw);
+  const divisionCapture =
+    overallMatch?.[1] ?? stageHeaderMatch?.[1] ?? essByStageMatch?.[1] ?? "";
+  const divisionRaw = normalizeDivisionCapture(divisionCapture);
+  // `resolveDivisionCode` tries the text as captured and its space-stripped
+  // variant, which covers `pdfjs` breaking "PISTOLA" into "P" + "ISTOLA" on
+  // kerning — positional reconstruction rejoins those with a space. When the
+  // two halves land on different rows instead (`reconstructTextByPosition`
+  // groups with a 2pt Y tolerance), the `\s` inside `[A-Z\s]` swallows the
+  // line break and the header still reads. That leniency is deliberate.
+  //
+  // Its price is that the capture can also START on the previous row: `\s`
+  // does not tell a space from a newline, so a title ending in letters ahead
+  // of the header ("Copa Sur\nOPTICS -- Overall Match Results") is captured
+  // whole as "COPA SUR OPTICS". What spares the fixtures we have is a
+  // typographic accident — they end in a digit ("...2026", "Printed: May 11,
+  // 2026 21:33:24"), and a digit is outside the class, so the match cannot
+  // start any earlier.
+  //
+  // When the capture does span rows and the joined form resolves to nothing,
+  // shed leading rows one at a time and see which of the remaining suffixes
+  // name a division. Strictly a second chance — a page that resolves today is
+  // unaffected, because the first attempt is unchanged and runs first.
+  //
+  // The suffix is accepted ONLY when every one that resolves agrees on the
+  // same code. Where they disagree the page is dropped, exactly as before,
+  // because nothing in the text says which reading is right and picking one
+  // is guessing with results on the line.
+  //
+  // That is not caution for its own sake: both orderings are demonstrably
+  // wrong, in mirror images of each other. Taking the shortest suffix loses
+  // a division that is itself split across rows —
+  //
+  //   Club ABC                          <- title
+  //   PRODUCTION                        <- division, split by kerning
+  //   OPTICS -- Overall Match Results
+  //
+  // where the last row alone is "OPTICS" (CO) but the truth is "PRODUCTION
+  // OPTICS" (PO). Taking the longest fails the other way —
+  //
+  //   Copa                              <- title, wrapped across two rows
+  //   Pistola
+  //   OPTICS -- Overall Match Results
+  //
+  // where the longest resolving suffix is "PISTOLA OPTICS" (PO) but the
+  // truth is "OPTICS" alone (CO). The two shapes are indistinguishable from
+  // the text: both are letters on the rows above the header. A wrong
+  // division is worse than a dropped one — the drop warns at the call site
+  // and loses a page, the mislabel says nothing and files real scores under
+  // another division — so ambiguity resolves to the drop.
+  //
+  // Two limits, so the rule is not read as more than it is.
+  //
+  // First, "agreement" only has force when there is more than one candidate
+  // to agree. A two-row capture yields exactly one suffix, so the check is
+  // trivially satisfied and protects nothing. That is not fixable by
+  // demanding two candidates: "Copa Sur\nPISTOLA", the very shape #299 is
+  // about, is a two-row capture, and refusing it would make this whole retry
+  // a no-op. Disagreement is a signal; its absence is not a guarantee.
+  //
+  // Second, shedding rows can only undo contamination that respects row
+  // boundaries. Whatever survives on the header's own row is trusted whole.
+  // So "Copa\nPRODUCTION OPTICS -- ..." resolves to PO, where the base
+  // parser dropped the page: right under the reading that "Copa" is the
+  // title and "PRODUCTION OPTICS" the division, which is the ordinary one,
+  // and wrong if a title word were ever fused onto the header row and the
+  // division were bare OPTICS. Nothing in the text separates those, and no
+  // real PDF is known to produce the second. Recorded because it is a real
+  // widening: pages that used to drop now resolve on the strength of a row
+  // this code cannot audit.
+  let divisionCode = resolveDivisionCode(DISCIPLINE.IPSC, divisionRaw);
   if (!divisionCode) {
-    // División desconocida: ignoramos esta página silenciosamente. El
-    // resto del PDF sigue siendo válido.
+    const divisionRows = divisionCapture.split("\n");
+    const candidates = new Set<string>();
+    for (let i = 1; i < divisionRows.length; i++) {
+      const code = resolveDivisionCode(
+        DISCIPLINE.IPSC,
+        normalizeDivisionCapture(divisionRows.slice(i).join(" ")),
+      );
+      if (code) candidates.add(code);
+    }
+    if (candidates.size === 1) {
+      divisionCode = [...candidates][0] ?? null;
+    }
+  }
+  if (!divisionCode) {
+    // Unknown division: skip this page, the rest of the PDF is still valid.
+    // Not silent — the caller warns with the page number and a text snippet.
     return null;
   }
 
