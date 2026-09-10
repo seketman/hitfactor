@@ -79,6 +79,34 @@ If your change touches business logic (parsers, importer, stats, claim),
 please add or update the matching test in `tests/`. There are real fixtures for
 PractiScore, FBI CSV and WinMSS PDF to reproduce cases.
 
+### PDF parser fixtures
+
+The PDF parser tests (`winmss-pdf`, `fat-pdf`, `practiscore-pdf`,
+`steel-challenge-pdf`) are driven by inline text fixtures. That text is not
+"the text of the PDF": it has to come from the output of `extractPdfPages`,
+which is what the parsers actually receive. Generate it with:
+
+```bash
+npm run pdf:fixture -- path/to/file.pdf --ts   # paste-ready TS literal
+npm run pdf:fixture -- path/to/file.pdf        # plain text, page by page
+```
+
+Do **not** copy the text out of a PDF viewer, `pdftotext`, or an attachment
+dump. Those hand you the order the strings sit in the PDF's content stream,
+while `extractPdfPages` sorts the pdfjs items by position so the visual layout
+wins. The two are close enough to look identical and different enough to change
+what the parser does — and a fixture in the wrong order does not fail loudly,
+it fails as a different bug somewhere in the parser. That cost a debugging
+round in #296.
+
+Fixtures are usually trimmed down from that output — a handful of rows is
+enough to pin a parser — and replacing the names and scores with invented ones
+is fine too, and preferable in a public repo. What has to survive untouched is
+the row **order** and the **shape** of each row: that is what the parser reads,
+and it is what a copy-paste silently gets wrong.
+
+Real PDFs are not committed to the repo: they carry competitor names.
+
 ## Commit conventions
 
 We use **conventional commits** because

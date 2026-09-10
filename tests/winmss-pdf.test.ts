@@ -7,12 +7,18 @@ import {
 } from "@/lib/parsers/winmss-pdf";
 
 /**
- * Fixtures sintéticos basados en la salida real de pdf-parse para los
- * archivos WinMSS de ipsc.org.ar (formato del TFABA 1er SOCIAL ESCOPETA).
+ * Synthetic fixtures for the WinMSS files from ipsc.org.ar (the
+ * "TFABA 1er SOCIAL ESCOPETA" export format).
  *
- * Mantenemos el texto inline en lugar de subir PDFs al repo: los tests
- * corren contra `parseWinmssText` (pure function), y el binding con
- * pdf-parse se valida en el navegador cuando el usuario sube un PDF real.
+ * Fixture provenance (required): this text must match what `extractPdfPages`
+ * produces for the real PDF, row order included. Start from
+ * `npm run pdf:fixture -- <file.pdf> --ts`, then trim and anonymize — never
+ * start from a PDF viewer's copy-paste. See "PDF parser fixtures" in
+ * .github/CONTRIBUTING.md (#298).
+ *
+ * The text stays inline instead of committing PDFs to the repo: the tests
+ * run against `parseWinmssText` (a pure function), and the unpdf binding is
+ * exercised in the browser when a user uploads a real PDF.
  */
 
 const overallClassicPage = `SG CLASSIC -- Overall Match Results

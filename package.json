@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:types": "npx --yes supabase gen types typescript --project-id igsfjdhtaxsxcnxaopxu --schema public > src/lib/supabase/database.types.ts"
+    "db:types": "npx --yes supabase gen types typescript --project-id igsfjdhtaxsxcnxaopxu --schema public > src/lib/supabase/database.types.ts",
+    "pdf:fixture": "npx --yes tsx scripts/pdf-fixture.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

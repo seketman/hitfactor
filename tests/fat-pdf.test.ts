@@ -7,19 +7,25 @@ import {
 } from "@/lib/parsers/fat-pdf";
 
 /**
- * Fixture sintético del PDF de "RANKING OFICIAL" de la FAT (basado en el
- * archivo real de Tiro FBI "resultados-apertura-fbi.pdf").
+ * Synthetic fixture of the FAT "RANKING OFICIAL" PDF (based on the real
+ * Tiro FBI file "resultados-apertura-fbi.pdf").
  *
- * Los tests corren contra `parseFatText` (pure function): recibe el texto
- * ya extraído + el nombre del archivo, sin necesitar un PDF real.
+ * Fixture provenance (required): this text must match what `extractPdfPages`
+ * produces for the real PDF, row order included. Start from
+ * `npm run pdf:fixture -- <file.pdf> --ts`, then trim and anonymize — never
+ * start from a PDF viewer's copy-paste. See "PDF parser fixtures" in
+ * .github/CONTRIBUTING.md (#298).
  *
- * Puntos que ejercita el fixture:
- *  - `PISTOLA GENERAL` / `REVOLVER GENERAL`: rankings que generan entries.
- *  - `PISTOLA VETERANO`: subranking — NO duplica entries en la división PIS,
- *    solo etiqueta la categoría.
- *  - `DAMAS` / `CADETE MAYOR`: secciones sin división explícita — etiquetan
- *    categoría matcheando por nombre.
- *  - `CASTAGÑETO` vs `CASTAGNETO`: el match de nombres ignora acentos/ñ.
+ * The tests run against `parseFatText` (a pure function): it receives the
+ * already-extracted text plus the filename, so no real PDF is needed.
+ *
+ * What the fixture exercises:
+ *  - `PISTOLA GENERAL` / `REVOLVER GENERAL`: rankings that produce entries.
+ *  - `PISTOLA VETERANO`: a subranking — it does NOT duplicate entries in the
+ *    PIS division, it only labels the category.
+ *  - `DAMAS` / `CADETE MAYOR`: sections with no explicit division — they
+ *    label the category by matching on name.
+ *  - `CASTAGÑETO` vs `CASTAGNETO`: name matching ignores accents and ñ.
  */
 const FAT_FBI_TEXT = `RANKING OFICIAL
 PISTOLA GENERAL
