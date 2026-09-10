@@ -7,19 +7,24 @@ import {
 } from "@/lib/parsers/steel-challenge-pdf";
 
 /**
- * Fixtures sintéticos basados en la salida real del extractor de PDFs
- * (`reconstructTextByPosition`) sobre los archivos PractiScore iPhone de
- * Steel Challenge.
+ * Synthetic fixtures for the PractiScore iPhone Steel Challenge files.
  *
- * Cubren los dos sub-formatos relevantes:
- *   - "Stage Results - By Division" (un archivo por stage, con secciones
- *     Pcc y Pistola dentro).
- *   - "Category Leaders - <División>" (ignorados por el parser pero
- *     usados para validar la detección + error de "solo Category Leaders").
+ * Fixture provenance (required): this text must match what `extractPdfPages`
+ * produces for the real PDF, row order included. Start from
+ * `npm run pdf:fixture -- <file.pdf> --ts`, then trim and anonymize — never
+ * start from a PDF viewer's copy-paste. See "PDF parser fixtures" in
+ * .github/CONTRIBUTING.md (#298). The reordering itself lives in
+ * `reconstructTextByPosition`.
  *
- * Mantenemos el texto inline en lugar de subir PDFs al repo: los tests
- * corren contra `parseSteelChallengePdfs` (pure function), y el binding
- * con `unpdf` se valida cuando el usuario sube un PDF real.
+ * They cover the two relevant sub-formats:
+ *   - "Stage Results - By Division" (one file per stage, with Pcc and
+ *     Pistola sections inside).
+ *   - "Category Leaders - <Division>" (ignored by the parser, but used to
+ *     validate detection plus the "only Category Leaders" error).
+ *
+ * The text stays inline instead of committing PDFs to the repo: the tests
+ * run against `parseSteelChallengePdfs` (a pure function), and the unpdf
+ * binding is exercised when a user uploads a real PDF.
  */
 
 const stage1Text = `Steel Challenge

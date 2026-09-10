@@ -7,11 +7,17 @@ import {
 } from "@/lib/parsers/practiscore-pdf";
 
 /**
- * Fixtures basados en la salida real de `extractPdfPages` (unpdf) para los
- * PDFs que exporta la app PractiScore — caso "TFMDP 2do Social Escopeta".
+ * Fixtures for the PDFs exported by the PractiScore app — the
+ * "TFMDP 2do Social Escopeta" case.
  *
- * Los tests corren contra `parsePractiscorePdfText` (pure function). El
- * binding con unpdf se valida en el navegador cuando el usuario sube el PDF.
+ * Fixture provenance (required): this text must match what `extractPdfPages`
+ * produces for the real PDF, row order included. Start from
+ * `npm run pdf:fixture -- <file.pdf> --ts`, then trim and anonymize — never
+ * start from a PDF viewer's copy-paste. See "PDF parser fixtures" in
+ * .github/CONTRIBUTING.md (#298).
+ *
+ * The tests run against `parsePractiscorePdfText` (a pure function). The
+ * unpdf binding is exercised in the browser when a user uploads the PDF.
  */
 
 const overallPage = `TFMDP 2do Social Escopeta - 2026-04-25
