@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.4](https://github.com/seketman/hitfactor/compare/v1.30.3...v1.30.4) (2026-09-11)
+
+
+### Bug Fixes
+
+* **feedback:** make a lost Telegram notification leave a trace ([#288](https://github.com/seketman/hitfactor/issues/288)) ([#305](https://github.com/seketman/hitfactor/issues/305)) ([dd5fc46](https://github.com/seketman/hitfactor/commit/dd5fc46c540c20e04eb5515257fb9e11f5496ea6))
+
 ## [1.30.3](https://github.com/seketman/hitfactor/compare/v1.30.2...v1.30.3) (2026-09-08)
 
 
