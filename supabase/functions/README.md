@@ -96,6 +96,17 @@ order by h.created_at desc
 limit 3;
 ```
 
+That join is on the request id alone, which the sweep no longer does — see
+`0027_correlate_sweep_join_by_time.sql`, where an id shared with a much older
+hook could hand it the wrong outcome.
+
+What keeps it safe here is how it is used, not the SQL: you run it right after
+submitting, and read the newest row. Nothing in the query enforces that. Run it
+months later as a general audit and the same id-reuse applies — for that
+question use `ops.feedback_delivery_status` below. Not because the view
+correlates anything itself: it reads a log that `ops.sweep_feedback_notifications`
+already correlated by time when it wrote it.
+
 `timed_out` and `error_msg` are there because `status_code` and `content` are
 both null when pg_net gives up before the function answers — without those two
 columns that row reads as though nothing happened. 400 rather than 200 because
