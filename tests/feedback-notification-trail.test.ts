@@ -46,6 +46,19 @@ const MIGRATION = readFileSync(
 );
 
 /**
+ * 0027, which replaces the sweep with one that correlates a response to its
+ * hook by time as well as by id.
+ *
+ * Applied separately rather than folded into `MIGRATION` because the
+ * precondition tests below run 0026 on its own — they are about what 0026
+ * refuses to install on, and 0027 has nothing to say about that.
+ */
+const FIX = readFileSync(
+  join(process.cwd(), "supabase/migrations/0027_correlate_sweep_join_by_time.sql"),
+  "utf8",
+);
+
+/**
  * The platform objects the migration reads, as the platform defines them.
  *
  * `cron.schedule` and `cron.unschedule` record their calls instead of doing
@@ -202,6 +215,32 @@ async function ageFixture(days: number): Promise<void> {
   `);
 }
 
+/**
+ * Writes a response for `requestId` at a known offset from its own hook,
+ * computed in SQL from the hook's own `created_at`.
+ *
+ * The offset is what the correlation window is about, so it must not go
+ * through a JS `Date` — the same rounding trap `ageFixture` documents.
+ *
+ * Call it *after* any `ageFixture`, not before: it measures from the hook's
+ * timestamp as it stands, so moving the hook afterwards moves the offset with
+ * it. Getting that backwards put a "23 hours" response 71 hours out.
+ */
+async function pgNetAnsweredAfter(
+  requestId: number,
+  offset: string,
+  statusCode: number,
+): Promise<void> {
+  await db.query(
+    `insert into net._http_response (id, status_code, content, created)
+     select $1, $2, '{"ok":true}',
+            h.created_at + $3::interval
+     from supabase_functions.hooks h
+     where h.request_id = $1`,
+    [requestId, statusCode, offset],
+  );
+}
+
 async function sweep(): Promise<number> {
   const { rows } = await db.query<{ written: number }>(
     "select ops.sweep_feedback_notifications() as written",
@@ -221,6 +260,7 @@ beforeAll(async () => {
   db = await PGlite.create();
   await db.exec(PLATFORM);
   await db.exec(MIGRATION);
+  await db.exec(FIX);
 });
 
 beforeEach(async () => {
@@ -269,8 +309,20 @@ describe("0026 — the migration itself", () => {
   });
 
   it("applies twice without complaint", async () => {
-    await expect(db.exec(MIGRATION)).resolves.toBeDefined();
-    const { rows } = await db.query("select jobname from cron.job");
+    // Its own database, like the precondition tests above. Re-running 0026
+    // reinstalls its own `create or replace` of the sweep — the pre-0027
+    // version — so doing this on the shared instance left every later test
+    // depending on declaration order and a comment to put the fix back.
+    // Isolation removes the dependency instead of documenting it.
+    const bare = await PGlite.create();
+    await bare.exec(PLATFORM);
+    await bare.exec(MIGRATION);
+    await bare.exec(FIX);
+
+    await expect(bare.exec(MIGRATION)).resolves.toBeDefined();
+    await expect(bare.exec(FIX)).resolves.toBeDefined();
+
+    const { rows } = await bare.query("select jobname from cron.job");
     expect(rows).toHaveLength(1);
   });
 
@@ -827,6 +879,86 @@ describe("the sweep", () => {
       "select count(*)::int as n from ops.sweep_heartbeat where last_run_at > now() - interval '1 minute'",
     );
     expect(rows[0]!.n).toBe(1);
+  });
+
+  it("will not take an outcome from a response that merely shares an id", async () => {
+    // `net._http_response.id` is unique only for the life of the extension.
+    // Recreate `pg_net` and the sequence restarts, while
+    // `supabase_functions.hooks` keeps every request id the project ever
+    // issued — so a response written today can carry the id of a request
+    // made months ago. Matching on the id alone hands that old hook this
+    // outcome, and the error lands on the worst side: a delivery that failed
+    // reported as `delivered`.
+    const f = await submitFeedback();
+    await fireHook(f, 1);
+    await ageFixture(10);
+
+    // Same id, ten days later. Nothing to do with the hook above.
+    await pgNetAnswered(1, { statusCode: 200, content: '{"ok":true}' });
+    await sweep();
+
+    const { rows } = await db.query<{ status_code: number | null; response_lost: boolean }>(
+      "select status_code, response_lost from ops.feedback_notification_log",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.status_code).toBeNull();
+    expect(rows[0]!.response_lost).toBe(true);
+    expect(await deliveryOf(f)).toBe(
+      "unknown: the answer was purged before a sweep read it",
+    );
+  });
+
+  it("takes an answer up to the edge of the correlation window", async () => {
+    const f = await submitFeedback();
+    await fireHook(f, 1);
+    await ageFixture(2);
+    await pgNetAnsweredAfter(1, "23 hours", 200);
+    await sweep();
+
+    expect(await deliveryOf(f)).toBe("delivered");
+  });
+
+  it("will not take an answer from beyond it", async () => {
+    // The cost of the bound, stated plainly: a response really belonging to
+    // this hook but recorded more than a day later is no longer taken, and
+    // the row stays `response_lost`. That needs pg_net to be a day behind,
+    // by which point its own TTL would have purged the row anyway — but it
+    // is a narrowing of the late-correction path 0026 documents, so it is
+    // pinned rather than left to be discovered.
+    const f = await submitFeedback();
+    await fireHook(f, 1);
+    await ageFixture(2);
+    await pgNetAnsweredAfter(1, "25 hours", 200);
+    await sweep();
+
+    expect(await deliveryOf(f)).toBe(
+      "unknown: the answer was purged before a sweep read it",
+    );
+  });
+
+  it("excludes a response landing exactly on the window", async () => {
+    // `<`, not `<=`. One instant, and nothing else in the file pins it.
+    const f = await submitFeedback();
+    await fireHook(f, 1);
+    await ageFixture(2);
+    await pgNetAnsweredAfter(1, "24 hours", 200);
+    await sweep();
+
+    expect(await deliveryOf(f)).toBe(
+      "unknown: the answer was purged before a sweep read it",
+    );
+  });
+
+  it("still takes an outcome that arrives late but plausibly", async () => {
+    // The other side of the bound. Tightening it until a real backlog is
+    // excluded would trade a false `delivered` for a false `purged`, which
+    // is quieter but no more true.
+    const f = await submitFeedback(SETTLED_MINUTES);
+    await fireHook(f, 1);
+    await pgNetAnswered(1, { statusCode: 200, content: '{"ok":true}' });
+    await sweep();
+
+    expect(await deliveryOf(f)).toBe("delivered");
   });
 
   it("ignores hooks belonging to other triggers", async () => {
