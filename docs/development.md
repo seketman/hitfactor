@@ -58,6 +58,13 @@ Apply **all** the migrations in Supabase, in numeric order:
 > repository, where rotating it is the least of the problems. Everything else
 > here really is paste-and-run.
 
+> **0026 needs `pg_cron` enabled first** (Supabase → *Database → Extensions →
+> `pg_cron`). It also aborts rather than applying halfway, and for the same
+> reason: it installs a log of feedback-notification outcomes — deliveries as
+> well as failures — and a log that nothing ever writes to is indistinguishable
+> from one with nothing to report. It also needs 0025's trigger already in
+> place — it checks for it by name. Log rows are kept for 90 days.
+
 | # | File | What it does |
 |---|---|---|
 | 0001 | [`0001_initial_schema.sql`](../supabase/migrations/0001_initial_schema.sql) | Consolidated base schema: profiles, disciplines, divisions, shooters, matches, stages, match_entries, stage_results, firearms, match_firearm_log, clubs, audit_log, feedback + indexes, triggers, RLS and seeds |
@@ -85,6 +92,7 @@ Apply **all** the migrations in Supabase, in numeric order:
 | 0023 | [`0023_rls_to_clause_and_initplan.sql`](../supabase/migrations/0023_rls_to_clause_and_initplan.sql) | Rewrites every pre-0021 policy to `to authenticated` + `(select auth.uid())` — drops the deprecated `auth.role()` and clears the `auth_rls_initplan` advisory. No predicate changes (#207) |
 | 0024 | [`0024_steel_rfri_division.sql`](../supabase/migrations/0024_steel_rfri_division.sql) | `RFRI` (rimfire rifle, labelled Minirifle) for Steel Challenge — the division was missing, so any match running it failed to import |
 | 0025 | [`0025_feedback_telegram_webhook.sql`](../supabase/migrations/0025_feedback_telegram_webhook.sql) | `feedback_to_telegram` — the trigger that posts new feedback to the `feedback-telegram` Edge Function. Existed in production since June, created by hand and never committed. **Needs two session settings to apply; see the file's header** |
+| 0026 | [`0026_feedback_notification_trail.sql`](../supabase/migrations/0026_feedback_notification_trail.sql) | `ops.feedback_notification_log` + a `pg_cron` sweep that copies each feedback webhook's outcome out of `net._http_response` before `pg_net` purges it, so a lost notification leaves a trace that outlives the hour nobody was watching (#288). Kept for 90 days, with a heartbeat so a stopped sweep says so rather than reading as healthy. **Needs `pg_cron` and 0025's trigger; aborts without either** |
 
 If you add a migration, add its row here: there is a test
 (`tests/migrations-doc.test.ts`) that fails if the directory and this table
