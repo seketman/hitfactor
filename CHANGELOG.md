@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.5](https://github.com/seketman/hitfactor/compare/v1.30.4...v1.30.5) (2026-09-11)
+
+
+### Bug Fixes
+
+* **feedback:** correlate the sweep's response lookup by time, not id alone ([#307](https://github.com/seketman/hitfactor/issues/307)) ([81ce2cf](https://github.com/seketman/hitfactor/commit/81ce2cf71b8c996fb4b3f71dad24c8f72625b79e))
+
 ## [1.30.4](https://github.com/seketman/hitfactor/compare/v1.30.3...v1.30.4) (2026-09-11)
 
 
