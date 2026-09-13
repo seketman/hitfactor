@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.1](https://github.com/seketman/hitfactor/compare/v1.31.0...v1.31.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* **auth:** the confirmation template did not parse, so no email was sent ([#312](https://github.com/seketman/hitfactor/issues/312)) ([b506b55](https://github.com/seketman/hitfactor/commit/b506b55dce06fbc27d229c0bde40c6350f016954))
+
 ## [1.31.0](https://github.com/seketman/hitfactor/compare/v1.30.5...v1.31.0) (2026-09-13)
 
 
