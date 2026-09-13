@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.0](https://github.com/seketman/hitfactor/compare/v1.30.5...v1.31.0) (2026-09-13)
+
+
+### Features
+
+* **auth:** send the signup confirmation in the user's language ([#151](https://github.com/seketman/hitfactor/issues/151)) ([#310](https://github.com/seketman/hitfactor/issues/310)) ([500935a](https://github.com/seketman/hitfactor/commit/500935a8db10f548fe19fa6de567b798d1a832ad))
+
 ## [1.30.5](https://github.com/seketman/hitfactor/compare/v1.30.4...v1.30.5) (2026-09-11)
 
 
