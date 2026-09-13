@@ -119,6 +119,18 @@ npm run db:types     # regenerate src/lib/supabase/database.types.ts from the DB
 `supabase login`). Run it after applying a migration that changes the schema,
 so the typed Supabase client stays in sync.
 
+**You will be told if you forget.** That file is what supabase-js derives every
+row type from, so when it drifts `tsc` keeps checking against a schema that no
+longer exists and says nothing (#269).
+
+`tests/database-types-drift.test.ts` applies every migration to a real Postgres
+compiled to wasm and compares the schema against the committed file: base
+tables, their columns, nullability, type class, and the functions PostgREST
+exposes. It needs no token and no network, so it runs in CI like any other
+test. It does **not** look at `Insert`/`Update` shapes, `Enums`, `Views`,
+`CompositeTypes` or relationships — the test header says why, and where to
+extend it.
+
 ## Project structure
 
 See [`architecture.md`](./architecture.md).
