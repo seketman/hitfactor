@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { safeBackPath } from "@/lib/paths";
+import { resolveLocale } from "@/i18n/routing";
 
 /**
  * Endpoint para los flujos de OTP por mail: signup confirm, magic link,
@@ -53,6 +54,26 @@ export async function GET(request: Request) {
   const typeParam = searchParams.get("type") as EmailOtpType | null;
   const next = safeBackPath(searchParams.get("next"), "/dashboard");
 
+  // The language to land in, carried by the email template from the
+  // `locale` this account recorded at signup (#151). This route sits outside
+  // `[locale]`, so without it every confirmation landed in Spanish whatever
+  // the user had been reading.
+  //
+  // Two separately validated pieces rather than one. `next=/en/dashboard`
+  // would read better, but `isInternalAppPath` is a closed list of exact path
+  // shapes and none of them carry a locale — by convention, which its own
+  // comment states, though it gives an architectural reason rather than this
+  // one. Either way the effect is the same: accepting a prefix here means
+  // loosening a whitelist whose entire value is that it is closed, and that
+  // closedness is what stands between an emailed link and an open redirect
+  // (#218).
+  //
+  // So `next` stays a bare app path, and the locale arrives beside it as a
+  // closed set of three values that `resolveLocale` narrows, falling back to
+  // the default for an account that predates this or signed up through
+  // Google.
+  const locale = resolveLocale(searchParams.get("locale") ?? undefined);
+
   if (token_hash && typeParam && ALLOWED_TYPES.has(typeParam)) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({
@@ -60,13 +81,14 @@ export async function GET(request: Request) {
       token_hash,
     });
     if (!error) {
-      return NextResponse.redirect(new URL(next, origin));
+      return NextResponse.redirect(new URL(`/${locale}${next}`, origin));
     }
   }
 
-  // Error code rather than prose — this route is outside `[locale]`, so it
-  // has no locale to translate with. The login page does it.
+  // Still an error code rather than prose: this route has a locale to send
+  // the user to, but no catalogue to translate with. The login page does the
+  // wording, and now it does it in the right language.
   return NextResponse.redirect(
-    new URL("/login?authError=confirmFailed", origin),
+    new URL(`/${locale}/login?authError=confirmFailed`, origin),
   );
 }

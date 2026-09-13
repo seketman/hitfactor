@@ -352,6 +352,20 @@ El `(?:/|$)` ancla cada exclusión a un segmento completo. Sin él la lista excl
 
 Una ruta que falte en el matcher tampoco falla ruidosamente: se la redirige a `/<locale>/<ruta>`, que no existe, y devuelve 404. Así entró `/api/health` —307 a `/es/api/health`— con toda la suite en verde, porque a un matcher no lo prueba nada más que ejercitarlo. `tests/proxy-matcher.test.ts` lo cubre ahora.
 
+**The one place the locale leaves the app.** Everything above works because
+the request passes through the proxy. The signup confirmation email does not:
+Supabase Auth sends it, from one template per project, with no idea who is
+reading it (#151). So the locale is handed over explicitly — `signUp` writes
+it into `options.data`, the template branches on it, and the confirmation link
+carries it back so `/auth/confirm` can land the user in their own language
+despite sitting outside `[locale]`.
+
+It travels as its own query value rather than as a prefix on `next`, because
+`isInternalAppPath` is a closed list of bare path shapes and that closedness
+is what stands between an emailed link and an open redirect (#218).
+`supabase/templates/README.md` has the rest, including the two-part check and
+why a file there is a record and not a deployment.
+
 ### 5.6 Tema y diseño
 
 - **Modos**: claro / oscuro / sistema, gestionados por `next-themes`. El provider setea la clase `.dark` en `<html>` (la variant Tailwind v4 se define con `@custom-variant dark (&:where(.dark, .dark *))` en `globals.css`).
