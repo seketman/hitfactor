@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { safeBackPath } from "@/lib/paths";
+import { resolveLocale, routing } from "@/i18n/routing";
 
 /**
  * The invariant behind the #218 fix, stated as a property.
@@ -114,6 +115,18 @@ describe("the auth handlers use the safe composition", () => {
     expect(code(route)).not.toMatch(/`\$\{origin\}\$\{/);
   });
 
+  it("/auth/confirm narrows the locale before putting it in the path", () => {
+    // The same gap this block exists to close, for the value #151 added.
+    // The property tests above reproduce the composition rather than the
+    // route, so deleting `resolveLocale` from the handler leaves all of them
+    // green — I checked, by deleting it. This is what notices.
+    const source = code("confirm");
+    expect(source).toMatch(/resolveLocale\(\s*searchParams\.get\("locale"\)/);
+    // And the shape that would bypass it: the raw query value interpolated
+    // straight into the path.
+    expect(source).not.toMatch(/`\/\$\{\s*searchParams\.get/);
+  });
+
   it("the comment stripper doesn't blank the file (sanity check)", () => {
     // If the regexes above ever ate the whole source, every assertion in
     // this block would pass vacuously.
@@ -121,6 +134,62 @@ describe("the auth handlers use the safe composition", () => {
       expect(code(route)).toContain("NextResponse.redirect");
       expect(code(route).length).toBeGreaterThan(200);
     }
+  });
+});
+
+/**
+ * `/auth/confirm` gained a second query value in #151: the language to land
+ * in, which it prefixes onto the path. That is a new way for a query string to
+ * reach the URL constructor, so it gets the same treatment as `next`.
+ *
+ * What stands in front of it is `resolveLocale`, which answers with one of
+ * three literals or the default and never with its argument. The composition
+ * below is the route's, reproduced here for the same reason the one above is:
+ * exercising the handler itself would need a Supabase session.
+ */
+describe("the locale prefix cannot leave the origin either", () => {
+  function resolveLocalized(next: string | null, locale: string | null): URL {
+    return new URL(
+      `/${resolveLocale(locale ?? undefined)}${safeBackPath(next, "/dashboard")}`,
+      ORIGIN,
+    );
+  }
+
+  const hostileLocales = [
+    "@evil.example",
+    "//evil.example",
+    "../..",
+    "es/../../evil.example",
+    "https://evil.example",
+    "javascript:alert(1)",
+    "",
+  ];
+
+  it.each(hostileLocales)("locale %s stays on the origin", (locale) => {
+    expect(resolveLocalized("/dashboard", locale).host).toBe(ORIGIN_HOST);
+  });
+
+  it("every hostile locale falls back to the default rather than half-applying", () => {
+    // Landing on the origin is not enough: a value that survived into the
+    // path would send the user to a 404 at best, and at worst somewhere a
+    // future route happens to serve.
+    for (const locale of hostileLocales) {
+      expect(resolveLocalized("/dashboard", locale).pathname).toBe(
+        `/${routing.defaultLocale}/dashboard`,
+      );
+    }
+  });
+
+  it("a hostile next and a hostile locale together still land safely", () => {
+    const url = resolveLocalized("@evil.example", "@evil.example");
+    expect(url.host).toBe(ORIGIN_HOST);
+    expect(url.pathname).toBe(`/${routing.defaultLocale}/dashboard`);
+  });
+
+  it.each(routing.locales)("%s reaches its own prefix", (locale) => {
+    const url = resolveLocalized("/matches", locale);
+    expect(url.host).toBe(ORIGIN_HOST);
+    expect(url.pathname).toBe(`/${locale}/matches`);
   });
 });
 

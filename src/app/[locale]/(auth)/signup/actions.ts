@@ -27,6 +27,22 @@ export async function signup(formData: FormData) {
     options: {
       data: {
         display_name: displayName,
+        // The language the account was created in, which is the only chance
+        // to learn it: Supabase sends the confirmation email itself, from a
+        // single template, with no idea who is reading it. The template
+        // branches on `{{ .Data.locale }}` — see `supabase/templates/` — and
+        // `/auth/confirm` uses it to land the user in their own language.
+        //
+        // It is metadata, not a preference: nothing reads it back to decide
+        // what the app shows. That stays with the `NEXT_LOCALE` cookie and
+        // the URL prefix.
+        //
+        // And it is not ours alone once written. Any authenticated user can
+        // overwrite their own `user_metadata` with
+        // `supabase.auth.updateUser({ data: … })`, never passing through
+        // here. So the template branches on this value but never echoes it
+        // into a link, and `/auth/confirm` narrows whatever arrives.
+        locale,
       },
     },
   });

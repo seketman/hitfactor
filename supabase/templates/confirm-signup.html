@@ -1,0 +1,68 @@
+<!--
+  Confirm signup — Supabase Auth → Email Templates → "Confirm signup".
+
+  This file is the record, not the deployment. Supabase renders the copy that
+  lives in the dashboard; committing this changes nothing until somebody
+  pastes it. See README.md in this directory, and the same warning at the top
+  of supabase/functions/README.md — which learned it the hard way, and has no
+  issue number because nobody filed one.
+
+  Three things are load-bearing and easy to break by tidying:
+
+  1. The link must point here, not at Supabase's own /auth/v1/verify. The
+     header of src/app/auth/confirm/route.ts explains why: verify confirms
+     the email server-side without setting cookies on our domain, so a
+     browser holding another session lands logged in as the wrong user.
+
+  2. `locale` on the query string is what lands the user in their own
+     language (#151). Each link carries the literal its own branch already
+     established — not `{{ .Data.locale }}`.
+
+     That is not caution for its own sake. `user_metadata` is not ours
+     alone: any authenticated user can overwrite their own with
+     `supabase.auth.updateUser({ data: … })`, straight against Supabase,
+     never passing through `resolveLocale`. Interpolating it back into an
+     href would put a value we do not control inside an attribute, and
+     whether GoTrue's mailer escapes it is Supabase's business, not
+     something this repo can check.
+
+     Inside `{{ if eq .Data.locale "en" }}` the language is already known,
+     so the variable was redundant anyway. The `{{ else }}` branch gains
+     the most: it renders Spanish for *any* unrecognised value, and now
+     says so — before, it forwarded the garbage and relied on
+     `resolveLocale` to fall back.
+
+  3. The final `{{ else }}` is the Spanish branch and also the fallback.
+     Accounts created before #151, and anyone who signed up through Google,
+     have no `locale` in their metadata and arrive here.
+-->
+{{ if eq .Data.locale "en" }}
+<h2>Confirm your account</h2>
+<p>Welcome to HitFactor. One click and you are in:</p>
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&locale=en">
+    Confirm my account
+  </a>
+</p>
+<p>If you did not create this account, ignore this email — nothing happens without that click.</p>
+
+{{ else if eq .Data.locale "pt-BR" }}
+<h2>Confirme sua conta</h2>
+<p>Bem-vindo ao HitFactor. Um clique e você entra:</p>
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&locale=pt-BR">
+    Confirmar minha conta
+  </a>
+</p>
+<p>Se você não criou esta conta, ignore este e-mail — nada acontece sem esse clique.</p>
+
+{{ else }}
+<h2>Confirmá tu cuenta</h2>
+<p>Bienvenido a HitFactor. Un click y entrás:</p>
+<p>
+  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&locale=es">
+    Confirmar mi cuenta
+  </a>
+</p>
+<p>Si no creaste esta cuenta, ignorá este mail — sin ese click no pasa nada.</p>
+{{ end }}
