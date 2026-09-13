@@ -11,17 +11,24 @@ import { routing } from "@/i18n/routing";
  * account recorded at signup — the approach Supabase documents for this, since
  * there is no per-language variant to select.
  *
- * **Why this file is only a text check, and why that is not the usual mistake.**
- * `supabase/functions/README.md` records that scanning source as text was tried
- * for the Edge Function and did not work: a substring is not a scope, and
- * regressions walked straight through it. The difference here is that there is
- * nothing to execute. The artifact is Go template text destined for a dashboard
- * field, rendered by a mailer nobody here can run. So this checks the few
- * properties that are genuinely textual, and claims nothing else.
+ * **Why this is a text check, and what that cost once.**
+ * There is nothing here to execute: the artifact is Go template text destined
+ * for a dashboard field, rendered by a mailer nobody in this repo can run. So
+ * these assertions are textual by necessity.
  *
- * What it cannot check at all is the thing most likely to be wrong: whether
- * the dashboard holds what this file says. That stays with the two-part check
- * in the directory's README.
+ * The first version stopped there, and shipped a template that would not
+ * parse. The explanatory comment at the top of the file contained
+ * `{{ if … }}` written to describe the branch below it — and Go parses
+ * actions everywhere, with no idea that HTML calls that a comment. The
+ * unclosed block broke the whole template, GoTrue sent nothing, and the
+ * failure surfaced as an email that simply never arrived: no error, no
+ * bounce, a dashboard that looked fine. A person signed up and waited.
+ *
+ * So the checks below include the two rules Go actually enforces and a text
+ * scan can too — actions balance, and none of them hide inside a comment.
+ * Assertions about the copy are still out of reach, and so is the thing most
+ * likely to be wrong: whether the dashboard holds what this file says. That
+ * stays with the two-part check in the directory's README.
  */
 
 const TEMPLATE = readFileSync(
@@ -55,6 +62,64 @@ function branchedLocales(): Set<string> {
   if (/\{\{\s*else\s*\}\}/.test(TEMPLATE)) covered.add(routing.defaultLocale);
   return covered;
 }
+
+/** Every `{{ … }}` action, wherever it sits — Go makes no exception. */
+function actions(source = TEMPLATE): string[] {
+  return [...source.matchAll(/\{\{[^}]*\}\}/g)].map((m) => m[0]);
+}
+
+/** The HTML comments, which Go does not treat as comments at all. */
+function htmlComments(): string[] {
+  return [...TEMPLATE.matchAll(/<!--[\s\S]*?-->/g)].map((m) => m[0]);
+}
+
+describe("the template still parses", () => {
+  // These two are the rules Go enforces that broke this file once. Neither
+  // needs a Go toolchain to check, which is the only reason the first version
+  // of this suite had an excuse for missing them.
+
+  it("hides no template action inside an HTML comment", () => {
+    // The bug: `{{ if … }}` written in prose to explain the branch below it.
+    // Go opened a block there and never found its end, the template failed to
+    // parse, and the mailer sent nothing at all.
+    //
+    // Stricter than Go, and the reason is not the one first written here.
+    // Go accepts a self-contained action in a comment — its own
+    // `{{/* … */}}`, which opens no block — and carving that out would be a
+    // single `startsWith`. It is absent because nobody needs a Go comment
+    // inside an HTML comment, and a rule with no exceptions is easier to
+    // obey than one with a footnote. Not because the distinction is hard.
+    const buried = htmlComments().flatMap((c) => actions(c));
+    expect(buried, "describe actions without braces — see the file header").toEqual([]);
+  });
+
+  it("balances every action that opens a block", () => {
+    // All five of Go's block openers, and the trim markers all of them
+    // accept. The first version of this counted only `if`, which fails both
+    // ways once anything else appears: an unclosed `define` slips through
+    // because its `end` is counted with nothing to match, and a *correct*
+    // `define` fails because that same `end` has no opener. Neither sound nor
+    // safe — a check that is wrong in both directions is worse than none,
+    // because it teaches people to delete it.
+    //
+    // Balance, not a count. Pinning "exactly one `if`" would fail on a second
+    // conditional somebody adds for a good reason.
+    //
+    // This is a hand-rolled approximation of a grammar, and it has already
+    // been wrong twice. The real answer is to parse the file with Go, which
+    // is how the original break was actually found — kept out of CI because
+    // `ubuntu-latest` carries Go only in its toolcache, so it would mean a
+    // `setup-go` step and a suite that cannot run without a Go toolchain. If
+    // this rule is wrong a third time, pay that price instead of widening it
+    // again.
+    const OPENS = /^\{\{-?\s*(if|range|with|define|block)\b/;
+    const ENDS = /^\{\{-?\s*end\s*-?\}\}$/;
+    const opens = actions().filter((a) => OPENS.test(a)).length;
+    const ends = actions().filter((a) => ENDS.test(a)).length;
+    expect(opens).toBeGreaterThan(0);
+    expect({ opens, ends }).toEqual({ opens, ends: opens });
+  });
+});
 
 describe("the signup confirmation template", () => {
   it("has a branch for every locale the app serves", () => {

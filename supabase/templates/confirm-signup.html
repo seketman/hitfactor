@@ -7,6 +7,15 @@
   of supabase/functions/README.md — which learned it the hard way, and has no
   issue number because nobody filed one.
 
+  NOTHING IN THIS COMMENT MAY CONTAIN TEMPLATE BRACES. Go parses actions
+  everywhere in the file and does not care that HTML calls this a comment, so
+  an "if" written here to explain one opens a block that never closes and the
+  whole template fails to parse. GoTrue then sends nothing at all — no error
+  reaches the user, no email arrives, and the dashboard looks fine. That is
+  not hypothetical: it is how this file shipped the first time, and it cost a
+  signup that never got its confirmation. Say "the eq .Data.locale branch",
+  never the braced form.
+
   Three things are load-bearing and easy to break by tidying:
 
   1. The link must point here, not at Supabase's own /auth/v1/verify. The
@@ -14,27 +23,23 @@
      the email server-side without setting cookies on our domain, so a
      browser holding another session lands logged in as the wrong user.
 
-  2. `locale` on the query string is what lands the user in their own
-     language (#151). Each link carries the literal its own branch already
-     established — not `{{ .Data.locale }}`.
+  2. Each link carries the literal locale its own branch already established,
+     never the .Data.locale variable (#151).
 
-     That is not caution for its own sake. `user_metadata` is not ours
-     alone: any authenticated user can overwrite their own with
-     `supabase.auth.updateUser({ data: … })`, straight against Supabase,
-     never passing through `resolveLocale`. Interpolating it back into an
-     href would put a value we do not control inside an attribute, and
-     whether GoTrue's mailer escapes it is Supabase's business, not
-     something this repo can check.
+     That is not caution for its own sake. user_metadata is not ours alone:
+     any authenticated user can overwrite their own with
+     supabase.auth.updateUser, straight against Supabase, never passing
+     through resolveLocale. Interpolating it back into an href would put a
+     value we do not control inside an attribute, and whether GoTrue's mailer
+     escapes it is Supabase's business, not something this repo can check.
 
-     Inside `{{ if eq .Data.locale "en" }}` the language is already known,
-     so the variable was redundant anyway. The `{{ else }}` branch gains
-     the most: it renders Spanish for *any* unrecognised value, and now
-     says so — before, it forwarded the garbage and relied on
-     `resolveLocale` to fall back.
+     Inside a branch that already tested the language, the variable was
+     redundant anyway. The final fallback gains the most: it renders Spanish
+     for any unrecognised value, and now says so.
 
-  3. The final `{{ else }}` is the Spanish branch and also the fallback.
-     Accounts created before #151, and anyone who signed up through Google,
-     have no `locale` in their metadata and arrive here.
+  3. The last branch is the Spanish copy and also the fallback. Accounts
+     created before #151, and anyone who signed up through Google, have no
+     locale in their metadata and arrive there.
 -->
 {{ if eq .Data.locale "en" }}
 <h2>Confirm your account</h2>
