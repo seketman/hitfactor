@@ -78,5 +78,38 @@ the one that gets skipped:
 
 `tests/auth-email-template.test.ts` checks that the template has a branch for
 every locale in `routing.locales`, so adding a fourth language fails there
-rather than silently sending it Spanish. What no test can check is whether the
-dashboard holds what this file says.
+rather than silently sending it Spanish. It also checks two rules Go enforces
+that a text scan can reach — one of which this file broke, the other its near
+neighbour. See below. What no test can check is whether the dashboard holds
+what this file says.
+
+## The failure this file already had
+
+The first version did not parse, and nothing here noticed.
+
+The explanatory comment at the top contained `{{ if … }}`, written to describe
+the branch below it. **Go parses actions everywhere and does not care that
+HTML calls that a comment.** The unclosed block broke the whole template.
+
+What that looked like from outside is the part worth remembering: a signup
+happened, no email arrived, no error appeared anywhere, and the dashboard
+looked perfectly fine. The same shape as #288 — the failure that reports
+nothing is the expensive one.
+
+Two consequences, both now enforced by the test file:
+
+- **No template braces in the comment.** Describe a branch as `the eq
+  .Data.locale branch`, never in its braced form.
+- **Block actions must balance** across the whole file, comments included —
+  all five of `if`, `range`, `with`, `define` and `block`, in both their plain
+  and trim-marker forms.
+
+The second rule is a hand-rolled approximation of Go's grammar, and it has
+been wrong twice: first by counting only `if`, which let an unclosed `define`
+through *and* rejected a correct one. Parsing the file with `html/template`
+and executing it against a sample `.Data` beats every assertion here — it is
+how the original break was found, after it had already shipped — but it stays
+out of CI because `ubuntu-latest` carries Go only in its toolcache, so it
+would mean a `setup-go` step and a suite that cannot run without a Go
+toolchain. **If the rule is wrong a third time, pay that price rather than
+widen it again.**
