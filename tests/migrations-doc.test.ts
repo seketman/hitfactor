@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { migrationFiles } from "./helpers/pg-platform";
 
 /**
  * La tabla de migraciones de `docs/development.md` es la guía para levantar
@@ -13,14 +14,7 @@ import { describe, expect, it } from "vitest";
  * test es esa verificación.
  */
 
-const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
 const DOC_PATH = join(process.cwd(), "docs/development.md");
-
-function migrationFiles(): string[] {
-  return readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
-    .sort();
-}
 
 function doc(): string {
   return readFileSync(DOC_PATH, "utf8");

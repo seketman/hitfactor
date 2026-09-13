@@ -1,6 +1,7 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { MIGRATIONS_DIR, migrationFiles } from "./helpers/pg-platform";
 
 /**
  * Guardrail sobre las policies de escritura (#195).
@@ -31,8 +32,6 @@ import { describe, expect, it } from "vitest";
  * porqué — la idea es que saltearlo sea una decisión consciente y visible
  * en el diff, no un descuido.
  */
-
-const MIGRATIONS_DIR = join(process.cwd(), "supabase/migrations");
 
 /** Policies exentas, con la razón. Vacío hoy: ninguna lo necesita. */
 const ALLOWLIST = new Set<string>();
@@ -110,9 +109,7 @@ function parsePolicies(sql: string, file: string): Policy[] {
 function effectivePolicyMap(excludeFile?: string): Map<string, Policy> {
   const byKey = new Map<string, Policy>();
 
-  for (const file of readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
-    .sort()) {
+  for (const file of migrationFiles()) {
     if (file === excludeFile) continue;
     const sql = readFileSync(join(MIGRATIONS_DIR, file), "utf8");
     for (const p of parsePolicies(sql, file)) {

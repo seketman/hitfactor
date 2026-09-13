@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PGlite } from "@electric-sql/pglite";
+import type { PGlite } from "@electric-sql/pglite";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { createPlatform } from "./helpers/pg-platform";
 
 /**
  * Behavioural coverage for `0026_feedback_notification_trail.sql` (#288).
@@ -59,45 +60,18 @@ const FIX = readFileSync(
 );
 
 /**
- * The platform objects the migration reads, as the platform defines them.
+ * What this file needs on top of the shared platform stubs: the feedback table
+ * and the trigger 0026 checks for by name.
  *
- * `cron.schedule` and `cron.unschedule` record their calls instead of doing
- * anything, which is also how the migration's own precondition gets exercised:
- * it looks for `cron.schedule(text,text,text)` by exact signature, so a stub
- * with the wrong arity would fail the migration here rather than pass quietly.
+ * `public.feedback` is a stand-in, not the real 0001 table — only the columns
+ * 0026 touches. The migrations that create it for real are applied by
+ * `database-types-drift.test.ts`, which is where their shape is guarded.
+ *
+ * The trigger does nothing: what the real one calls is platform code that
+ * cannot run here, and every test writes its own hooks row anyway. Its name
+ * and the table it sits on are the part under test.
  */
-const PLATFORM = `
-  create schema net;
-  create table net._http_response (
-    id            bigint primary key,
-    status_code   integer,
-    content_type  text,
-    headers       jsonb,
-    content       text,
-    timed_out     boolean,
-    error_msg     text,
-    created       timestamptz not null default now()
-  );
-
-  create schema supabase_functions;
-  create table supabase_functions.hooks (
-    id             bigserial primary key,
-    hook_table_id  integer     not null,
-    hook_name      text        not null,
-    created_at     timestamptz not null default now(),
-    request_id     bigint
-  );
-
-  create schema cron;
-  create table cron.job (jobid bigserial primary key, jobname text, schedule text, command text);
-  create function cron.schedule(job_name text, schedule text, command text)
-    returns bigint language sql as
-    $$ insert into cron.job (jobname, schedule, command)
-       values (job_name, schedule, command) returning jobid $$;
-  create function cron.unschedule(job_name text) returns boolean language sql as
-    $$ delete from cron.job where jobname = job_name returning true $$;
-
-  -- Only the columns 0026 touches. The real table is in 0001.
+const FEEDBACK_TABLE = `
   create table public.feedback (
     id         bigserial primary key,
     type       text        not null default 'bug',
@@ -105,18 +79,10 @@ const PLATFORM = `
     created_at timestamptz not null default now()
   );
 
-  -- 0025's trigger, by the name 0026 checks for. It does nothing here:
-  -- the tests write hooks rows themselves, because what the real trigger
-  -- calls (supabase_functions.http_request) is platform code this cannot
-  -- run. The name and the table it sits on are the part under test.
   create function public.feedback_to_telegram_stub() returns trigger
     language plpgsql as $$ begin return new; end $$;
   create trigger feedback_to_telegram after insert on public.feedback
     for each row execute function public.feedback_to_telegram_stub();
-
-  -- Roles the migration revokes from. They exist on every Supabase project.
-  create role anon;
-  create role authenticated;
 `;
 
 let db: PGlite;
@@ -257,8 +223,7 @@ async function deliveryOf(feedbackId: number): Promise<string> {
 }
 
 beforeAll(async () => {
-  db = await PGlite.create();
-  await db.exec(PLATFORM);
+  db = await createPlatform(FEEDBACK_TABLE);
   await db.exec(MIGRATION);
   await db.exec(FIX);
 });
@@ -295,8 +260,7 @@ describe("0026 — the migration itself", () => {
   });
 
   it("aborts rather than installing a log nothing fills", async () => {
-    const bare = await PGlite.create();
-    await bare.exec(PLATFORM);
+    const bare = await createPlatform(FEEDBACK_TABLE);
     await bare.exec("drop function cron.schedule(text, text, text)");
 
     await expect(bare.exec(MIGRATION)).rejects.toThrow(/pg_cron is not installed/);
@@ -314,8 +278,7 @@ describe("0026 — the migration itself", () => {
     // version — so doing this on the shared instance left every later test
     // depending on declaration order and a comment to put the fix back.
     // Isolation removes the dependency instead of documenting it.
-    const bare = await PGlite.create();
-    await bare.exec(PLATFORM);
+    const bare = await createPlatform(FEEDBACK_TABLE);
     await bare.exec(MIGRATION);
     await bare.exec(FIX);
 
@@ -331,8 +294,7 @@ describe("0026 — the migration itself", () => {
     // grants none on a new schema, so that assertion passes just as well
     // with the `revoke` lines deleted from the migration. Granting first is
     // what gives the test something to observe.
-    const bare = await PGlite.create();
-    await bare.exec(PLATFORM);
+    const bare = await createPlatform(FEEDBACK_TABLE);
     await bare.exec(`
       create schema ops;
       grant usage on schema ops to anon, authenticated;
@@ -358,8 +320,7 @@ describe("0026 — the migration itself", () => {
   });
 
   it("refuses to install without pg_net or Database Webhooks", async () => {
-    const bare = await PGlite.create();
-    await bare.exec(PLATFORM);
+    const bare = await createPlatform(FEEDBACK_TABLE);
     await bare.exec("drop table supabase_functions.hooks");
 
     await expect(bare.exec(MIGRATION)).rejects.toThrow(
@@ -371,8 +332,7 @@ describe("0026 — the migration itself", () => {
     // A disabled trigger passes an existence check and fires nothing, which
     // installs a sweep that matches no hook and leaves an empty log — the
     // same healthy-looking nothing as no trigger at all.
-    const bare = await PGlite.create();
-    await bare.exec(PLATFORM);
+    const bare = await createPlatform(FEEDBACK_TABLE);
     await bare.exec(
       "alter table public.feedback disable trigger feedback_to_telegram",
     );
@@ -387,8 +347,7 @@ describe("0026 — the migration itself", () => {
     // project with a webhook of any other kind has them, so checking for
     // them would install a sweep that matches no hook and leaves an empty
     // log — the healthy-looking nothing this whole file is about.
-    const bare = await PGlite.create();
-    await bare.exec(PLATFORM);
+    const bare = await createPlatform(FEEDBACK_TABLE);
     await bare.exec("drop trigger feedback_to_telegram on public.feedback");
 
     await expect(bare.exec(MIGRATION)).rejects.toThrow(
