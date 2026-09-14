@@ -62,6 +62,61 @@ that a branch exists per locale, never what it says.
    setting cookies on our domain, so a browser already holding a session lands
    logged in as the previous user.
 
+## Two traps before you can check it
+
+Both were found the expensive way, while verifying this template in
+production, and both look exactly like a broken language branch.
+
+### An account that already exists keeps its first language
+
+Signing up again with an address that already exists as an unconfirmed user
+does not rewrite its `locale`. GoTrue — the service behind Supabase Auth —
+skips the update deliberately, in `internal/api/signup.go`:
+
+```go
+if user != nil {
+    if (params.Provider == EmailProvider && user.IsConfirmed()) || /* … */ {
+        return UserExistsError
+    }
+    // do not update the user because we can't be sure of their claimed identity
+}
+```
+
+**It does not skip the email.** Further down the same transaction:
+
+```go
+if params.Provider == EmailProvider && !user.IsConfirmed() {
+    if config.Mailer.Autoconfirm {
+        // …
+    } else {
+        // … models.UserConfirmationRequestedAction …
+        if terr = a.sendConfirmation(r, tx, user, flowType); terr != nil {
+            // …
+```
+
+So the request answers 200 and a confirmation does go out — carrying the
+`locale` of the *first* signup. A second language tested on the same address
+reports a broken branch that was never reached.
+
+Use a different address per language. `+alias` is enough, and
+`src/app/[locale]/(auth)/signup/actions.ts` puts the exact destination in the
+notice it shows after signup, so you can tell which alias an email belongs to.
+
+Deleting the user does clear the metadata, but it does not refund the budget
+in the trap below.
+
+### The built-in SMTP sends two emails per hour, for the whole project
+
+`auth.rate_limits.email.inbuilt_smtp_per_hour` in
+`packages/shared-data/config.ts` of `supabase/supabase` — the file the docs
+table renders from — is `2`. Three languages do not fit in one hour. The third
+attempt returns 429, and the app currently reports that to the user as "check
+the details and try again", which is #313.
+
+Custom SMTP lifts the limit. It is also worth doing for its own sake:
+Supabase documents the built-in service as best-effort only, with no SLA on
+delivery or uptime, and intended for testing with project members.
+
 ## Checking it
 
 Sign up in each language and read what arrives. Three things, and the third is
