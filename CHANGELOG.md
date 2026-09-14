@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.2](https://github.com/seketman/hitfactor/compare/v1.31.1...v1.31.2) (2026-09-14)
+
+
+### Documentation
+
+* **templates:** record the two traps that invalidate a locale email test ([#315](https://github.com/seketman/hitfactor/issues/315)) ([67349d9](https://github.com/seketman/hitfactor/commit/67349d927ea05c30c3e01a8c9ead0e847be2bed8))
+
 ## [1.31.1](https://github.com/seketman/hitfactor/compare/v1.31.0...v1.31.1) (2026-09-13)
 
 
