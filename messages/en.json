@@ -650,7 +650,8 @@
     "createFailed": "That couldn't be created. Try again.",
     "invalidCredentials": "Wrong email or password.",
     "emailNotConfirmed": "Your email isn't confirmed yet. Check the inbox for {email} and click the link we sent when you signed up. If you can't see it, look in your spam folder.",
-    "signupFailed": "The account couldn't be created. Check the details and try again."
+    "signupFailed": "The account couldn't be created. Check the details and try again.",
+    "signupRateLimit": "The signup couldn't be completed due to a temporary limit. Your details are fine — try again in a little while."
   },
   "activityLog": {
     "matchImport": "You imported the match \"{name}\"",

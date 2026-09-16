@@ -710,6 +710,7 @@
     "createFailed": "Não foi possível criar. Tente de novo.",
     "invalidCredentials": "E-mail ou senha incorretos.",
     "emailNotConfirmed": "Seu e-mail ainda não foi confirmado. Confira a caixa de {email} e clique no link que enviamos no cadastro. Se não aparecer, veja a pasta de spam.",
-    "signupFailed": "Não foi possível criar a conta. Confira os dados e tente de novo."
+    "signupFailed": "Não foi possível criar a conta. Confira os dados e tente de novo.",
+    "signupRateLimit": "Não foi possível concluir o cadastro por um limite temporal. Seus dados estão corretos — tente de novo em breve."
   }
 }

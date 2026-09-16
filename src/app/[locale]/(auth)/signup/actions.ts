@@ -48,6 +48,17 @@ export async function signup(formData: FormData) {
   });
 
   if (error) {
+    // Rate-limit: the email budget is per *project*, not per account.
+    // A 429 leaks nothing (identical response whether the address exists,
+    // does not exist, or is malformed), so the enumeration argument that
+    // justifies hiding every other cause simply does not apply here.
+    if (error.status === 429 || error.code === "over_email_send_rate_limit" || error.code === "over_request_rate_limit") {
+      redirectWithError("/signup", t("signupRateLimit"), locale, {
+        context: "auth.signup.rateLimit",
+        detail: error.message,
+      });
+    }
+
     // Genérico a propósito. `error.message` de GoTrue viaja siempre en
     // inglés y distingue causas —entre ellas "el email ya está
     // registrado"—, así que ponerlo en la URL era enumeración de cuentas
