@@ -709,8 +709,8 @@
     "subtitle": "A chronological record of the changes you made to your data. Only you can see this list.",
     "emptyTitle": "No activity recorded yet.",
     "emptyBody": "Anything you do (importing a match, assigning a firearm, linking an entry to your account, and so on) will show up here.",
-    "paginationCaption": "{total, plural, one {# action} other {# actions}} · page {page} of {totalPages}",
-    "prev": "← Previous",
-    "next": "Next →"
+    "itemOne": "action",
+    "itemMany": "actions",
+    "paginationCaption": "{total, plural, one {# action} other {# actions}} · page {page} of {totalPages}"
   }
 }

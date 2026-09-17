@@ -2,7 +2,7 @@ import { Link } from "@/i18n/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
+import { Pagination } from "@/components/Pagination";
 import { requireUser } from "@/lib/supabase/require-user";
 import { listAuditLog } from "@/lib/db/audit";
 import { describeAuditEntry } from "@/lib/audit/render";
@@ -81,54 +81,19 @@ export default async function ActivityPage({ searchParams }: PageProps) {
       )}
 
       {totalPages > 1 && (
-        <Pagination page={page} totalPages={totalPages} total={total} />
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          basePath="/activity"
+          itemLabel={{ one: t("itemOne"), many: t("itemMany") }}
+          caption={
+            <span className="text-xs text-fg-subtle">
+              {t("paginationCaption", { total, page, totalPages })}
+            </span>
+          }
+        />
       )}
     </PageContainer>
-  );
-}
-
-async function Pagination({
-  page,
-  totalPages,
-  total,
-}: {
-  page: number;
-  totalPages: number;
-  total: number;
-}) {
-  const t = await getTranslations("activityLog");
-  const prev = page > 1 ? page - 1 : null;
-  const next = page < totalPages ? page + 1 : null;
-
-  return (
-    <nav className="mt-6 flex items-center justify-between gap-3 text-sm">
-      <span className="text-xs text-fg-subtle">
-        {t("paginationCaption", { total, page, totalPages })}
-      </span>
-      <div className="flex gap-2">
-        {prev ? (
-          <Link href={`/activity?page=${prev}`}>
-            <Button variant="ghost" size="sm">
-              {t("prev")}
-            </Button>
-          </Link>
-        ) : (
-          <Button variant="ghost" size="sm" disabled>
-            {t("prev")}
-          </Button>
-        )}
-        {next ? (
-          <Link href={`/activity?page=${next}`}>
-            <Button variant="ghost" size="sm">
-              {t("next")}
-            </Button>
-          </Link>
-        ) : (
-          <Button variant="ghost" size="sm" disabled>
-            {t("next")}
-          </Button>
-        )}
-      </div>
-    </nav>
   );
 }
