@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   describeFetchFailure,
   handleRequest,
@@ -377,6 +377,17 @@ describe("secretsMatch", () => {
 
   it("refuses a missing header without hashing anything", async () => {
     expect(await secretsMatch(null, "abc")).toBe(false);
+  });
+
+  it("hashes both inputs via crypto.subtle.digest (catches === replacement)", async () => {
+    const spy = vi.spyOn(crypto.subtle, "digest");
+
+    try {
+      await secretsMatch("presented", "expected");
+      expect(spy).toHaveBeenCalledTimes(2);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
