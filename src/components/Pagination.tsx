@@ -14,10 +14,10 @@ interface PaginationProps {
   totalPages: number;
   /** Total de items (para mostrar "N torneos"). */
   total: number;
-  /** Items por página actuales. */
-  size: number;
-  /** Opciones del selector de tamaño. */
-  sizes: ReadonlyArray<number>;
+  /** Items por página actuales. Requerido si se provee `sizes`. */
+  size?: number;
+  /** Opciones del selector de tamaño. Si se omite, el selector se oculta. */
+  sizes?: ReadonlyArray<number>;
   /** Ruta base de la página, ej `/matches`. */
   basePath: string;
   /** Etiqueta singular/plural del recurso paginado. */
@@ -29,6 +29,11 @@ interface PaginationProps {
    * `?size` de la URL — esto solo cambia el default de la próxima visita.
    */
   onSizeChange?: (size: number) => Promise<void>;
+  /**
+   * Caption custom. Si se provee, reemplaza el caption default
+   * (selector + "Page X of Y (N items)").
+   */
+  caption?: React.ReactNode;
 }
 
 /**
@@ -52,12 +57,15 @@ export function Pagination({
   basePath,
   itemLabel,
   onSizeChange,
+  caption,
 }: PaginationProps) {
   const router = useRouter();
   const selectId = useId();
   const t = useTranslations("matches.pagination");
 
-  const buildHref = (p: number) => `${basePath}?page=${p}&size=${size}`;
+  const effectiveSize = size ?? 10;
+  const buildHref = (p: number) =>
+    sizes ? `${basePath}?page=${p}&size=${effectiveSize}` : `${basePath}?page=${p}`;
 
   const handleSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newSize = Number(e.target.value);
@@ -76,36 +84,60 @@ export function Pagination({
 
   return (
     <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-sm">
-      <div className="flex items-center gap-2 text-fg-muted">
-        <label htmlFor={selectId} className="text-xs uppercase tracking-wider">
-          {t("perPage")}
-        </label>
-        <select
-          id={selectId}
-          value={size}
-          onChange={handleSizeChange}
-          className="h-8 rounded-md border border-border bg-surface-2 px-2 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-        >
-          {sizes.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <span className="ml-2">
-          {totalPages > 1 ? (
+      {caption ?? (
+        <div className="flex items-center gap-2 text-fg-muted">
+          {sizes && (
             <>
-              {t("page")} <span className="text-fg">{page}</span> {t("of")}{" "}
-              <span className="text-fg">{totalPages}</span>{" "}
-              <span className="text-fg-subtle">
-                ({t("countItem", { count: total, item: itemWord })})
+              <label
+                htmlFor={selectId}
+                className="text-xs uppercase tracking-wider"
+              >
+                {t("perPage")}
+              </label>
+              <select
+                id={selectId}
+                value={effectiveSize}
+                onChange={handleSizeChange}
+                className="h-8 rounded-md border border-border bg-surface-2 px-2 text-sm text-fg focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              >
+                {sizes.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+              <span className="ml-2">
+                {totalPages > 1 ? (
+                  <>
+                    {t("page")} <span className="text-fg">{page}</span>{" "}
+                    {t("of")} <span className="text-fg">{totalPages}</span>{" "}
+                    <span className="text-fg-subtle">
+                      ({t("countItem", { count: total, item: itemWord })})
+                    </span>
+                  </>
+                ) : (
+                  <>{t("countItem", { count: total, item: itemWord })}</>
+                )}
               </span>
             </>
-          ) : (
-            <>{t("countItem", { count: total, item: itemWord })}</>
           )}
-        </span>
-      </div>
+          {!sizes && (
+            <span>
+              {totalPages > 1 ? (
+                <>
+                  {t("page")} <span className="text-fg">{page}</span>{" "}
+                  {t("of")} <span className="text-fg">{totalPages}</span>{" "}
+                  <span className="text-fg-subtle">
+                    ({t("countItem", { count: total, item: itemWord })})
+                  </span>
+                </>
+              ) : (
+                <>{t("countItem", { count: total, item: itemWord })}</>
+              )}
+            </span>
+          )}
+        </div>
+      )}
 
       {totalPages > 1 && (
         <nav className="flex items-center gap-1" aria-label={t("ariaLabel")}>

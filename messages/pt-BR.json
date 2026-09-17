@@ -668,9 +668,9 @@
     "subtitle": "Registro cronológico das alterações que você fez nos seus dados. Só você pode ver esta lista.",
     "emptyTitle": "Ainda não há atividade registrada.",
     "emptyBody": "Qualquer ação que você fizer (importar um match, atribuir uma arma, vincular uma participação à sua conta etc.) vai aparecer aqui.",
-    "paginationCaption": "{total, plural, one {# ação} other {# ações}} · página {page} de {totalPages}",
-    "prev": "← Anterior",
-    "next": "Próxima →"
+    "itemOne": "ação",
+    "itemMany": "ações",
+    "paginationCaption": "{total, plural, one {# ação} other {# ações}} · página {page} de {totalPages}"
   },
   "actionError": {
     "incompleteData": "Dados incompletos",
