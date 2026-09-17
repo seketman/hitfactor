@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.3](https://github.com/seketman/hitfactor/compare/v1.31.2...v1.31.3) (2026-09-17)
+
+
+### Refactors
+
+* **pagination:** replace local activity pagination with shared component ([#318](https://github.com/seketman/hitfactor/issues/318)) ([8934c16](https://github.com/seketman/hitfactor/commit/8934c16b8c06dccee1695fb448a2254d3dd5230c)), closes [#276](https://github.com/seketman/hitfactor/issues/276)
+
 ## [1.31.2](https://github.com/seketman/hitfactor/compare/v1.31.1...v1.31.2) (2026-09-14)
 
 
