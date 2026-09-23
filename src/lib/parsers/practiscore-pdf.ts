@@ -65,6 +65,8 @@ const KNOWN_DIVISION_CODES = new Set([
   "S",
   "SM",
   "CO",
+  // Optics as abbreviated in the Div column of PractiScore Android reports.
+  "OP",
   "R",
   "CL",
   "CM",
@@ -98,6 +100,13 @@ export function parsePractiscorePdfText(
     throw new ParserError("emptyPdf");
   }
 
+  // Browser print chrome must go before any title-based detection: every
+  // page-level helper below reads the page's first line.
+  const cleanPages = pages.map((page) => ({
+    ...page,
+    text: stripBrowserPrintChrome(page.text),
+  }));
+
   const matchEntries: ParsedMatchEntry[] = [];
 
   let matchName = "";
@@ -125,7 +134,7 @@ export function parsePractiscorePdfText(
   let prevStageNumber: number | null = null;
   const usedStageNumbers = new Set<number>();
 
-  for (const page of pages) {
+  for (const page of cleanPages) {
     const isStagePage = /Stage\s+Results\s*-/i.test(page.text);
     const isOverallPage = /Match\s+Results\s*-/i.test(page.text);
     if (!isStagePage && !isOverallPage) {
@@ -221,6 +230,34 @@ export function parsePractiscorePdfText(
     stages,
     generatedBy: "PractiScore",
   };
+}
+
+// Print chrome a browser adds to every page when the PractiScore HTML report
+// is printed to PDF (the files published on ipsc.org.ar as `winmss_*.pdf`):
+//   header: "22/9/26, 14:47 <HTML title>" (en-US: "9/22/26, 2:47 PM <title>")
+//   footer: "file:///C:/.../results.html 1/2" (URL + page n/m)
+// The header would otherwise be read as the page title, hiding the real one.
+const BROWSER_PRINT_HEADER_RE =
+  /^\d{1,2}\/\d{1,2}\/\d{2,4},\s*\d{1,2}:\d{2}(?:\s*[AP]M)?\s+\S.*$/i;
+const BROWSER_PRINT_FOOTER_RE = /^(?:file|https?):\/\/\S.*\s\d+\/\d+$/i;
+
+/**
+ * Removes the browser print header (first non-empty line) and footer (last
+ * non-empty line) from a page, if present. Pages without chrome are returned
+ * unchanged. The header is dropped rather than accepted as a title so that
+ * continuation pages, which carry it too, are not mistaken for new stages.
+ */
+function stripBrowserPrintChrome(text: string): string {
+  const lines = text.split(/\n/);
+  const first = lines.findIndex((l) => l.trim() !== "");
+  if (first !== -1 && BROWSER_PRINT_HEADER_RE.test(lines[first]!.trim())) {
+    lines.splice(first, 1);
+  }
+  const last = lines.findLastIndex((l) => l.trim() !== "");
+  if (last !== -1 && BROWSER_PRINT_FOOTER_RE.test(lines[last]!.trim())) {
+    lines.splice(last, 1);
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -349,16 +386,19 @@ function extractExplicitStageNumber(text: string): number | null {
  *  - "Stage 4 Campo 13" → "Campo 13"   (iPhone)
  *  - "Campo 4B"         → "Campo 4B"    (iPhone, sin número)
  *  - "Ejercicio 1"      → "Ejercicio 1" (Android)
+ *  - "Etapa 1 Campo 2"  → "Campo 2"     (Android)
  * `null` si no hay descriptor (overall, o título sólo "Nombre - fecha").
  */
 function extractStageName(text: string): string | null {
   const firstLine = text.split(/\n/)[0] ?? "";
   const m =
-    /-\s*((?:Stage\s+\d+\s+)?Campo\b[^-]*?|(?:Ejercicio|Etapa)\s+\d+)\s*-\s*\d{4}-\d{2}-\d{2}/i.exec(
+    /-\s*((?:(?:Stage|Ejercicio|Etapa)\s+\d+\s+)?Campo\b[^-]*?|(?:Ejercicio|Etapa)\s+\d+)\s*-\s*\d{4}-\d{2}-\d{2}/i.exec(
       firstLine,
     );
   if (!m) return null;
-  return m[1]!.replace(/^Stage\s+\d+\s+/i, "").trim() || null;
+  return (
+    m[1]!.replace(/^(?:Stage|Ejercicio|Etapa)\s+\d+\s+/i, "").trim() || null
+  );
 }
 
 /**
