@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.4](https://github.com/seketman/hitfactor/compare/v1.31.3...v1.31.4) (2026-09-23)
+
+
+### Bug Fixes
+
+* **parsers:** parse PractiScore reports printed to PDF from a browser ([#321](https://github.com/seketman/hitfactor/issues/321)) ([a42f1c8](https://github.com/seketman/hitfactor/commit/a42f1c81c64e76f9af76d55b550295b9913fa273))
+
 ## [1.31.3](https://github.com/seketman/hitfactor/compare/v1.31.2...v1.31.3) (2026-09-17)
 
 
