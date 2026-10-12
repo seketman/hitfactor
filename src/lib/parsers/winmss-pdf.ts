@@ -171,9 +171,50 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
   let matchName = "";
   let matchDate = "";
 
+  // Last ranking section read, so a page without a section header can be
+  // attached to it. ESS prints the division header only on the first page of
+  // a division; the rest of a long division arrives header-less.
+  let context: ContinuationContext | null = null;
+
   for (const page of pages) {
-    const parsed = parsePage(page.text);
+    let parsed = parsePage(page.text);
+    const places = dataRowPlaces(page.text);
+    const hasHeader = hasSectionHeader(page.text);
+    let continued = false;
+
+    if (!parsed && !hasHeader) {
+      if (context && continuesSection(page.text, places, context)) {
+        context.rowCount += places.length;
+        context.lastPlace = places.at(-1) ?? context.lastPlace;
+        if (context.kind === "skipped") {
+          console.warn(
+            `[winmss-pdf] page ${page.num} skipped (continues a skipped section).`,
+          );
+          continue;
+        }
+        parsed = continuationPage(page.text, context);
+        continued = true;
+      } else if (places.length > 0 || essDqRowCount(page.text) > 0) {
+        // Result rows (or ESS DQ rows) that belong to no section we can name.
+        // Stop the import rather than drop them: this is how a 182-shooter
+        // division used to land with its first 56 rows and a success screen.
+        const rowCount = places.length || essDqRowCount(page.text);
+        dropped.push(`página ${page.num}: leímos 0 de ${rowCount} filas`);
+        context = null;
+        continue;
+      }
+    }
+
     if (!parsed) {
+      // A section we could not resolve (unknown division, no stage number)
+      // takes its own continuation pages with it.
+      if (hasHeader) {
+        context = {
+          kind: "skipped",
+          rowCount: places.length,
+          lastPlace: places.at(-1) ?? 0,
+        };
+      }
       // Diagnóstico: la página no se mapeó a ninguna división conocida o no
       // tiene header. Dejamos snippet en logs para investigar.
       console.warn(
@@ -187,6 +228,7 @@ export function parseWinmssText(pages: WinmssPage[]): ParsedMatch {
 
     matchName = matchName || parsed.matchName;
     matchDate = matchDate || parsed.date;
+    if (!continued) context = sectionContext(parsed, page.text, places);
 
     // Chequeo de sanidad por página. Va antes de acumular para que el
     // mensaje pueda nombrar la página exacta.
@@ -366,11 +408,173 @@ interface DqPageResult {
  * exactamente el bug que queremos atajar.
  */
 function countUnparsedDataRows(text: string, parsedRows: number): number {
-  let candidates = 0;
-  for (const line of text.split(/\n/)) {
-    if (/^\s*\d+\s+\d/.test(line) && line.includes(",")) candidates++;
+  return Math.max(0, dataRowPlaces(text).length - parsedRows);
+}
+
+/**
+ * Section headers of every page shape `parsePage` reads. They live here, and
+ * not inline, because `hasSectionHeader` must agree with `parsePage` on what
+ * a header is. No `g` flag, so `exec` and `test` stay stateless.
+ */
+const DQ_PAGE_HEADER_RE = /Disqualified\s+Shooters/i;
+const OVERALL_HEADER_RES: readonly RegExp[] = [
+  /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Match\s+Results/i,
+  /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Overall(?!\s+Stage)/i,
+];
+const STAGE_HEADER_RES: readonly RegExp[] = [
+  /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Stage\s+Results/i,
+  // Variante ESS de guion simple ("CLASSIC - Overall Stage Results"). Va
+  // después del clásico `--` para que ese gane cuando ambos podrían aplicar.
+  /([A-Z][A-Z\s]*?)\s+-\s*Overall\s+Stage\s+Results/i,
+  /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Stage\s+\d+/i,
+];
+const ESS_BY_STAGE_HEADER_RE = /([A-Z][A-Z\s]*?)\s+-\s*Results\s+by\s+Stage/i;
+
+/** First match among `patterns`, tried in order. */
+function firstMatch(
+  patterns: readonly RegExp[],
+  text: string,
+): RegExpExecArray | null {
+  for (const re of patterns) {
+    const m = re.exec(text);
+    if (m) return m;
   }
-  return Math.max(0, candidates - parsedRows);
+  return null;
+}
+
+/**
+ * `true` when the page carries any section header `parsePage` looks for. A
+ * page that fails this is a continuation page, or not a ranking at all.
+ */
+function hasSectionHeader(text: string): boolean {
+  return (
+    DQ_PAGE_HEADER_RE.test(text) ||
+    firstMatch(OVERALL_HEADER_RES, text) != null ||
+    firstMatch(STAGE_HEADER_RES, text) != null ||
+    ESS_BY_STAGE_HEADER_RE.test(text)
+  );
+}
+
+/**
+ * What a header-less page would continue: the section of the last page that
+ * had a header, plus how far its ranking got.
+ *
+ * `rowCount` and `lastPlace` are both kept because they diverge on a tie:
+ * after "14, 15, 15" three rows were read but the last place is 15.
+ */
+type ContinuationContext = { rowCount: number; lastPlace: number } & (
+  | { kind: "overall"; divisionCode: string }
+  | {
+      kind: "stage";
+      divisionCode: string;
+      stageNumber: number;
+      /** ESS by-stage rows (5 columns) vs. stage rows with 8 columns. */
+      essRows: boolean;
+    }
+  | { kind: "skipped" }
+);
+
+/**
+ * Leading place of every line shaped like a result row. Same test as
+ * `countUnparsedDataRows`, so the two agree on what a row is.
+ */
+function dataRowPlaces(text: string): number[] {
+  const places: number[] = [];
+  for (const line of text.split(/\n/)) {
+    const m = /^\s*(\d+)\s+\d/.exec(line);
+    if (m && line.includes(",")) places.push(parseInt(m[1]!, 10));
+  }
+  return places;
+}
+
+/** Number of ESS disqualified rows: "<bib> <Surname, Name> DQ". */
+function essDqRowCount(text: string): number {
+  return text
+    .split(/\n/)
+    .filter((line) => /^\s*\d+\s+.+?\s+DQ\s*$/.test(line)).length;
+}
+
+/**
+ * Whether a header-less page picks up where `context` left off.
+ *
+ * With result rows, the first place has to follow the ranking: either the
+ * next one by count, or a repeat of the last place when a tie straddles the
+ * page break ("…, 15 | 15, 17"). Anything else is not provably this section,
+ * and the caller fails the import instead of guessing.
+ *
+ * A page whose first place is 1 never continues a section: it starts over,
+ * so it is a new section whose header we failed to read, and attaching it
+ * would file a whole division under the one before it. That holds even when
+ * the previous section read no ranked rows (a header page of DQ rows only),
+ * where "the next place by count" would also be 1.
+ *
+ * Without result rows, only a page of ESS DQ rows continues a section — ESS
+ * lists the disqualified after the ranking, and in a long division they can
+ * spill onto a page of their own. That needs a row parser that reads them,
+ * which the 8-column stage one does not.
+ */
+function continuesSection(
+  text: string,
+  places: number[],
+  context: ContinuationContext,
+): boolean {
+  if (places.length > 0) {
+    const first = places[0]!;
+    if (first === 1) return false;
+    return first === context.rowCount + 1 || first === context.lastPlace;
+  }
+  if (context.kind === "stage" && !context.essRows) return false;
+  return essDqRowCount(text) > 0;
+}
+
+/** Context a page with a header opens for the pages that follow it. */
+function sectionContext(
+  parsed: OverallPageResult | StagePageResult | DqPageResult,
+  text: string,
+  places: number[],
+): ContinuationContext | null {
+  const progress = { rowCount: places.length, lastPlace: places.at(-1) ?? 0 };
+  if (parsed.kind === "overall") {
+    return { kind: "overall", divisionCode: parsed.divisionCode, ...progress };
+  }
+  if (parsed.kind === "stage") {
+    return {
+      kind: "stage",
+      divisionCode: parsed.divisionCode,
+      stageNumber: parsed.stageNumber,
+      essRows: ESS_BY_STAGE_HEADER_RE.test(text),
+      ...progress,
+    };
+  }
+  // The classic DQ page names the division on each row; nothing to inherit.
+  return null;
+}
+
+/**
+ * Reads a header-less page as more rows of the section in `context`. Name and
+ * date are left empty so the page never contributes to the match title.
+ */
+function continuationPage(
+  text: string,
+  context: Exclude<ContinuationContext, { kind: "skipped" }>,
+): OverallPageResult | StagePageResult {
+  if (context.kind === "overall") {
+    return {
+      kind: "overall",
+      divisionCode: context.divisionCode,
+      matchName: "",
+      date: "",
+      entries: parseOverallRows(text),
+    };
+  }
+  return {
+    kind: "stage",
+    divisionCode: context.divisionCode,
+    stageNumber: context.stageNumber,
+    matchName: "",
+    date: "",
+    results: context.essRows ? parseEssStageRows(text) : parseStageRows(text),
+  };
 }
 
 /**
@@ -393,7 +597,7 @@ function parsePage(
   // Devolvemos matchName/date vacíos para que esta página no contribuya al
   // nombre del match (el title/fecha vienen de las páginas overall que se
   // procesan antes).
-  if (/Disqualified\s+Shooters/i.test(text)) {
+  if (DQ_PAGE_HEADER_RE.test(text)) {
     return {
       kind: "dq",
       matchName: "",
@@ -409,17 +613,9 @@ function parsePage(
   //    con filas 5-col (mismo shape que overall — no hay raw hits/time/factor).
   //  - ESS stage (guion simple): "X - Overall Stage Results" + subheader
   //    "Stage NN" (pelado, cero-padded) + filas 8-col como el WinMSS clásico.
-  const overallMatch =
-    /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Match\s+Results/i.exec(text) ??
-    /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Overall(?!\s+Stage)/i.exec(text);
-  const stageHeaderMatch =
-    /([A-Z][A-Z\s]*?)\s*--\s*Overall\s+Stage\s+Results/i.exec(text) ??
-    // Variante ESS de guion simple ("CLASSIC - Overall Stage Results"). Va
-    // después del clásico `--` para que ese gane cuando ambos podrían aplicar.
-    /([A-Z][A-Z\s]*?)\s+-\s*Overall\s+Stage\s+Results/i.exec(text) ??
-    /([A-Z][A-Z\s]*?)\s+-\s*Results\s+Stage\s+\d+/i.exec(text);
-  const essByStageMatch =
-    /([A-Z][A-Z\s]*?)\s+-\s*Results\s+by\s+Stage/i.exec(text);
+  const overallMatch = firstMatch(OVERALL_HEADER_RES, text);
+  const stageHeaderMatch = firstMatch(STAGE_HEADER_RES, text);
+  const essByStageMatch = ESS_BY_STAGE_HEADER_RE.exec(text);
 
   if (!overallMatch && !stageHeaderMatch && !essByStageMatch) return null;
 

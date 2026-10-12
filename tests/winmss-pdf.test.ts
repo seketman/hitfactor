@@ -1165,3 +1165,371 @@ World Classification System used Page 1`),
     );
   });
 });
+
+describe("parseWinmssText — continuation pages without a section header", () => {
+  // ESS prints "<DIVISION> - Results Overall" only on the first page of a
+  // division. A division that does not fit on one page continues on pages
+  // that carry the title, the column header and the rows, and nothing that
+  // names the division. Those pages used to be skipped with a warning, so a
+  // long division was imported truncated and the import reported success.
+  //
+  // Shapes taken from a real ESS overall export (10 pages, two divisions
+  // spanning several); names and numbers are made up.
+  const title = `TORNEO DE PRUEBA - Handgun
+Printed: Jul 27, 2026 12:20:57`;
+  const footer = "Printed Jul 27, 2026 12:20:57 ESS - Electronic Scoring System";
+  const overallColumns = "% Points Competitor Cat Reg Cls Tag ICS";
+
+  const overallPage = (division: string, ...rows: string[]) =>
+    [title, `${division} - Results Overall`, overallColumns, ...rows, footer].join(
+      "\n",
+    );
+  // Same page minus the division header.
+  const headerless = (...rows: string[]) =>
+    [title, overallColumns, ...rows, footer].join("\n");
+
+  const productionFirst = overallPage(
+    "PRODUCTION",
+    "1 100.00 500.0000 11 ROJAS, Ana ARG",
+    "2 90.00 450.0000 12 SOSA, Bruno S ARG",
+  );
+  const productionRest = headerless(
+    "3 80.00 400.0000 13 VERA, Carla ARG",
+    "4 70.00 350.0000 14 DIAZ, Dario ARG B",
+  );
+
+  const divisionsOf = (parsed: ReturnType<typeof parseWinmssText>) =>
+    parsed.matchEntries.map((e) => `${e.divisionCode}:${e.shooter.fullName}`);
+
+  it("attaches a contiguous continuation page to the division above it", () => {
+    const parsed = parseWinmssText(pages(productionFirst, productionRest));
+    expect(divisionsOf(parsed)).toEqual([
+      "P:ROJAS, Ana",
+      "P:SOSA, Bruno",
+      "P:VERA, Carla",
+      "P:DIAZ, Dario",
+    ]);
+    expect(parsed.matchEntries.map((e) => e.place)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("does not let a continuation page change the match name or date", () => {
+    const parsed = parseWinmssText(pages(productionFirst, productionRest));
+    expect(parsed.name).toBe("TORNEO DE PRUEBA - Handgun");
+    expect(parsed.date).toBe("2026-07-27");
+  });
+
+  it("attaches a continuation page that only holds DQ rows", () => {
+    const onlyDq = headerless("21 LUNA, Elena DQ", "22 PAZ, Fabio S ARG DQ");
+    const parsed = parseWinmssText(pages(productionFirst, onlyDq));
+    const dq = parsed.matchEntries.filter((e) => e.isDq);
+    expect(dq.map((e) => e.shooter.fullName)).toEqual([
+      "LUNA, Elena",
+      "PAZ, Fabio",
+    ]);
+    expect(dq.every((e) => e.divisionCode === "P")).toBe(true);
+    expect(parsed.matchEntries).toHaveLength(4);
+  });
+
+  it("keeps two consecutive multi-page divisions apart", () => {
+    const productionTail = headerless(
+      "3 80.00 400.0000 13 VERA, Carla ARG",
+      "21 LUNA, Elena DQ",
+    );
+    const opticsFirst = overallPage(
+      "PRODUCTION OPTICS",
+      "1 100.00 480.0000 31 MORA, Gina ARG",
+      "2 95.00 456.0000 32 RUIZ, Hugo ARG",
+    );
+    const opticsTail = headerless(
+      "3 60.00 288.0000 33 CANO, Ines ARG",
+      "34 NIETO, Joel DQ",
+    );
+    const parsed = parseWinmssText(
+      pages(productionFirst, productionTail, opticsFirst, opticsTail),
+    );
+    expect(divisionsOf(parsed)).toEqual([
+      "P:ROJAS, Ana",
+      "P:SOSA, Bruno",
+      "P:VERA, Carla",
+      "P:LUNA, Elena",
+      "PO:MORA, Gina",
+      "PO:RUIZ, Hugo",
+      "PO:CANO, Ines",
+      "PO:NIETO, Joel",
+    ]);
+  });
+
+  it("follows a division across more than one continuation page", () => {
+    const third = headerless("5 60.00 300.0000 15 GIL, Karen ARG");
+    const parsed = parseWinmssText(
+      pages(productionFirst, productionRest, third),
+    );
+    expect(parsed.matchEntries).toHaveLength(5);
+    expect(parsed.matchEntries.every((e) => e.divisionCode === "P")).toBe(true);
+  });
+
+  it("accepts a tie that straddles the page break (…, 2 | 2, 4)", () => {
+    const tiedRest = headerless(
+      "2 90.00 450.0000 13 VERA, Carla ARG",
+      "4 70.00 350.0000 14 DIAZ, Dario ARG",
+    );
+    const parsed = parseWinmssText(pages(productionFirst, tiedRest));
+    expect(parsed.matchEntries.map((e) => e.place)).toEqual([1, 2, 2, 4]);
+    expect(parsed.matchEntries.every((e) => e.divisionCode === "P")).toBe(true);
+  });
+
+  it("accepts a tie that ends right before the page break (…, 2, 2 | 4)", () => {
+    const tiedFirst = overallPage(
+      "PRODUCTION",
+      "1 100.00 500.0000 11 ROJAS, Ana ARG",
+      "2 90.00 450.0000 12 SOSA, Bruno S ARG",
+      "2 90.00 450.0000 13 VERA, Carla ARG",
+    );
+    const rest = headerless("4 70.00 350.0000 14 DIAZ, Dario ARG");
+    const parsed = parseWinmssText(pages(tiedFirst, rest));
+    expect(parsed.matchEntries.map((e) => e.place)).toEqual([1, 2, 2, 4]);
+  });
+
+  it("fails the import when a header-less page leaves a gap in the places", () => {
+    const gap = headerless(
+      "5 60.00 300.0000 15 GIL, Karen ARG",
+      "6 50.00 250.0000 16 LEAL, Omar ARG",
+    );
+    expectParserError(
+      () => parseWinmssText(pages(productionFirst, gap)),
+      "partialRows",
+    );
+  });
+
+  it("does not read a page that starts over at place 1 as a tie", () => {
+    // A one-shooter division ends at place 1. A header-less page that also
+    // starts at 1 is a new section with an unread header, not a tie.
+    const single = overallPage("STANDARD", "1 100.00 500.0000 61 ROJAS, Ana ARG");
+    const restart = headerless(
+      "1 100.00 480.0000 62 SOSA, Bruno ARG",
+      "2 90.00 432.0000 63 VERA, Carla ARG",
+    );
+    expectParserError(
+      () => parseWinmssText(pages(single, restart)),
+      "partialRows",
+    );
+  });
+
+  it("fails the import when a header-less page with rows has no section before it", () => {
+    expectParserError(
+      () => parseWinmssText(pages(productionRest, productionFirst)),
+      "partialRows",
+    );
+  });
+
+  it("does not attach rows across a section it could not place", () => {
+    // The gap page is refused, and so is what follows it: after a refusal
+    // there is no section left to continue.
+    const gap = headerless("7 40.00 200.0000 17 PINO, Raul ARG");
+    const afterGap = headerless("8 30.00 150.0000 18 SANZ, Tina ARG");
+    expectParserError(
+      () => parseWinmssText(pages(productionFirst, gap, afterGap)),
+      "partialRows",
+    );
+  });
+
+  it("still skips a header-less page with no rows", () => {
+    const cover = [title, footer].join("\n");
+    const parsed = parseWinmssText(
+      pages(productionFirst, cover, productionRest),
+    );
+    // The blank page is ignored and does not break the division in two.
+    expect(parsed.matchEntries).toHaveLength(4);
+    expect(parsed.matchEntries.every((e) => e.divisionCode === "P")).toBe(true);
+  });
+
+  it("skips the continuation of an unknown division along with it", () => {
+    const unknownFirst = overallPage(
+      "FOOBAR",
+      "1 100.00 500.0000 41 ROCA, Ulises ARG",
+      "2 90.00 450.0000 42 VIDAL, Wanda ARG",
+    );
+    const unknownRest = headerless("3 80.00 400.0000 43 YANEZ, Zoe ARG");
+    const parsed = parseWinmssText(
+      pages(productionFirst, unknownFirst, unknownRest),
+    );
+    expect(divisionsOf(parsed)).toEqual(["P:ROJAS, Ana", "P:SOSA, Bruno"]);
+  });
+
+  it("continues an ESS by-stage section (5-column rows)", () => {
+    const stageFirst = [
+      title,
+      "CLASSIC - Results by Stage",
+      "Stage Classic - Stage 03",
+      overallColumns,
+      "1 100.00 155.0000 58 ROJAS, Ana ARG",
+      "2 79.04 122.5174 51 SOSA, Bruno ARG",
+      footer,
+    ].join("\n");
+    const stageRest = headerless(
+      "3 60.00 93.0000 52 VERA, Carla ARG",
+      "4 0.00 0.0000 53 DIAZ, Dario ARG",
+    );
+    const parsed = parseWinmssText(pages(stageFirst, stageRest));
+    expect(parsed.stages).toHaveLength(1);
+    expect(parsed.stages[0]?.stageNumber).toBe(3);
+    const results = parsed.stages[0]?.results ?? [];
+    expect(results.map((r) => r.shooter.fullName)).toEqual([
+      "ROJAS, Ana",
+      "SOSA, Bruno",
+      "VERA, Carla",
+      "DIAZ, Dario",
+    ]);
+    expect(results.every((r) => r.divisionCode === "CL")).toBe(true);
+  });
+
+  it("continues an ESS 'Overall Stage Results' section (8-column rows)", () => {
+    const stageColumns =
+      "Points Time Hit Factor Stage Pts Stage % # Competitor Name";
+    const stageFirst = [
+      title,
+      "PRODUCTION - Overall Stage Results",
+      "Stage 02",
+      stageColumns,
+      "1 104 22.66 4.5896 120.0000 100.00 1 ROJAS, Ana",
+      "2 97 23.96 4.0484 105.8505 88.21 11 SOSA, Bruno",
+      footer,
+    ].join("\n");
+    const stageRest = [
+      title,
+      stageColumns,
+      "3 90 25.00 3.6000 94.1258 78.44 12 VERA, Carla",
+      footer,
+    ].join("\n");
+    const parsed = parseWinmssText(pages(stageFirst, stageRest));
+    expect(parsed.stages).toHaveLength(1);
+    expect(parsed.stages[0]?.stageNumber).toBe(2);
+    const results = parsed.stages[0]?.results ?? [];
+    expect(results.map((r) => r.place)).toEqual([1, 2, 3]);
+    expect(results[2]?.hitFactor).toBe(3.6);
+    expect(results.every((r) => r.divisionCode === "P")).toBe(true);
+  });
+
+  it("continues a classic WinMSS stage section (8-column rows, decimal comma)", () => {
+    const stageRest = `TFABA 1er SOCIAL ESCOPETA Printed mayo 2, 2026 at 16:17
+PTS TIME FACTOR POINTS PERCENT # Name
+HIT STAGE STAGE COMPETITOR
+6 100 60,00 1,6667 34,6338 31,49 19 LEAL, Omar
+Page 2`;
+    // `stageOpenStage1Page` is a trimmed fixture: five rows whose printed
+    // places skip from 2 to 6. The sixth row by count is what continues it.
+    const parsed = parseWinmssText(pages(stageOpenStage1Page, stageRest));
+    expect(parsed.stages).toHaveLength(1);
+    const results = parsed.stages[0]?.results ?? [];
+    expect(results).toHaveLength(6);
+    expect(results[5]?.shooter.fullName).toBe("LEAL, Omar");
+    expect(results.every((r) => r.divisionCode === "O")).toBe(true);
+  });
+
+  it("leaves a stages file with one section per page untouched", () => {
+    const parsed = parseWinmssText(
+      pages(stageOpenStage1Page, stagePccStage1Page, stageOpenStage2Page),
+    );
+    expect(parsed.stages.map((s) => s.results.length)).toEqual([7, 2]);
+  });
+
+  it("accepts a tie of three rows split across the break (…, 2 | 2, 2, 5)", () => {
+    const tiedRest = headerless(
+      "2 90.00 450.0000 13 VERA, Carla ARG",
+      "2 90.00 450.0000 14 DIAZ, Dario ARG",
+      "5 60.00 300.0000 15 GIL, Karen ARG",
+    );
+    const parsed = parseWinmssText(pages(productionFirst, tiedRest));
+    expect(parsed.matchEntries.map((e) => e.place)).toEqual([1, 2, 2, 2, 5]);
+    expect(parsed.matchEntries.every((e) => e.divisionCode === "P")).toBe(true);
+  });
+
+  describe("pages of DQ rows only", () => {
+    const dqOnly = headerless("21 LUNA, Elena DQ", "22 PAZ, Fabio S ARG DQ");
+
+    it("fails when a page starting at place 1 follows a section that read no ranked rows", () => {
+      // The first section holds only a DQ row, so "the next place by count"
+      // would also be 1. A page that starts over is never a continuation.
+      const dqHeaderOnly = overallPage("PRODUCTION", "21 LUNA, Elena DQ");
+      const restart = headerless(
+        "1 100.00 480.0000 62 SOSA, Bruno ARG",
+        "2 90.00 432.0000 63 VERA, Carla ARG",
+      );
+      expectParserError(
+        () => parseWinmssText(pages(dqHeaderOnly, restart)),
+        "partialRows",
+      );
+    });
+
+    it("fails when no section comes before it", () => {
+      expectParserError(
+        () => parseWinmssText(pages(dqOnly, productionFirst)),
+        "partialRows",
+      );
+    });
+
+    it("fails after an 8-column stage section, whose rows cannot hold DQ", () => {
+      const stageColumns =
+        "Points Time Hit Factor Stage Pts Stage % # Competitor Name";
+      const stage = [
+        title,
+        "PRODUCTION - Overall Stage Results",
+        "Stage 02",
+        stageColumns,
+        "1 104 22.66 4.5896 120.0000 100.00 1 ROJAS, Ana",
+        footer,
+      ].join("\n");
+      expectParserError(
+        () => parseWinmssText(pages(stage, dqOnly)),
+        "partialRows",
+      );
+    });
+
+    it("attaches to an ESS by-stage section as DQ rows of that stage and division", () => {
+      const stageFirst = [
+        title,
+        "CLASSIC - Results by Stage",
+        "Stage Classic - Stage 03",
+        overallColumns,
+        "1 100.00 155.0000 58 ROJAS, Ana ARG",
+        footer,
+      ].join("\n");
+      const parsed = parseWinmssText(pages(stageFirst, dqOnly));
+      expect(parsed.stages).toHaveLength(1);
+      expect(parsed.stages[0]?.stageNumber).toBe(3);
+      const results = parsed.stages[0]?.results ?? [];
+      expect(results.map((r) => r.shooter.fullName)).toEqual([
+        "ROJAS, Ana",
+        "LUNA, Elena",
+        "PAZ, Fabio",
+      ]);
+      expect(results.every((r) => r.divisionCode === "CL")).toBe(true);
+      expect(results.filter((r) => r.isDq)).toHaveLength(2);
+    });
+
+    it("is skipped along with a skipped unknown-division section", () => {
+      const unknownFirst = overallPage(
+        "FOOBAR",
+        "1 100.00 500.0000 41 ROCA, Ulises ARG",
+      );
+      const parsed = parseWinmssText(
+        pages(productionFirst, unknownFirst, dqOnly),
+      );
+      expect(divisionsOf(parsed)).toEqual(["P:ROJAS, Ana", "P:SOSA, Bruno"]);
+    });
+  });
+
+  it("fails when a header-less page with rows follows a classic Disqualified Shooters page", () => {
+    const dqPage = `Printed Jul 27, 2026 12:20:57
+TORNEO DE PRUEBA - Handgun
+Disqualified Shooters
+No. Division Name
+51 Production Prieto, Gonzalo Martin
+1 Disqualifications
+Page 1 of 1`;
+    expectParserError(
+      () => parseWinmssText(pages(productionFirst, dqPage, productionRest)),
+      "partialRows",
+    );
+  });
+});
