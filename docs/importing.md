@@ -197,6 +197,17 @@ DQ rows in the ESS format (`89 LASTNAME, Max DQ`) do not match the first
 condition — a letter follows the bib number — so a division whose only shooter
 was DQ'd passes without noise. That case is rare but legitimate.
 
+The same rule covers pages **without a section header**. ESS prints the
+division header only on the first page of a division, so a long division
+continues on header-less pages: those are attached to the section above when
+their first place follows its ranking (the next place by count, or a repeat of
+the last one when a tie straddles the page break), or when they hold only DQ
+rows. A header-less page with rows that does not follow fails the import —
+before, such pages were skipped with a warning and the division came in
+truncated. Pages continuing a skipped (unknown-division) section are skipped
+with it. A header-less page of DQ rows that cannot be attached also fails the
+import, and a header-less page that starts over at place 1 is never attached.
+
 **A consequence worth keeping in mind:** a PDF with one unreadable row that
 used to import partially now fails entirely. This is deliberate — incomplete
 data in a shared database is worse than a visible error — but if a new format
