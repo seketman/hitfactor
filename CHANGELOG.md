@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.31.5](https://github.com/seketman/hitfactor/compare/v1.31.4...v1.31.5) (2026-10-13)
+
+
+### Bug Fixes
+
+* **parsers:** attach header-less continuation pages in WinMSS/ESS PDFs ([#328](https://github.com/seketman/hitfactor/issues/328)) ([3897fc9](https://github.com/seketman/hitfactor/commit/3897fc942ace7a559db28f7df992b64d8cf6c554))
+
+
+### Documentation
+
+* **import:** document one-off format conversion and add the ESS web-print converter ([#330](https://github.com/seketman/hitfactor/issues/330)) ([adef353](https://github.com/seketman/hitfactor/commit/adef3530b88427d0ac8d840de46331b54e01b4f0))
+
 ## [1.31.4](https://github.com/seketman/hitfactor/compare/v1.31.3...v1.31.4) (2026-09-23)
 
 
