@@ -25,3 +25,13 @@ predate the rule and are still Spanish — don't translate them as a side effect
 of an unrelated change, and don't copy their language into a new file.
 
 See `.github/CONTRIBUTING.md` for the full statement.
+
+# Unsupported import files
+
+A file format seen once is converted into a supported one and imported as
+that; it does not get a parser. A format that keeps arriving does.
+
+The policy, the worked case (the ESS results page printed to PDF) and how to
+verify a conversion are in `docs/importing.md`, under "One-off formats". The
+converter for that case is `scripts/ess-web-print-to-pdf.mts`
+(`npm run pdf:ess-stages`).

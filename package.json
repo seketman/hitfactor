@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:types": "npx --yes supabase gen types typescript --project-id igsfjdhtaxsxcnxaopxu --schema public > src/lib/supabase/database.types.ts",
-    "pdf:fixture": "npx --yes tsx scripts/pdf-fixture.mts"
+    "pdf:fixture": "npx --yes tsx scripts/pdf-fixture.mts",
+    "pdf:ess-stages": "npx --yes tsx scripts/ess-web-print-to-pdf.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
