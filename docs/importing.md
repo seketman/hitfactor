@@ -214,6 +214,49 @@ data in a shared database is worse than a visible error — but if a new format
 shows up, the symptom will be "nothing imports" rather than "not much imports".
 The error message says which page and how many rows.
 
+## One-off formats: convert the file instead of adding a parser
+
+A format seen once is converted into a supported one, by hand or with a
+script, and imported as that. A format that keeps arriving gets a parser. Every
+parser is a permanent entry in the detection order and one more layout that can
+be mistaken for another, so a single file does not pay for one.
+
+**Worked case: the ESS results page printed to PDF.** ipsc.org.ar published
+the stages of one match as `winmss_stages_<id>_<ts>.pdf`, but the file was the
+ESS web page (`…/results?group=stage`) printed by Chrome, not an ESS report.
+It is rejected with `unknownPdfFormat`: it has the `X - Results by Stage`
+headers but no `Printed:` line, every page carries the browser's header and
+footer, and a section flows across pages with no repeated header.
+
+To recognise it: `pdfinfo` (poppler) reports Chrome as the Creator, and the
+last line of every page is the ESS URL followed by `n/N`.
+
+To convert it, with the match's ESS overall PDF at hand:
+
+```bash
+npm run pdf:ess-stages -- <web-print.pdf> <overall.pdf> <out.pdf>
+```
+
+[`scripts/ess-web-print-to-pdf.mts`](../scripts/ess-web-print-to-pdf.mts)
+rewrites the file as an ESS "Results by Stage" report, one division and stage
+per page. The title and the `Printed:` line are copied from the overall, so
+both files parse to the same match name and date and the stages attach to the
+match already imported. It writes nothing unless every line after the first
+division header is recognised, the rows read equal the row-shaped lines in the
+file (a leading place and a comma in the name), no division and stage appears
+twice, and places start at 1 and never decrease within a section. Before
+writing, it also reads the generated PDF back through `parsePdf` and refuses if
+the stage or row count differs, or if name and date do not match the overall's.
+
+Check by hand afterwards that the rows per division in each stage equal the
+placed (non-DQ) shooters of that division in the overall. Import the overall
+first, then the converted file.
+
+Two properties of the result are inherent to the source, not to the
+conversion: disqualified shooters are not listed on the by-stage page, and a
+row with zero points is read as a DQ for that stage, as in any ESS by-stage
+file.
+
 ## Known errors (codes)
 
 The code is the identity of the error. Its user-facing text lives in
